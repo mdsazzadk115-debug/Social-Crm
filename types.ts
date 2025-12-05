@@ -44,6 +44,15 @@ export interface User {
   role: UserRole;
 }
 
+export interface ClientInteraction {
+    id: string;
+    date: string;
+    type: 'CALL' | 'MEETING' | 'EMAIL' | 'WHATSAPP' | 'OTHER';
+    notes: string;
+    next_follow_up?: string;
+    created_at: string;
+}
+
 export interface Lead {
   id: string;
   full_name: string;
@@ -66,6 +75,8 @@ export interface Lead {
   last_activity_at: string; 
   created_at: string;
   active_campaign_id?: string;
+
+  interactions?: ClientInteraction[]; // CRM: Interaction History
 }
 
 export interface LeadNote {
@@ -164,6 +175,7 @@ export interface Task {
     is_completed: boolean;
     created_at: string;
     due_date?: string; // NEW: Due Date & Time
+    lead_id?: string; // NEW: Link task to a specific lead/client
 }
 
 // 3. Invoice
@@ -290,10 +302,17 @@ export interface BigFish {
     transactions: Transaction[];
     growth_tasks: GrowthTask[];
     reports: WorkLog[];
+    interactions?: ClientInteraction[]; // NEW: CRM History
     portal_config: PortalConfig;
     
     start_date: string;
     end_date?: string;
+
+    // Retainer / Subscription
+    is_retainer?: boolean;
+    retainer_amount?: number;
+    retainer_renewal_date?: string; // Next payment date
+    retainer_status?: 'ACTIVE' | 'PAUSED';
 }
 
 // 7. Payment Methods (Global)
@@ -375,5 +394,16 @@ export interface SalesEntry {
     service: SalesServiceType;
     amount: number;
     description: string; // e.g. "Client Name - Project X"
+    created_at: string;
+}
+
+// 11. AD INSPIRATION SWIPE FILE (NEW)
+export interface AdInspiration {
+    id: string;
+    title: string;
+    url: string; // Ad Library Link or Post Link
+    image_url?: string; // Optional Screenshot URL
+    category: string; // Real Estate, Fashion, etc.
+    notes: string; // Why it's good
     created_at: string;
 }

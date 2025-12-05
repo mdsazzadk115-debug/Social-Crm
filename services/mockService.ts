@@ -3,7 +3,7 @@ import {
   Lead, LeadStatus, LeadSource, Interaction, MessageTemplate, Campaign, 
   SimpleAutomationRule, LeadForm, Customer, Task, Invoice, Snippet, 
   Document, BigFish, PaymentMethod, MessengerConversation, SystemSettings,
-  MonthlyTarget, SalesEntry, SalesServiceType, Transaction
+  MonthlyTarget, SalesEntry, SalesServiceType, Transaction, AdInspiration, ClientInteraction
 } from '../types';
 import { 
   INITIAL_TEMPLATES, INITIAL_LEAD_FORMS, INITIAL_SNIPPETS, INDUSTRIES, DEMO_LEADS 
@@ -30,7 +30,8 @@ const STORAGE_KEYS = {
   SALES_TARGETS: 'sales_targets',
   SALES_ENTRIES: 'sales_entries',
   CUSTOMER_CATEGORIES: 'customer_categories',
-  INDUSTRIES_LIST: 'industries_list'
+  INDUSTRIES_LIST: 'industries_list',
+  AD_INSPIRATIONS: 'ad_inspirations'
 };
 
 class MockService {
@@ -48,8 +49,8 @@ class MockService {
     // Inject Demo Data if empty
     let leads = this.getStorage<Lead[]>(STORAGE_KEYS.LEADS, []);
     if (leads.length === 0) {
-        // Initialize download_count for demo leads
-        leads = DEMO_LEADS.map(l => ({...l, download_count: 0}));
+        // Initialize download_count and interactions for demo leads
+        leads = DEMO_LEADS.map(l => ({...l, download_count: 0, interactions: []}));
         this.setStorage(STORAGE_KEYS.LEADS, leads);
     }
     return leads;
@@ -72,6 +73,7 @@ class MockService {
       is_unread: true,
       total_messages_sent: 0,
       download_count: 0,
+      interactions: [],
       first_contact_at: new Date().toISOString(),
       last_activity_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
@@ -134,6 +136,34 @@ class MockService {
       }
   }
 
+  // --- LEAD CRM INTERACTIONS ---
+  async addLeadInteraction(leadId: string, data: Partial<ClientInteraction>): Promise<void> {
+      const leads = await this.getLeads();
+      const lead = leads.find(l => l.id === leadId);
+      if(lead) {
+          const interaction: ClientInteraction = {
+              id: uuid(),
+              date: data.date || new Date().toISOString(),
+              type: data.type || 'OTHER',
+              notes: data.notes || '',
+              next_follow_up: data.next_follow_up,
+              created_at: new Date().toISOString()
+          };
+          if (!lead.interactions) lead.interactions = [];
+          lead.interactions.unshift(interaction);
+          this.setStorage(STORAGE_KEYS.LEADS, leads);
+      }
+  }
+
+  async deleteLeadInteraction(leadId: string, interactionId: string): Promise<void> {
+      const leads = await this.getLeads();
+      const lead = leads.find(l => l.id === leadId);
+      if(lead && lead.interactions) {
+          lead.interactions = lead.interactions.filter(i => i.id !== interactionId);
+          this.setStorage(STORAGE_KEYS.LEADS, leads);
+      }
+  }
+
   // --- INDUSTRIES MANAGEMENT ---
   async getIndustries(): Promise<string[]> {
       return this.getStorage<string[]>(STORAGE_KEYS.INDUSTRIES_LIST, INDUSTRIES);
@@ -152,7 +182,7 @@ class MockService {
       this.setStorage(STORAGE_KEYS.INDUSTRIES_LIST, list.filter(i => i !== name));
   }
 
-  // --- INTERACTIONS ---
+  // --- INTERACTIONS (Message Logs) ---
   async getInteractions(leadId: string): Promise<Interaction[]> {
     const all = this.getStorage<Interaction[]>(STORAGE_KEYS.INTERACTIONS, []);
     return all.filter(i => i.lead_id === leadId).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
@@ -357,14 +387,15 @@ class MockService {
     return this.getStorage<Task[]>(STORAGE_KEYS.TASKS, []);
   }
 
-  async createTask(text: string, dueDate?: string): Promise<void> {
+  async createTask(text: string, dueDate?: string, leadId?: string): Promise<void> {
     const tasks = await this.getTasks();
     tasks.unshift({ 
         id: uuid(), 
         text, 
         is_completed: false, 
         created_at: new Date().toISOString(),
-        due_date: dueDate
+        due_date: dueDate,
+        lead_id: leadId
     });
     this.setStorage(STORAGE_KEYS.TASKS, tasks);
   }
@@ -472,9 +503,14 @@ class MockService {
       transactions: [],
       growth_tasks: [],
       reports: [],
+      interactions: [], // CRM: Initialize interactions
       start_date: new Date().toISOString(),
       low_balance_alert_threshold: 10,
       portal_config: { show_balance: true, show_history: true, is_suspended: false },
+      // Subscription Defaults
+      is_retainer: false,
+      retainer_amount: 0,
+      retainer_status: 'ACTIVE',
       ...data
     } as BigFish;
     
@@ -527,6 +563,35 @@ class MockService {
       f.portal_config = { ...f.portal_config, ...config };
       this.setStorage(STORAGE_KEYS.BIG_FISH, fish);
     }
+  }
+
+  // --- CRM: INTERACTIONS (BIG FISH) ---
+  async addClientInteraction(fishId: string, data: Partial<ClientInteraction>): Promise<void> {
+      const fish = await this.getBigFish();
+      const f = fish.find(x => x.id === fishId);
+      if(f) {
+          const interaction: ClientInteraction = {
+              id: uuid(),
+              date: data.date || new Date().toISOString(),
+              type: data.type || 'OTHER',
+              notes: data.notes || '',
+              next_follow_up: data.next_follow_up,
+              created_at: new Date().toISOString()
+          };
+          
+          if (!f.interactions) f.interactions = [];
+          f.interactions.unshift(interaction);
+          this.setStorage(STORAGE_KEYS.BIG_FISH, fish);
+      }
+  }
+
+  async deleteClientInteraction(fishId: string, interactionId: string): Promise<void> {
+      const fish = await this.getBigFish();
+      const f = fish.find(x => x.id === fishId);
+      if(f && f.interactions) {
+          f.interactions = f.interactions.filter(i => i.id !== interactionId);
+          this.setStorage(STORAGE_KEYS.BIG_FISH, fish);
+      }
   }
 
   // Transactions & Financials
@@ -648,6 +713,29 @@ class MockService {
           const days = diff / (1000 * 3600 * 24);
           return days <= 1 && days >= 0; // Expires in <= 24 hours
       });
+  }
+
+  async checkRetainerRenewals(): Promise<BigFish[]> {
+      const fish = await this.getBigFish();
+      const now = new Date();
+      return fish.filter(f => {
+          if (f.status !== 'Active Pool' || !f.is_retainer || !f.retainer_renewal_date) return false;
+          const renewal = new Date(f.retainer_renewal_date);
+          const diff = renewal.getTime() - now.getTime();
+          const days = Math.ceil(diff / (1000 * 3600 * 24));
+          return days <= 7 && days >= -5; // Renewals in next 7 days or overdue by 5
+      });
+  }
+
+  async renewRetainer(id: string): Promise<void> {
+      const fish = await this.getBigFish();
+      const f = fish.find(x => x.id === id);
+      if (f && f.retainer_renewal_date) {
+          const current = new Date(f.retainer_renewal_date);
+          current.setDate(current.getDate() + 30); // Add 30 days
+          f.retainer_renewal_date = current.toISOString().slice(0, 10);
+          this.setStorage(STORAGE_KEYS.BIG_FISH, fish);
+      }
   }
 
   getLifetimeDeposit(fish: BigFish): number {
@@ -799,6 +887,47 @@ class MockService {
   async deleteSalesEntry(id: string): Promise<void> {
       const entries = await this.getSalesEntries();
       this.setStorage(STORAGE_KEYS.SALES_ENTRIES, entries.filter(e => e.id !== id));
+  }
+
+  // --- AD SWIPE FILE ---
+  async getAdInspirations(): Promise<AdInspiration[]> {
+      let ads = this.getStorage<AdInspiration[]>(STORAGE_KEYS.AD_INSPIRATIONS, []);
+      if (ads.length === 0) {
+          // Add some demo ads
+          ads = [
+              {
+                  id: uuid(),
+                  title: 'Nike High Conversion',
+                  url: 'https://nike.com',
+                  image_url: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&q=80',
+                  category: 'Fashion',
+                  notes: 'Great use of red background and bold text.',
+                  created_at: new Date().toISOString()
+              },
+              {
+                  id: uuid(),
+                  title: 'Real Estate Luxury',
+                  url: 'https://zillow.com',
+                  image_url: 'https://images.unsplash.com/photo-1560518883-ce09059eeffa?w=500&q=80',
+                  category: 'Real Estate',
+                  notes: 'Video hook was amazing. Showing lifestyle first.',
+                  created_at: new Date().toISOString()
+              }
+          ];
+          this.setStorage(STORAGE_KEYS.AD_INSPIRATIONS, ads);
+      }
+      return ads;
+  }
+
+  async addAdInspiration(data: Omit<AdInspiration, 'id' | 'created_at'>): Promise<void> {
+      const ads = await this.getAdInspirations();
+      ads.unshift({ ...data, id: uuid(), created_at: new Date().toISOString() });
+      this.setStorage(STORAGE_KEYS.AD_INSPIRATIONS, ads);
+  }
+
+  async deleteAdInspiration(id: string): Promise<void> {
+      const ads = await this.getAdInspirations();
+      this.setStorage(STORAGE_KEYS.AD_INSPIRATIONS, ads.filter(a => a.id !== id));
   }
 }
 

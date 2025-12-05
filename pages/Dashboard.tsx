@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Users, ShoppingBag, CheckSquare, FileText, Calculator, Zap, Wallet, ArrowUpRight, ArrowDownRight, Filter, Download, BarChart2, Calendar, Phone, Globe, Layers, TrendingUp, AlertTriangle, Copy, Check } from 'lucide-react';
+import { Users, ShoppingBag, CheckSquare, FileText, Calculator, Zap, Wallet, ArrowUpRight, ArrowDownRight, Filter, Download, BarChart2, Calendar, Phone, Globe, Layers, TrendingUp, AlertTriangle, Copy, Check, Repeat, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { mockService } from '../services/mockService';
 import { Lead, LeadStatus, BigFish, Customer, Invoice, Task, MessageTemplate, Snippet, SalesEntry, MonthlyTarget, SalesServiceType } from '../types';
@@ -65,6 +65,7 @@ const Dashboard: React.FC = () => {
   // Data States
   const [activeFish, setActiveFish] = useState<BigFish[]>([]);
   const [lowBalanceFish, setLowBalanceFish] = useState<BigFish[]>([]); 
+  const [retainerRenewals, setRetainerRenewals] = useState<BigFish[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -104,7 +105,7 @@ const Dashboard: React.FC = () => {
   }, [exchangeRate]);
 
   const loadAllData = async () => {
-    const [f, c, i, t, sn, se, l, st] = await Promise.all([
+    const [f, c, i, t, sn, se, l, st, renew] = await Promise.all([
         mockService.getBigFish(),
         mockService.getCustomers(),
         mockService.getInvoices(),
@@ -112,7 +113,8 @@ const Dashboard: React.FC = () => {
         mockService.getSnippets(),
         mockService.getSalesEntries(),
         mockService.getLeads(),
-        mockService.getSalesTargets()
+        mockService.getSalesTargets(),
+        mockService.checkRetainerRenewals()
     ]);
     
     // Process Big Fish Data
@@ -129,6 +131,8 @@ const Dashboard: React.FC = () => {
         .slice(0, 20);
     setLowBalanceFish(lowBal);
 
+    setRetainerRenewals(renew);
+
     setCustomers(c.slice(0, 5)); 
     setInvoices(i.slice(0, 5)); 
     setTasks(t); 
@@ -141,6 +145,14 @@ const Dashboard: React.FC = () => {
     calculateFinancials(f);
 
     setLoading(false);
+  };
+
+  const handleRenewRetainer = async (id: string) => {
+      if(confirm("Renew this subscription for another 30 days?")) {
+          await mockService.renewRetainer(id);
+          alert("Success! Create an invoice now.");
+          loadAllData();
+      }
   };
 
   const calculateFinancials = (allFish: BigFish[]) => {
@@ -718,6 +730,43 @@ const Dashboard: React.FC = () => {
                                       <span className="text-xs font-mono font-bold text-red-600 bg-white px-2 py-1 rounded border border-red-100 shadow-sm">
                                           {formatCurrency(fish.balance || 0)}
                                       </span>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
+                  </div>
+              </div>
+
+              {/* RETAINER RENEWAL ALERTS (NEW) */}
+              <div className="bg-purple-50 rounded-xl shadow-sm border border-purple-100 overflow-hidden">
+                  <div className="p-4 border-b border-purple-100 flex items-center justify-between">
+                      <h3 className="font-bold text-purple-800 flex items-center text-sm">
+                          <Repeat className="h-4 w-4 mr-2 text-purple-600" /> Upcoming Subscriptions
+                      </h3>
+                      <span className="text-[10px] bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">{retainerRenewals.length}</span>
+                  </div>
+                  <div className="max-h-[250px] overflow-y-auto custom-scrollbar">
+                      {retainerRenewals.length === 0 ? (
+                          <p className="p-4 text-xs text-purple-400 text-center">No renewals in next 7 days.</p>
+                      ) : (
+                          <div className="divide-y divide-purple-100">
+                              {retainerRenewals.map(fish => (
+                                  <div key={fish.id} className="p-3 hover:bg-purple-100/50 transition-colors">
+                                      <div className="flex justify-between items-start mb-1">
+                                          <div>
+                                              <p className="text-xs font-bold text-gray-800 truncate w-24" title={fish.name}>{fish.name}</p>
+                                              <p className="text-[10px] text-purple-600 font-bold">{new Date(fish.retainer_renewal_date!).toLocaleDateString()}</p>
+                                          </div>
+                                          <div className="text-right">
+                                              <span className="text-xs font-mono font-bold text-gray-700">{formatCurrency(fish.retainer_amount || 0)}</span>
+                                          </div>
+                                      </div>
+                                      <button 
+                                        onClick={() => handleRenewRetainer(fish.id)}
+                                        className="w-full mt-1 bg-white border border-purple-200 text-purple-700 text-[10px] font-bold py-1 rounded hover:bg-purple-600 hover:text-white transition-colors flex items-center justify-center"
+                                      >
+                                          <RefreshCw className="h-3 w-3 mr-1"/> Renew (+30 Days)
+                                      </button>
                                   </div>
                               ))}
                           </div>

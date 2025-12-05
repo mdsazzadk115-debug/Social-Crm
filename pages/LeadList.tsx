@@ -89,6 +89,16 @@ const LeadList: React.FC = () => {
       await mockService.toggleLeadStar(leadId);
   };
 
+  // WhatsApp Logic
+  const handleWhatsApp = (lead: Lead) => {
+      let num = lead.primary_phone.replace(/\D/g, '');
+      if(num.startsWith('01')) num = '88' + num;
+      
+      const text = `Hi ${lead.full_name}, welcome to Social Ads Expert! Saw your interest in ${lead.service_category || lead.industry || 'our services'}. How can we help?`;
+      const url = `https://wa.me/${num}?text=${encodeURIComponent(text)}`;
+      window.open(url, '_blank');
+  };
+
   // Note Handlers
   const openNoteModal = (lead: Lead) => {
       setEditingNoteLeadId(lead.id);
@@ -429,6 +439,13 @@ const LeadList: React.FC = () => {
                             </div>
                             <div className="flex items-center text-xs text-gray-500 font-mono">
                                 <Phone className="h-3 w-3 mr-1"/> {lead.primary_phone}
+                                <button 
+                                    onClick={(e) => { e.stopPropagation(); handleWhatsApp(lead); }}
+                                    className="ml-2 text-green-500 hover:text-green-700 p-0.5 rounded hover:bg-green-50 transition-colors"
+                                    title="Open in WhatsApp"
+                                >
+                                    <MessageCircle className="h-4 w-4" />
+                                </button>
                             </div>
                         </div>
                     </div>

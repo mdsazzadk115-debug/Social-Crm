@@ -1,7 +1,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Settings, MessageSquare, Menu, X, LogOut, Layers, Send, FileText, ShoppingBag, CheckSquare, FileText as FileInvoice, Zap, ScrollText, Calculator, MessageCircle, Target, Coins, Bell, Clock, AlertTriangle, CheckCircle } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, MessageSquare, Menu, X, LogOut, Layers, Send, FileText, ShoppingBag, CheckSquare, FileText as FileInvoice, Zap, ScrollText, Calculator, MessageCircle, Target, Coins, Bell, Clock, AlertTriangle, CheckCircle, Sparkles } from 'lucide-react';
 import { useCurrency } from '../context/CurrencyContext';
 import { mockService } from '../services/mockService';
 import { Task, BigFish } from '../types';
@@ -80,6 +80,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Daily Tasks', href: '/tasks', icon: CheckSquare }, 
     { name: 'Invoices', href: '/invoices', icon: FileInvoice }, 
     { name: 'Calculators', href: '/calculators', icon: Calculator },
+    { name: 'Ad Swipe File', href: '/ad-swipe', icon: Sparkles },
     { name: 'Letterhead', href: '/letterhead', icon: ScrollText }, 
     { name: 'Quick Msgs', href: '/snippets', icon: Zap }, 
     { name: 'Forms', href: '/forms', icon: FileText },

@@ -22,6 +22,7 @@ import MessageBaba from './pages/MessageBaba';
 import Settings from './pages/Settings';
 import SalesGoals from './pages/SalesGoals';
 import WonLeads from './pages/WonLeads';
+import AdSwipeFile from './pages/AdSwipeFile';
 import { CurrencyProvider } from './context/CurrencyContext';
 
 const App: React.FC = () => {
@@ -42,6 +43,7 @@ const App: React.FC = () => {
           <Route path="/won-leads" element={<Layout><WonLeads /></Layout>} />
           <Route path="/messaging" element={<Layout><Messaging /></Layout>} />
           <Route path="/message-baba" element={<Layout><MessageBaba /></Layout>} />
+          <Route path="/ad-swipe" element={<Layout><AdSwipeFile /></Layout>} />
           {/* Campaigns route removed */}
           <Route path="/customers" element={<Layout><OnlineCustomers /></Layout>} /> 
           <Route path="/tasks" element={<Layout><DailyTasks /></Layout>} /> 
