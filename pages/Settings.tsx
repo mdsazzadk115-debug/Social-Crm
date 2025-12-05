@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { SystemSettings } from '../types';
@@ -230,7 +229,7 @@ function onFormSubmit(e) {
                                         {copied ? <Check className="h-4 w-4 text-green-600"/> : <Copy className="h-4 w-4 text-gray-600"/>}
                                     </button>
                                 </div>
-                                <p className="text-xs text-gray-500 mt-2">Paste this URL in the Facebook App Dashboard > Messenger > Settings > Webhooks.</p>
+                                <p className="text-xs text-gray-500 mt-2">Paste this URL in the Facebook App Dashboard &gt; Messenger &gt; Settings &gt; Webhooks.</p>
                             </div>
                         </div>
                     )}

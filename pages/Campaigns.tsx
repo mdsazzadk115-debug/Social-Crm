@@ -73,7 +73,7 @@ const Campaigns: React.FC = () => {
             <div className="sm:flex sm:items-center sm:justify-between">
                 <div>
                     <h1 className="text-2xl font-bold text-gray-900">Automation Campaigns</h1>
-                    <p className="mt-1 text-sm text-gray-500">Create Drip Sequences (e.g., Step 1 -> Wait 10 Days -> Step 2)</p>
+                    <p className="mt-1 text-sm text-gray-500">Create Drip Sequences (e.g., Step 1 -&gt; Wait 10 Days -&gt; Step 2)</p>
                 </div>
                 {!isCreateMode && (
                     <button
