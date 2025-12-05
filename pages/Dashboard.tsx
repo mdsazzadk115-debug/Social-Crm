@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Users, ShoppingBag, CheckSquare, FileText, Calculator, Zap, Wallet, ArrowUpRight, ArrowDownRight, Filter, Download, BarChart2, Calendar, Phone, Globe, Layers, TrendingUp, AlertTriangle, Copy, Check, Repeat, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -258,7 +257,7 @@ const Dashboard: React.FC = () => {
       LeadStatus.CLOSED_WON
   ];
 
-  const industryGroups = leads.reduce((acc, lead) => {
+  const industryGroups = leads.reduce((acc: Record<string, Lead[]>, lead: Lead) => {
       const ind = lead.industry || 'Unknown';
       if (!acc[ind]) acc[ind] = [];
       acc[ind].push(lead);
@@ -267,7 +266,7 @@ const Dashboard: React.FC = () => {
 
   // Top 5 Industries
   const topIndustries = Object.entries(industryGroups)
-      .sort((a, b) => b[1].length - a[1].length)
+      .sort((a: [string, Lead[]], b: [string, Lead[]]) => b[1].length - a[1].length)
       .slice(0, 5);
 
   const handleCopySnippet = (id: string, text: string) => {
@@ -493,7 +492,7 @@ const Dashboard: React.FC = () => {
               </div>
 
               <div className="space-y-4">
-                  {topIndustries.map(([industry, segmentLeads]) => {
+                  {topIndustries.map(([industry, segmentLeads]: [string, Lead[]]) => {
                       const phoneCount = segmentLeads.filter(l => l.primary_phone).length;
                       const webCount = segmentLeads.filter(l => l.website_url).length;
                       const maxCount = topIndustries[0][1].length;
