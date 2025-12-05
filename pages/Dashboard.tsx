@@ -1,10 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
-import { Users, ShoppingBag, CheckSquare, FileText, Calculator, Zap, Wallet, ArrowUpRight, ArrowDownRight, Filter, Download, BarChart2, Calendar, Phone, Globe, Layers, TrendingUp, AlertTriangle, Copy, Check, Repeat, RefreshCw } from 'lucide-react';
+import { Users, ShoppingBag, CheckSquare, FileText, Calculator, Zap, Wallet, ArrowUpRight, ArrowDownRight, Filter, Download, BarChart2, Phone, Globe, Layers, TrendingUp, AlertTriangle, Copy, Check, Repeat, RefreshCw } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { mockService } from '../services/mockService';
-import { Lead, LeadStatus, BigFish, Customer, Invoice, Task, MessageTemplate, Snippet, SalesEntry, MonthlyTarget, SalesServiceType } from '../types';
-import { STATUS_LABELS, STATUS_COLORS } from '../constants';
+import { Lead, LeadStatus, BigFish, Customer, Invoice, Task, Snippet, SalesEntry, MonthlyTarget, SalesServiceType } from '../types';
+import { STATUS_LABELS } from '../constants';
 import { useCurrency } from '../context/CurrencyContext';
 
 // --- COMPONENTS ---

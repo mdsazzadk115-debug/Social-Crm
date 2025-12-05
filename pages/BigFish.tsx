@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { BigFish, Lead, LeadStatus, Transaction, PaymentMethod, ClientInteraction } from '../types';
-import { Plus, TrendingUp, ExternalLink, CheckCircle, Target, Copy, ArrowLeft, Wallet, PieChart, Activity, Eye, List, X, Download, Archive, RotateCcw, Trash2, Settings, Building, Smartphone, Share2, AlertTriangle, Clock, Edit2, User, Search, Power, CheckSquare, ChevronLeft, ChevronRight, Repeat, Phone, MessageSquare, Calendar, Mail, MessageCircle } from 'lucide-react';
+import { Plus, TrendingUp, ExternalLink, CheckCircle, Target, Copy, ArrowLeft, Wallet, PieChart, Activity, Eye, List, X, Download, Archive, RotateCcw, Trash2, Settings, Building, Smartphone, Share2, AlertTriangle, Clock, Edit2, User, Search, CheckSquare, ChevronLeft, ChevronRight, Repeat, Phone, MessageSquare, Mail, MessageCircle } from 'lucide-react';
 import { PortalView } from './ClientPortal'; 
 import { useCurrency } from '../context/CurrencyContext';
 

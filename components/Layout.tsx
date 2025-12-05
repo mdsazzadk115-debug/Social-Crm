@@ -1,10 +1,10 @@
 
 import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Settings, MessageSquare, Menu, X, LogOut, Layers, Send, FileText, ShoppingBag, CheckSquare, FileText as FileInvoice, Zap, ScrollText, Calculator, MessageCircle, Target, Coins, Bell, Clock, AlertTriangle, CheckCircle, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, MessageSquare, Menu, X, LogOut, Send, FileText, ShoppingBag, CheckSquare, FileText as FileInvoice, Zap, ScrollText, Calculator, MessageCircle, Target, Coins, Bell, AlertTriangle, CheckCircle, Sparkles } from 'lucide-react';
 import { useCurrency } from '../context/CurrencyContext';
 import { mockService } from '../services/mockService';
-import { Task, BigFish } from '../types';
+import { BigFish } from '../types';
 
 interface LayoutProps {
   children: React.ReactNode;

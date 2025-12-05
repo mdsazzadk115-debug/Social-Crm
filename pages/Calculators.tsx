@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { DollarSign, BarChart2, Calculator, ShoppingBag, Copy, Check, MessageCircle, ShoppingCart } from 'lucide-react';
+import { DollarSign, BarChart2, ShoppingBag, Copy, Check, MessageCircle, ShoppingCart } from 'lucide-react';
 import { mockService } from '../services/mockService';
 import { PaymentMethod } from '../types';
 

@@ -1,17 +1,9 @@
 
-
-
-
-
-
-
-
-
 import React, { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { mockService } from '../services/mockService';
-import { BigFish, Transaction, PaymentMethod, SystemSettings } from '../types';
-import { TrendingUp, DollarSign, Calendar, CheckCircle, PieChart, ExternalLink, ShieldCheck, Target, AlertTriangle, CreditCard, Lock, List, BarChart2, Download, Filter, Building, Smartphone, Copy, Check, Calculator, ShoppingBag, ChevronLeft, ChevronRight, Phone, Globe, Users } from 'lucide-react';
+import { BigFish, PaymentMethod, SystemSettings } from '../types';
+import { DollarSign, Calendar, CheckCircle, ShieldCheck, Target, AlertTriangle, CreditCard, Lock, List, BarChart2, Download, Building, Smartphone, Copy, Check, Calculator, ChevronLeft, ChevronRight, Phone, Globe, Users } from 'lucide-react';
 
 // --- REUSABLE PORTAL VIEW COMPONENT (Exported for Admin Preview) ---
 export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMethod[] }> = ({ client, paymentMethods = [] }) => {
@@ -46,8 +38,7 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
     const [salePrice, setSalePrice] = useState(0);
     const [adCost, setAdCost] = useState(0);
     const [delCost, setDelCost] = useState(100);
-    const [retRate, setRetRate] = useState(20);
-    const [retCharge, setRetCharge] = useState(100);
+    const retCharge = 100; // Fixed default return charge for simplicity
 
     useEffect(() => {
         // Fetch global settings for support info

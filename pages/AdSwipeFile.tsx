@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { AdInspiration } from '../types';
-import { Plus, Trash2, ExternalLink, Image as ImageIcon, Filter, X, Sparkles } from 'lucide-react';
+import { Plus, Trash2, ExternalLink, Image as ImageIcon, X, Sparkles } from 'lucide-react';
 
 const CATEGORIES = ['All', 'Real Estate', 'Fashion', 'E-commerce', 'Service', 'Software', 'Food', 'Other'];
 

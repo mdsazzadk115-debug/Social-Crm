@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { LeadForm } from '../types';
-import { Plus, Edit2, Trash2, Eye, Link as LinkIcon, Code, Copy, Check, Save } from 'lucide-react';
+import { Plus, Edit2, Trash2, Eye, Link as LinkIcon, Copy, Check, Save } from 'lucide-react';
 
 const THEME_COLORS: Record<string, string> = {
     indigo: '#4f46e5',
@@ -319,38 +318,27 @@ const Forms: React.FC = () => {
 
                                     <div>
                                         <label className="block text-sm font-medium text-gray-700 mb-1">Website Embed Code</label>
-                                        <div className="relative">
+                                        <div className="flex rounded-md shadow-sm">
                                             <textarea 
                                                 readOnly
                                                 rows={3}
-                                                className="block w-full px-3 py-2 border border-gray-300 rounded-md bg-gray-50 text-xs font-mono text-gray-600"
+                                                className="flex-1 min-w-0 block w-full px-3 py-2 rounded-l-md border border-gray-300 bg-gray-50 text-xs font-mono text-gray-600"
                                                 value={getEmbedCode(showShareModal)}
                                             />
-                                             <button 
+                                            <button 
                                                 onClick={() => copyToClipboard(getEmbedCode(showShareModal))}
-                                                className="absolute top-2 right-2 p-1 bg-white border border-gray-300 rounded hover:bg-gray-100"
+                                                className="inline-flex items-center px-4 border border-l-0 border-gray-300 rounded-r-md bg-gray-100 text-sm font-medium text-gray-700 hover:bg-gray-200"
                                             >
-                                                {copied ? <Check className="h-3 w-3 text-green-600"/> : <Copy className="h-3 w-3"/>}
+                                                {copied ? <Check className="h-4 w-4 text-green-600"/> : <Copy className="h-4 w-4"/>}
                                             </button>
                                         </div>
-                                    </div>
-
-                                    <div className="mt-4 flex justify-center">
-                                         <a 
-                                            href={getPublicLink(showShareModal)} 
-                                            target="_blank" 
-                                            rel="noreferrer"
-                                            className="text-sm text-indigo-600 hover:underline flex items-center"
-                                         >
-                                             <Eye className="h-4 w-4 mr-1"/> Preview Form
-                                         </a>
                                     </div>
                                 </div>
                             </div>
                             <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                                 <button 
                                     type="button" 
-                                    className="w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm"
+                                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                                     onClick={() => setShowShareModal(null)}
                                 >
                                     Close
