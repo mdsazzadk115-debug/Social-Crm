@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { LeadForm } from '../types';
-import { Plus, Edit2, Trash2, Eye, Link as LinkIcon, Copy, Check, Save } from 'lucide-react';
+import { Plus, Edit2, Trash2, Link as LinkIcon, Copy, Check, Save } from 'lucide-react';
 
 const THEME_COLORS: Record<string, string> = {
     indigo: '#4f46e5',
@@ -222,128 +223,69 @@ const Forms: React.FC = () => {
                     <div className="p-6 bg-gray-50 flex justify-end space-x-3">
                         <button 
                             onClick={() => setIsCreateMode(false)}
-                            className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50"
+                            className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none"
                         >
                             Cancel
                         </button>
                         <button 
                             onClick={handleSave}
-                            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700"
+                            className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none"
                         >
-                            <Save className="h-4 w-4 mr-2"/>
                             Save Form
                         </button>
                     </div>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {forms.map(form => {
-                         const formColor = THEME_COLORS[form.config.theme_color || 'indigo'];
-                         return (
-                        <div key={form.id} className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition-all">
-                            <div className="h-2 rounded-t-lg" style={{ backgroundColor: formColor }}></div>
-                            <div className="p-5">
-                                <h3 className="text-lg font-bold text-gray-900 truncate">{form.title}</h3>
-                                <p className="text-sm text-gray-500 mt-1 line-clamp-2 min-h-[40px]">{form.subtitle}</p>
-                                
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                    {form.config.include_industry && <span className="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600">Industry</span>}
-                                    {form.config.include_website && <span className="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600">Website</span>}
-                                    {form.config.include_facebook && <span className="px-2 py-0.5 rounded text-xs bg-gray-100 text-gray-600">FB Link</span>}
-                                </div>
-
-                                <div className="mt-6 flex items-center justify-between pt-4 border-t border-gray-100">
-                                    <div className="flex space-x-1">
-                                        <button 
-                                            onClick={() => handleEdit(form)}
-                                            className="p-2 text-gray-400 hover:text-indigo-600 rounded-full hover:bg-indigo-50"
-                                            title="Edit"
-                                        >
-                                            <Edit2 className="h-4 w-4" />
+                <div className="bg-white shadow overflow-hidden sm:rounded-md">
+                    <ul className="divide-y divide-gray-200">
+                        {forms.length === 0 ? (
+                            <li className="px-6 py-12 text-center text-gray-500">No forms created yet.</li>
+                        ) : (
+                            forms.map((form) => (
+                                <li key={form.id} className="px-6 py-4 hover:bg-gray-50 flex items-center justify-between">
+                                    <div>
+                                        <h3 className="text-sm font-bold text-gray-900">{form.title}</h3>
+                                        <p className="text-xs text-gray-500">{form.subtitle}</p>
+                                        <div className="flex gap-2 mt-2">
+                                            {form.config.include_facebook && <span className="text-[10px] bg-blue-50 text-blue-700 px-1.5 rounded border border-blue-100">Facebook</span>}
+                                            {form.config.include_website && <span className="text-[10px] bg-gray-100 text-gray-700 px-1.5 rounded border border-gray-200">Website</span>}
+                                            {form.config.include_industry && <span className="text-[10px] bg-purple-50 text-purple-700 px-1.5 rounded border border-purple-100">Industry</span>}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <button onClick={() => {copyToClipboard(getPublicLink(form.id));}} className="p-2 text-gray-400 hover:text-indigo-600 rounded-full hover:bg-indigo-50" title="Copy Link">
+                                            {copied ? <Check className="h-4 w-4 text-green-500"/> : <LinkIcon className="h-4 w-4"/>}
                                         </button>
-                                        <button 
-                                            onClick={() => handleDelete(form.id)}
-                                            className="p-2 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-50"
-                                            title="Delete"
-                                        >
-                                            <Trash2 className="h-4 w-4" />
+                                        <button onClick={() => {setShowShareModal(getEmbedCode(form.id));}} className="p-2 text-gray-400 hover:text-indigo-600 rounded-full hover:bg-indigo-50" title="Get Embed Code">
+                                            <Copy className="h-4 w-4"/>
+                                        </button>
+                                        <button onClick={() => handleEdit(form)} className="p-2 text-gray-400 hover:text-blue-600 rounded-full hover:bg-blue-50" title="Edit">
+                                            <Edit2 className="h-4 w-4"/>
+                                        </button>
+                                        <button onClick={() => handleDelete(form.id)} className="p-2 text-gray-400 hover:text-red-600 rounded-full hover:bg-red-50" title="Delete">
+                                            <Trash2 className="h-4 w-4"/>
                                         </button>
                                     </div>
-                                    <button 
-                                        onClick={() => setShowShareModal(form.id)}
-                                        className="inline-flex items-center px-3 py-1.5 border border-indigo-200 text-indigo-700 text-xs font-medium rounded-full hover:bg-indigo-50"
-                                    >
-                                        <LinkIcon className="h-3 w-3 mr-1" />
-                                        Share / Embed
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )})}
-                    {forms.length === 0 && (
-                        <div className="col-span-full py-12 text-center bg-white border-2 border-dashed border-gray-300 rounded-lg">
-                            <p className="text-gray-500">No forms created yet. Click "Create New Form" to get started.</p>
-                        </div>
-                    )}
+                                </li>
+                            ))
+                        )}
+                    </ul>
                 </div>
             )}
 
-            {/* SHARE MODAL */}
+            {/* Embed Code Modal */}
             {showShareModal && (
-                <div className="fixed z-20 inset-0 overflow-y-auto">
-                    <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                        <div className="fixed inset-0 bg-gray-500 bg-opacity-75" onClick={() => setShowShareModal(null)}></div>
-                        <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                            <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                                <h3 className="text-lg leading-6 font-medium text-gray-900 mb-4">Share Form</h3>
-                                
-                                <div className="space-y-4">
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Public Link (WhatsApp, Messenger)</label>
-                                        <div className="flex rounded-md shadow-sm">
-                                            <input 
-                                                type="text" 
-                                                readOnly
-                                                className="flex-1 min-w-0 block w-full px-3 py-2 rounded-l-md border border-gray-300 bg-gray-50 text-sm text-gray-500"
-                                                value={getPublicLink(showShareModal)}
-                                            />
-                                            <button 
-                                                onClick={() => copyToClipboard(getPublicLink(showShareModal))}
-                                                className="inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 rounded-r-md bg-gray-100 text-sm font-medium text-gray-700 hover:bg-gray-200"
-                                            >
-                                                {copied ? <Check className="h-4 w-4 text-green-600"/> : <Copy className="h-4 w-4"/>}
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <label className="block text-sm font-medium text-gray-700 mb-1">Website Embed Code</label>
-                                        <div className="flex rounded-md shadow-sm">
-                                            <textarea 
-                                                readOnly
-                                                rows={3}
-                                                className="flex-1 min-w-0 block w-full px-3 py-2 rounded-l-md border border-gray-300 bg-gray-50 text-xs font-mono text-gray-600"
-                                                value={getEmbedCode(showShareModal)}
-                                            />
-                                            <button 
-                                                onClick={() => copyToClipboard(getEmbedCode(showShareModal))}
-                                                className="inline-flex items-center px-4 border border-l-0 border-gray-300 rounded-r-md bg-gray-100 text-sm font-medium text-gray-700 hover:bg-gray-200"
-                                            >
-                                                {copied ? <Check className="h-4 w-4 text-green-600"/> : <Copy className="h-4 w-4"/>}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                                <button 
-                                    type="button" 
-                                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
-                                    onClick={() => setShowShareModal(null)}
-                                >
-                                    Close
-                                </button>
-                            </div>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+                    <div className="bg-white rounded-lg w-full max-w-lg shadow-xl p-6">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4">Embed Code</h3>
+                        <p className="text-sm text-gray-500 mb-2">Copy this code to your website:</p>
+                        <textarea 
+                            readOnly 
+                            className="w-full h-32 p-3 border border-gray-300 rounded-md text-xs font-mono text-gray-600 focus:outline-none bg-gray-50"
+                            value={showShareModal} 
+                        />
+                        <div className="mt-4 flex justify-end">
+                            <button onClick={() => setShowShareModal(null)} className="bg-indigo-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-indigo-700">Close</button>
                         </div>
                     </div>
                 </div>

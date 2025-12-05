@@ -820,7 +820,7 @@ const Dashboard: React.FC = () => {
                                   <p className="text-xs font-mono font-bold text-gray-800">{c.phone}</p>
                                   <span className="text-[9px] bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded">{c.category}</span>
                               </div>
-                              <span className="text-[10px] text-gray-400">{new Date(c.date_added).toLocaleDateString()}</span>
+                              <span className="text-[10px] text-gray-400">{new Date(c.date_added).toLocaleDateString()}</span
                           </div>
                       ))}
                   </div>
