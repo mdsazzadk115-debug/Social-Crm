@@ -12,9 +12,8 @@ import {
 const uuid = () => Math.random().toString(36).substr(2, 9);
 
 // API Configuration
-// When deployed to shared hosting, this relative path works if api folder is in public_html
-// For local development, you might need http://localhost/social-ads-expert/api/index.php
-const API_URL = '/api/index.php'; 
+// Changed to relative path './' so it works if the app is in a subfolder
+const API_URL = './api/index.php'; 
 
 class MockService {
   
