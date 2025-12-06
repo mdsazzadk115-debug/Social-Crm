@@ -424,20 +424,34 @@ export const mockService = {
         } catch (e) { console.error("API Error", e); }
     },
 
-    // --- TASKS ---
+    // --- TASKS (API Connected) ---
     getTasks: async (): Promise<Task[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/tasks.php`);
+            if (res.ok) return await res.json();
+        } catch (e) { console.warn("API Error", e); }
         return getStorage<Task[]>('tasks', []);
     },
     createTask: async (text: string, dueDate?: string, leadId?: string) => {
-        const tasks = getStorage<Task[]>('tasks', []);
-        tasks.push({
+        const newTask = {
             id: uuid(),
             text,
             is_completed: false,
             created_at: new Date().toISOString(),
             due_date: dueDate,
             lead_id: leadId
-        });
+        };
+
+        try {
+            await fetch(`${API_BASE}/tasks.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'create', ...newTask })
+            });
+        } catch (e) { console.error("API Error", e); }
+
+        const tasks = getStorage<Task[]>('tasks', []);
+        tasks.push(newTask);
         setStorage('tasks', tasks);
     },
     toggleTask: async (id: string) => {
@@ -446,9 +460,25 @@ export const mockService = {
         if (t) {
             t.is_completed = !t.is_completed;
             setStorage('tasks', tasks);
+
+            try {
+                await fetch(`${API_BASE}/tasks.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'toggle', id, is_completed: t.is_completed })
+                });
+            } catch (e) { console.error("API Error", e); }
         }
     },
     deleteTask: async (id: string) => {
+        try {
+            await fetch(`${API_BASE}/tasks.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete', id })
+            });
+        } catch (e) { console.error("API Error", e); }
+
         let tasks = getStorage<Task[]>('tasks', []);
         tasks = tasks.filter(t => t.id !== id);
         setStorage('tasks', tasks);
