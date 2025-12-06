@@ -1,3 +1,4 @@
+
 import { 
   Lead, LeadStatus, LeadSource, Interaction, MessageTemplate, Campaign, 
   SimpleAutomationRule, LeadForm, Customer, Task, Invoice, Snippet, 
@@ -1105,45 +1106,97 @@ export const mockService = {
 
     // --- SALES GOALS ---
     getSalesTargets: async (): Promise<MonthlyTarget[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/sales_goals.php?action=get_targets`);
+            if (res.ok) return await res.json();
+        } catch (e) { console.warn("API Error", e); }
         return getStorage<MonthlyTarget[]>('sales_targets', []);
     },
     setSalesTarget: async (target: Omit<MonthlyTarget, 'id'>) => {
+        // Local Update
         let targets = getStorage<MonthlyTarget[]>('sales_targets', []);
         const idx = targets.findIndex(t => t.month === target.month && t.service === target.service);
+        const newTarget = { ...target, id: idx !== -1 ? targets[idx].id : uuid() };
+        
         if (idx !== -1) {
             targets[idx] = { ...targets[idx], ...target };
         } else {
-            targets.push({ ...target, id: uuid() });
+            targets.push(newTarget as MonthlyTarget);
         }
         setStorage('sales_targets', targets);
+
+        // Server Update
+        try {
+            await fetch(`${API_BASE}/sales_goals.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'set_target', ...newTarget })
+            });
+        } catch (e) { console.error("API Error", e); }
     },
     getSalesEntries: async (): Promise<SalesEntry[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/sales_goals.php?action=get_entries`);
+            if (res.ok) return await res.json();
+        } catch (e) { console.warn("API Error", e); }
         return getStorage<SalesEntry[]>('sales_entries', []);
     },
     addSalesEntry: async (entry: Partial<SalesEntry>) => {
-        const entries = getStorage<SalesEntry[]>('sales_entries', []);
-        entries.push({
+        const newEntry = {
             id: uuid(),
             date: entry.date || new Date().toISOString(),
             service: entry.service!,
             amount: entry.amount!,
             description: entry.description!,
             created_at: new Date().toISOString()
-        });
+        };
+        
+        // Local
+        const entries = getStorage<SalesEntry[]>('sales_entries', []);
+        entries.push(newEntry);
         setStorage('sales_entries', entries);
+
+        // Server
+        try {
+            await fetch(`${API_BASE}/sales_goals.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'add_entry', ...newEntry })
+            });
+        } catch (e) { console.error("API Error", e); }
     },
     updateSalesEntry: async (id: string, updates: Partial<SalesEntry>) => {
+        // Local
         const entries = getStorage<SalesEntry[]>('sales_entries', []);
         const idx = entries.findIndex(e => e.id === id);
         if (idx !== -1) {
             entries[idx] = { ...entries[idx], ...updates };
             setStorage('sales_entries', entries);
         }
+
+        // Server
+        try {
+            await fetch(`${API_BASE}/sales_goals.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update_entry', id, ...updates })
+            });
+        } catch (e) { console.error("API Error", e); }
     },
     deleteSalesEntry: async (id: string) => {
+        // Local
         let entries = getStorage<SalesEntry[]>('sales_entries', []);
         entries = entries.filter(e => e.id !== id);
         setStorage('sales_entries', entries);
+
+        // Server
+        try {
+            await fetch(`${API_BASE}/sales_goals.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete_entry', id })
+            });
+        } catch (e) { console.error("API Error", e); }
     },
 
     // --- LEAD CRM INTERACTIONS ---
