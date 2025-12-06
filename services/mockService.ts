@@ -36,6 +36,18 @@ const setStorage = (key: string, val: any) => {
 // If your index.html is at public_html/, then api should be at public_html/api/
 const API_BASE = './api'; 
 
+// --- JSON PARSER HELPER ---
+const safeJSONParse = (data: any, fallback: any = {}) => {
+    if (!data) return fallback;
+    if (typeof data === 'object') return data; // Already an object
+    try {
+        return JSON.parse(data);
+    } catch (e) {
+        console.warn("JSON Parse failed for:", data);
+        return fallback;
+    }
+};
+
 export const mockService = {
     // --- LEADS (CONNECTED TO PHP/MYSQL) ---
     getLeads: async (): Promise<Lead[]> => {
@@ -538,7 +550,40 @@ export const mockService = {
     getBigFish: async (): Promise<BigFish[]> => {
         try {
             const res = await fetch(`${API_BASE}/bigfish.php`);
-            if(res.ok) return await res.json();
+            if(res.ok) {
+                const rawData = await res.json();
+                if (!Array.isArray(rawData)) return [];
+                
+                // Sanitize Data (Fix for White Screen on Shared Hosting)
+                return rawData.map((fish: any) => {
+                    // Safe parse portal_config
+                    const config = safeJSONParse(fish.portal_config, { show_balance: true, show_history: true, is_suspended: false });
+                    
+                    // Safe parse transactions
+                    let transactions = fish.transactions;
+                    if (!Array.isArray(transactions)) transactions = [];
+                    
+                    transactions = transactions.map((t: any) => ({
+                        ...t,
+                        amount: parseFloat(t.amount || 0),
+                        metadata: safeJSONParse(t.metadata)
+                    }));
+
+                    return {
+                        ...fish,
+                        balance: parseFloat(fish.balance || 0),
+                        spent_amount: parseFloat(fish.spent_amount || 0),
+                        target_sales: parseInt(fish.target_sales || 0),
+                        current_sales: parseInt(fish.current_sales || 0),
+                        retainer_amount: parseFloat(fish.retainer_amount || 0),
+                        portal_config: config,
+                        transactions: transactions,
+                        growth_tasks: Array.isArray(fish.growth_tasks) ? fish.growth_tasks : [],
+                        reports: Array.isArray(fish.reports) ? fish.reports : [],
+                        interactions: Array.isArray(fish.interactions) ? fish.interactions : [],
+                    };
+                });
+            }
         } catch (e) { console.warn("API Error", e); }
         return getStorage<BigFish[]>('big_fish', []);
     },
