@@ -1,4 +1,3 @@
-
 import { 
   Lead, LeadStatus, LeadSource, Interaction, MessageTemplate, Campaign, 
   SimpleAutomationRule, LeadForm, Customer, Task, Invoice, Snippet, 
@@ -660,7 +659,25 @@ export const mockService = {
         if (f) {
             f.status = f.status === 'Active Pool' ? 'Hall of Fame' : 'Active Pool';
             if (f.status === 'Hall of Fame') f.end_date = new Date().toISOString();
+            else f.end_date = undefined; // Clear end date if reactivated
+            
             setStorage('big_fish', fish);
+
+            // Sync with Server
+            try {
+                await fetch(`${API_BASE}/bigfish.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        action: 'update', 
+                        id, 
+                        updates: { 
+                            status: f.status,
+                            end_date: f.end_date 
+                        } 
+                    })
+                });
+            } catch (e) { console.error("API Error", e); }
         }
     },
     updateBigFish: async (id: string, updates: Partial<BigFish>) => {
