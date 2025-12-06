@@ -506,31 +506,33 @@ export const mockService = {
         setStorage('tasks', tasks);
     },
 
-    // --- INVOICES ---
+    // --- INVOICES (API Connected) ---
     getInvoices: async (): Promise<Invoice[]> => {
         try {
             const res = await fetch(`${API_BASE}/invoices.php`);
             if (res.ok) {
-                return await res.json();
+                const data = await res.json();
+                if (Array.isArray(data)) return data;
             }
         } catch(e) { console.warn("API Error, using local", e); }
         return getStorage<Invoice[]>('invoices', []);
     },
     createInvoice: async (inv: Partial<Invoice>) => {
         const invoices = getStorage<Invoice[]>('invoices', []);
+        // Generate a simple number if creating new
         const num = invoices.length + 1;
         const padded = num.toString().padStart(4, '0');
         
         const newInv = {
-            id: uuid(),
-            number: `INV-${padded}`,
+            id: inv.id || uuid(),
+            number: inv.number || `INV-${padded}`,
             client_name: inv.client_name!,
             client_phone: inv.client_phone,
             client_address: inv.client_address,
             items: inv.items || [],
             status: inv.status || 'new',
             date: inv.date || new Date().toISOString().slice(0, 10),
-            created_at: new Date().toISOString(),
+            created_at: formatDateForMySQL(new Date().toISOString()),
             paid_amount: inv.paid_amount || 0,
             terms_enabled: inv.terms_enabled || false,
             terms_content: inv.terms_content
@@ -540,11 +542,20 @@ export const mockService = {
             await fetch(`${API_BASE}/invoices.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newInv)
+                body: JSON.stringify({
+                    action: 'create',
+                    ...newInv
+                })
             });
         } catch(e) { console.warn("API Error", e); }
 
-        invoices.unshift(newInv as Invoice);
+        // Local Fallback
+        const idx = invoices.findIndex(i => i.id === newInv.id);
+        if (idx !== -1) {
+            invoices[idx] = newInv as Invoice;
+        } else {
+            invoices.unshift(newInv as Invoice);
+        }
         setStorage('invoices', invoices);
     },
     deleteInvoice: async (id: string) => {
