@@ -695,11 +695,16 @@ export const mockService = {
             };
             f.transactions.unshift(tx);
             
-            if (type === 'DEPOSIT') f.balance += amount;
-            else f.balance -= amount;
+            // Force balance to be number before calculation
+            const currentBalance = parseFloat(f.balance as any) || 0;
+            
+            if (type === 'DEPOSIT') f.balance = currentBalance + amount;
+            else f.balance = currentBalance - amount;
 
             if (type === 'AD_SPEND') {
-                f.spent_amount += amount;
+                const currentSpent = parseFloat(f.spent_amount as any) || 0;
+                f.spent_amount = currentSpent + amount;
+                
                 f.reports.unshift({
                     id: uuid(),
                     date: dateOverride || new Date().toISOString(),
@@ -707,7 +712,7 @@ export const mockService = {
                 });
                 if (metadata && metadata.leads) {
                     if (metadata.resultType === 'SALES') {
-                        f.current_sales += metadata.leads;
+                        f.current_sales = (f.current_sales || 0) + metadata.leads;
                     }
                 }
             }
@@ -739,11 +744,14 @@ export const mockService = {
         if (f) {
             const tx = f.transactions.find(t => t.id === txId);
             if (tx) {
-                if (tx.type === 'DEPOSIT') f.balance -= tx.amount;
-                else f.balance += tx.amount;
+                const currentBalance = parseFloat(f.balance as any) || 0;
+                
+                if (tx.type === 'DEPOSIT') f.balance = currentBalance - tx.amount;
+                else f.balance = currentBalance + tx.amount;
                 
                 if (tx.type === 'AD_SPEND') {
-                    f.spent_amount -= tx.amount;
+                    const currentSpent = parseFloat(f.spent_amount as any) || 0;
+                    f.spent_amount = currentSpent - tx.amount;
                     
                     // Revert Sales Count if applicable
                     if (tx.metadata && tx.metadata.resultType === 'SALES' && tx.metadata.leads) {
@@ -778,17 +786,28 @@ export const mockService = {
             const txIndex = f.transactions.findIndex(t => t.id === txId);
             if (txIndex !== -1) {
                 const oldTx = f.transactions[txIndex];
+                let currentBalance = parseFloat(f.balance as any) || 0;
+
                 // Revert old balance effect
-                if (oldTx.type === 'DEPOSIT') f.balance -= oldTx.amount;
-                else f.balance += oldTx.amount;
-                if (oldTx.type === 'AD_SPEND') f.spent_amount -= oldTx.amount;
+                if (oldTx.type === 'DEPOSIT') currentBalance -= oldTx.amount;
+                else currentBalance += oldTx.amount;
+                
+                if (oldTx.type === 'AD_SPEND') {
+                    const currentSpent = parseFloat(f.spent_amount as any) || 0;
+                    f.spent_amount = currentSpent - oldTx.amount;
+                }
 
                 // Apply new balance effect
                 const newAmount = updates.amount;
-                if (oldTx.type === 'DEPOSIT') f.balance += newAmount;
-                else f.balance -= newAmount;
-                if (oldTx.type === 'AD_SPEND') f.spent_amount += newAmount;
+                if (oldTx.type === 'DEPOSIT') currentBalance += newAmount;
+                else currentBalance -= newAmount;
+                
+                if (oldTx.type === 'AD_SPEND') {
+                    const currentSpent = parseFloat(f.spent_amount as any) || 0;
+                    f.spent_amount = currentSpent + newAmount;
+                }
 
+                f.balance = currentBalance;
                 f.transactions[txIndex] = { ...oldTx, ...updates };
                 setStorage('big_fish', fish);
             }
