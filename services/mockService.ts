@@ -741,7 +741,17 @@ export const mockService = {
             if (tx) {
                 if (tx.type === 'DEPOSIT') f.balance -= tx.amount;
                 else f.balance += tx.amount;
-                if (tx.type === 'AD_SPEND') f.spent_amount -= tx.amount;
+                
+                if (tx.type === 'AD_SPEND') {
+                    f.spent_amount -= tx.amount;
+                    
+                    // Revert Sales Count if applicable
+                    if (tx.metadata && tx.metadata.resultType === 'SALES' && tx.metadata.leads) {
+                         f.current_sales = (f.current_sales || 0) - tx.metadata.leads;
+                         if (f.current_sales < 0) f.current_sales = 0;
+                    }
+                }
+                
                 f.transactions = f.transactions.filter(t => t.id !== txId);
                 setStorage('big_fish', fish);
             }
@@ -898,7 +908,7 @@ export const mockService = {
                     body: JSON.stringify({ 
                         action: 'add_log', 
                         id: fishId, 
-                        log_id: newLog.id,
+                        log_id: newLog.id, 
                         task,
                         date: newLog.date 
                     })
