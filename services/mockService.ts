@@ -1,4 +1,3 @@
-
 import { 
   Lead, LeadStatus, LeadSource, Interaction, MessageTemplate, Campaign, 
   SimpleAutomationRule, LeadForm, Customer, Task, Invoice, Snippet, 
@@ -664,7 +663,7 @@ export const mockService = {
             
             setStorage('big_fish', fish);
 
-            // Sync with Server
+            // Sync with Server (Fix for Mark Complete Bug)
             try {
                 await fetch(`${API_BASE}/bigfish.php`, {
                     method: 'POST',
@@ -713,7 +712,7 @@ export const mockService = {
             };
             f.transactions.unshift(tx);
             
-            // Force balance to be number before calculation
+            // Force balance to be number before calculation (Fix for Balance Bug)
             const currentBalance = parseFloat(f.balance as any) || 0;
             
             if (type === 'DEPOSIT') f.balance = currentBalance + amount;
@@ -762,6 +761,7 @@ export const mockService = {
         if (f) {
             const tx = f.transactions.find(t => t.id === txId);
             if (tx) {
+                // Force number conversion (Fix for Balance Bug)
                 const currentBalance = parseFloat(f.balance as any) || 0;
                 
                 if (tx.type === 'DEPOSIT') f.balance = currentBalance - tx.amount;
@@ -771,7 +771,7 @@ export const mockService = {
                     const currentSpent = parseFloat(f.spent_amount as any) || 0;
                     f.spent_amount = currentSpent - tx.amount;
                     
-                    // Revert Sales Count if applicable
+                    // Revert Sales Count if applicable (Fix for Sales Count Bug)
                     if (tx.metadata && tx.metadata.resultType === 'SALES' && tx.metadata.leads) {
                          f.current_sales = (f.current_sales || 0) - tx.metadata.leads;
                          if (f.current_sales < 0) f.current_sales = 0;
@@ -804,6 +804,7 @@ export const mockService = {
             const txIndex = f.transactions.findIndex(t => t.id === txId);
             if (txIndex !== -1) {
                 const oldTx = f.transactions[txIndex];
+                // Force number conversion
                 let currentBalance = parseFloat(f.balance as any) || 0;
 
                 // Revert old balance effect
