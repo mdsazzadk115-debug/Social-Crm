@@ -32,8 +32,6 @@ const setStorage = (key: string, val: any) => {
 };
 
 // API Helper
-// NOTE: Ensure this points to the correct location relative to your index.html
-// If your index.html is at public_html/, then api should be at public_html/api/
 const API_BASE = './api'; 
 
 // --- JSON PARSER HELPER ---
@@ -158,7 +156,6 @@ export const mockService = {
             leads[index].quick_note = note;
             setStorage('leads', leads);
         }
-        // TODO: Add API support for notes
     },
     incrementDownloadCount: async (ids: string[]) => {
         const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
@@ -174,7 +171,6 @@ export const mockService = {
     resolvePhoneNumbersToIds: async (phones: string[]): Promise<string[]> => {
         const leads = await mockService.getLeads(); // Use getLeads to ensure we have latest
         const ids: string[] = [];
-        let updated = false;
 
         for (const phone of phones) {
             const existing = leads.find(l => l.primary_phone.includes(phone) || phone.includes(l.primary_phone));
@@ -300,10 +296,7 @@ export const mockService = {
 
     // --- MESSAGING ---
     sendBulkSMS: async (leadIds: string[], body: string) => {
-        // Simulate API call
         await new Promise(resolve => setTimeout(resolve, 500));
-        
-        // Log interactions
         const interactions = getStorage<Interaction[]>('interactions', []);
         const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
         
@@ -312,7 +305,7 @@ export const mockService = {
                 id: uuid(),
                 lead_id: id,
                 channel: 'sms',
-                direction: 'outgoing', // MessageDirection.OUTGOING
+                direction: 'outgoing', 
                 content: body,
                 created_at: new Date().toISOString()
             } as any);
@@ -323,12 +316,10 @@ export const mockService = {
                 leads[leadIdx].last_activity_at = new Date().toISOString();
             }
         });
-        
         setStorage('interactions', interactions);
         setStorage('leads', leads);
     },
     scheduleBulkMessages: async (leadIds: string[], messages: any[]) => {
-        // Just simulate success for now
         await new Promise(resolve => setTimeout(resolve, 500));
     },
 
@@ -371,7 +362,7 @@ export const mockService = {
         await mockService.createLead(newLead);
     },
 
-    // --- CUSTOMERS (ONLINE) ---
+    // --- CUSTOMERS ---
     getCustomers: async (): Promise<Customer[]> => {
         return getStorage<Customer[]>('online_customers', []);
     },
@@ -393,7 +384,6 @@ export const mockService = {
     addBulkCustomers: async (lines: string[], category: string): Promise<number> => {
         const customers = getStorage<Customer[]>('online_customers', []);
         let added = 0;
-        
         lines.forEach(line => {
             const phone = line.trim();
             if (phone && !customers.some(c => c.phone === phone)) {
@@ -445,7 +435,7 @@ export const mockService = {
         setStorage('tasks', tasks);
     },
 
-    // --- INVOICES (API Connected) ---
+    // --- INVOICES ---
     getInvoices: async (): Promise<Invoice[]> => {
         try {
             const res = await fetch(`${API_BASE}/invoices.php`);
@@ -457,7 +447,6 @@ export const mockService = {
     },
     createInvoice: async (inv: Partial<Invoice>) => {
         const invoices = getStorage<Invoice[]>('invoices', []);
-        // Generate number INV-0001
         const num = invoices.length + 1;
         const padded = num.toString().padStart(4, '0');
         
@@ -524,7 +513,7 @@ export const mockService = {
         setStorage('snippets', snippets);
     },
 
-    // --- DOCUMENTS (LETTERHEAD) ---
+    // --- DOCUMENTS ---
     getDocuments: async (): Promise<Document[]> => {
         return getStorage<Document[]>('documents', []);
     },
@@ -554,12 +543,9 @@ export const mockService = {
                 const rawData = await res.json();
                 if (!Array.isArray(rawData)) return [];
                 
-                // Sanitize Data (Fix for White Screen on Shared Hosting)
+                // Sanitize Data
                 return rawData.map((fish: any) => {
-                    // Safe parse portal_config
                     const config = safeJSONParse(fish.portal_config, { show_balance: true, show_history: true, is_suspended: false });
-                    
-                    // Safe parse transactions
                     let transactions = fish.transactions;
                     if (!Array.isArray(transactions)) transactions = [];
                     
@@ -594,7 +580,7 @@ export const mockService = {
     createBigFish: async (data: Partial<BigFish>) => {
         const newFish = {
             id: uuid(),
-            lead_id: uuid(), // Dummy if manual
+            lead_id: uuid(),
             name: data.name!,
             phone: data.phone!,
             status: 'Active Pool',
@@ -617,7 +603,7 @@ export const mockService = {
             await fetch(`${API_BASE}/bigfish.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newFish)
+                body: JSON.stringify({ action: 'create', ...newFish })
             });
         } catch(e) { console.warn("API Error", e); }
 
@@ -658,7 +644,7 @@ export const mockService = {
             await fetch(`${API_BASE}/bigfish.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(newFish)
+                body: JSON.stringify({ action: 'create', ...newFish })
             });
         } catch(e) { console.warn("API Error", e); }
 
@@ -676,14 +662,24 @@ export const mockService = {
         }
     },
     updateBigFish: async (id: string, updates: Partial<BigFish>) => {
+        // Optimistic UI Update
         const fish = getStorage<BigFish[]>('big_fish', []);
         const idx = fish.findIndex(f => f.id === id);
         if(idx !== -1) {
             fish[idx] = { ...fish[idx], ...updates };
             setStorage('big_fish', fish);
         }
+        // Send to Server
+        try {
+            await fetch(`${API_BASE}/bigfish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update', id, updates })
+            });
+        } catch(e) { console.warn("API Error", e); }
     },
     addTransaction: async (fishId: string, type: Transaction['type'], amount: number, desc: string, metadata?: any, dateOverride?: string) => {
+        // 1. Prepare Local Data
         const fish = getStorage<BigFish[]>('big_fish', []);
         const f = fish.find(x => x.id === fishId);
         if (f) {
@@ -697,20 +693,16 @@ export const mockService = {
             };
             f.transactions.unshift(tx);
             
-            // Recalculate Balance
             if (type === 'DEPOSIT') f.balance += amount;
             else f.balance -= amount;
 
             if (type === 'AD_SPEND') {
                 f.spent_amount += amount;
-                // Auto create work log
                 f.reports.unshift({
                     id: uuid(),
                     date: dateOverride || new Date().toISOString(),
                     task: `Ad Run: Spent $${amount} (${desc})`
                 });
-                
-                // Update sales/messages count
                 if (metadata && metadata.leads) {
                     if (metadata.resultType === 'SALES') {
                         f.current_sales += metadata.leads;
@@ -718,6 +710,24 @@ export const mockService = {
                 }
             }
             setStorage('big_fish', fish);
+
+            // 2. Send to PHP API
+            try {
+                await fetch(`${API_BASE}/bigfish.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'add_transaction',
+                        id: tx.id,
+                        big_fish_id: fishId,
+                        type,
+                        amount,
+                        description: desc,
+                        date: tx.date,
+                        metadata
+                    })
+                });
+            } catch (e) { console.error("API Error", e); }
         }
     },
     deleteTransaction: async (fishId: string, txId: string) => {
@@ -726,12 +736,9 @@ export const mockService = {
         if (f) {
             const tx = f.transactions.find(t => t.id === txId);
             if (tx) {
-                // Reverse Balance
                 if (tx.type === 'DEPOSIT') f.balance -= tx.amount;
                 else f.balance += tx.amount;
-
                 if (tx.type === 'AD_SPEND') f.spent_amount -= tx.amount;
-
                 f.transactions = f.transactions.filter(t => t.id !== txId);
                 setStorage('big_fish', fish);
             }
@@ -744,13 +751,10 @@ export const mockService = {
             const txIndex = f.transactions.findIndex(t => t.id === txId);
             if (txIndex !== -1) {
                 const oldTx = f.transactions[txIndex];
-                
-                // Revert old effect
                 if (oldTx.type === 'DEPOSIT') f.balance -= oldTx.amount;
                 else f.balance += oldTx.amount;
                 if (oldTx.type === 'AD_SPEND') f.spent_amount -= oldTx.amount;
 
-                // Apply new effect
                 const newAmount = updates.amount;
                 if (oldTx.type === 'DEPOSIT') f.balance += newAmount;
                 else f.balance -= newAmount;
@@ -768,13 +772,28 @@ export const mockService = {
         const fish = getStorage<BigFish[]>('big_fish', []);
         const f = fish.find(x => x.id === fishId);
         if (f) {
-            f.growth_tasks.push({
+            const newTask = {
                 id: uuid(),
                 title,
                 is_completed: false,
                 due_date: dueDate
-            });
+            };
+            f.growth_tasks.push(newTask);
             setStorage('big_fish', fish);
+
+            try {
+                await fetch(`${API_BASE}/bigfish.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'add_task',
+                        id: fishId,
+                        task_id: newTask.id,
+                        title,
+                        due_date: dueDate
+                    })
+                });
+            } catch (e) { console.error("API Error", e); }
         }
     },
     toggleGrowthTask: async (fishId: string, taskId: string) => {
@@ -784,6 +803,14 @@ export const mockService = {
             const t = f.growth_tasks.find(x => x.id === taskId);
             if (t) t.is_completed = !t.is_completed;
             setStorage('big_fish', fish);
+
+            try {
+                await fetch(`${API_BASE}/bigfish.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'toggle_task', task_id: taskId })
+                });
+            } catch (e) { console.error("API Error", e); }
         }
     },
     updatePortalConfig: async (fishId: string, config: any) => {
@@ -792,6 +819,14 @@ export const mockService = {
         if (f) {
             f.portal_config = { ...f.portal_config, ...config };
             setStorage('big_fish', fish);
+
+            try {
+                await fetch(`${API_BASE}/bigfish.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'update_config', id: fishId, config: f.portal_config })
+                });
+            } catch (e) { console.error("API Error", e); }
         }
     },
     updateTargets: async (fishId: string, target: number, current: number) => {
@@ -801,18 +836,41 @@ export const mockService = {
             f.target_sales = target;
             f.current_sales = current;
             setStorage('big_fish', fish);
+
+            try {
+                await fetch(`${API_BASE}/bigfish.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'update_targets', id: fishId, target, current })
+                });
+            } catch (e) { console.error("API Error", e); }
         }
     },
     addWorkLog: async (fishId: string, task: string) => {
         const fish = getStorage<BigFish[]>('big_fish', []);
         const f = fish.find(x => x.id === fishId);
         if (f) {
-            f.reports.unshift({
+            const newLog = {
                 id: uuid(),
                 date: new Date().toISOString(),
                 task
-            });
+            };
+            f.reports.unshift(newLog);
             setStorage('big_fish', fish);
+
+            try {
+                await fetch(`${API_BASE}/bigfish.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        action: 'add_log', 
+                        id: fishId, 
+                        log_id: newLog.id,
+                        task,
+                        date: newLog.date 
+                    })
+                });
+            } catch (e) { console.error("API Error", e); }
         }
     },
     checkExpiringCampaigns: async (): Promise<BigFish[]> => {
@@ -836,7 +894,7 @@ export const mockService = {
         return fish.filter(f => {
             if (f.status !== 'Active Pool' || !f.is_retainer || !f.retainer_renewal_date) return false;
             const renew = new Date(f.retainer_renewal_date);
-            return renew <= nextWeek; // Alerts if renewal is within 7 days or past due
+            return renew <= nextWeek; 
         });
     },
     renewRetainer: async (fishId: string) => {
@@ -844,7 +902,7 @@ export const mockService = {
         const f = fish.find(x => x.id === fishId);
         if (f && f.retainer_renewal_date) {
             const current = new Date(f.retainer_renewal_date);
-            current.setDate(current.getDate() + 30); // Add 30 days
+            current.setDate(current.getDate() + 30); 
             f.retainer_renewal_date = current.toISOString().slice(0, 10);
             setStorage('big_fish', fish);
         }
@@ -923,7 +981,6 @@ export const mockService = {
             convs.push(conv);
         }
 
-        // Add message
         conv.messages.push({
             id: uuid(),
             sender: 'customer',
@@ -934,13 +991,11 @@ export const mockService = {
         conv.last_message = text;
         conv.last_updated = new Date().toISOString();
 
-        // Phone Extraction Logic
         const phoneMatch = text.match(/(?:\+88|88)?01[3-9]\d{8}/);
         if (phoneMatch) {
             const phone = phoneMatch[0];
             conv.customer_phone = phone;
             
-            // Check if lead exists or create
             const leads = await mockService.getLeads();
             const exists = leads.find(l => l.primary_phone === phone);
             
