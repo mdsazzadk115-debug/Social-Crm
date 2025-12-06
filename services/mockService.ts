@@ -363,8 +363,12 @@ export const mockService = {
         await mockService.createLead(newLead);
     },
 
-    // --- CUSTOMERS ---
+    // --- CUSTOMERS (ONLINE) - API Connected ---
     getCustomers: async (): Promise<Customer[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/customers.php?action=get_customers`);
+            if (res.ok) return await res.json();
+        } catch (e) { console.warn("API Error", e); }
         return getStorage<Customer[]>('online_customers', []);
     },
     getCustomerCategories: async (): Promise<string[]> => {
@@ -383,27 +387,41 @@ export const mockService = {
         setStorage('customer_categories', cats);
     },
     addBulkCustomers: async (lines: string[], category: string): Promise<number> => {
-        const customers = getStorage<Customer[]>('online_customers', []);
         let added = 0;
-        lines.forEach(line => {
+        
+        // Loop through lines and send API requests
+        const promises = lines.map(async (line) => {
             const phone = line.trim();
-            if (phone && !customers.some(c => c.phone === phone)) {
-                customers.push({
-                    id: uuid(),
-                    phone,
-                    category,
-                    date_added: new Date().toISOString()
-                });
-                added++;
+            if (phone) {
+                try {
+                    const res = await fetch(`${API_BASE}/customers.php`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            action: 'add_customer',
+                            id: uuid(),
+                            phone, 
+                            category,
+                            date_added: new Date().toISOString()
+                        })
+                    });
+                    const result = await res.json();
+                    if (result.added) added++;
+                } catch (e) { console.error("Error adding customer", e); }
             }
         });
-        setStorage('online_customers', customers);
+
+        await Promise.all(promises);
         return added;
     },
     deleteCustomer: async (id: string) => {
-        let customers = getStorage<Customer[]>('online_customers', []);
-        customers = customers.filter(c => c.id !== id);
-        setStorage('online_customers', customers);
+        try {
+            await fetch(`${API_BASE}/customers.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete_customer', id })
+            });
+        } catch (e) { console.error("API Error", e); }
     },
 
     // --- TASKS ---
