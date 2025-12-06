@@ -1331,22 +1331,50 @@ export const mockService = {
 
     // --- AD SWIPE FILE ---
     getAdInspirations: async (): Promise<AdInspiration[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/ad_swipe.php`);
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data)) return data;
+            }
+        } catch(e) { console.warn("API Error, using local", e); }
         return getStorage<AdInspiration[]>('ad_swipe_file', []);
     },
     addAdInspiration: async (ad: Partial<AdInspiration>) => {
-        const list = getStorage<AdInspiration[]>('ad_swipe_file', []);
-        list.unshift({
+        const newAd = {
             id: uuid(),
             title: ad.title!,
             url: ad.url!,
             image_url: ad.image_url,
             category: ad.category || 'Other',
             notes: ad.notes || '',
-            created_at: new Date().toISOString()
-        });
+            created_at: formatDateForMySQL(new Date().toISOString())
+        };
+
+        try {
+            await fetch(`${API_BASE}/ad_swipe.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'create',
+                    ...newAd
+                })
+            });
+        } catch(e) { console.warn("API Error", e); }
+
+        const list = getStorage<AdInspiration[]>('ad_swipe_file', []);
+        list.unshift(newAd as AdInspiration);
         setStorage('ad_swipe_file', list);
     },
     deleteAdInspiration: async (id: string) => {
+        try {
+            await fetch(`${API_BASE}/ad_swipe.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete', id })
+            });
+        } catch(e) { console.warn("API Error", e); }
+
         let list = getStorage<AdInspiration[]>('ad_swipe_file', []);
         list = list.filter(a => a.id !== id);
         setStorage('ad_swipe_file', list);
