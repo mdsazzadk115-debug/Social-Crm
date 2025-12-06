@@ -758,23 +758,34 @@ export const mockService = {
         // 1. Update Local Storage
         const fish = getStorage<BigFish[]>('big_fish', []);
         const f = fish.find(x => x.id === fishId);
+        
+        let updates: Partial<BigFish> = {}; // Capture changes to sync
+
         if (f) {
             const tx = f.transactions.find(t => t.id === txId);
             if (tx) {
                 // Force number conversion (Fix for Balance Bug)
                 const currentBalance = parseFloat(f.balance as any) || 0;
                 
-                if (tx.type === 'DEPOSIT') f.balance = currentBalance - tx.amount;
-                else f.balance = currentBalance + tx.amount;
+                if (tx.type === 'DEPOSIT') {
+                    f.balance = currentBalance - tx.amount;
+                } else {
+                    f.balance = currentBalance + tx.amount;
+                }
+                updates.balance = f.balance;
                 
                 if (tx.type === 'AD_SPEND') {
                     const currentSpent = parseFloat(f.spent_amount as any) || 0;
                     f.spent_amount = currentSpent - tx.amount;
+                    updates.spent_amount = f.spent_amount;
                     
                     // Revert Sales Count if applicable (Fix for Sales Count Bug)
                     if (tx.metadata && tx.metadata.resultType === 'SALES' && tx.metadata.leads) {
-                         f.current_sales = (f.current_sales || 0) - tx.metadata.leads;
-                         if (f.current_sales < 0) f.current_sales = 0;
+                         const currentSales = (f.current_sales || 0);
+                         let newSales = currentSales - tx.metadata.leads;
+                         if (newSales < 0) newSales = 0;
+                         f.current_sales = newSales;
+                         updates.current_sales = newSales;
                     }
                 }
                 
@@ -785,6 +796,7 @@ export const mockService = {
 
         // 2. Update Server
         try {
+            // Delete the transaction record
             await fetch(`${API_BASE}/bigfish.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -794,6 +806,19 @@ export const mockService = {
                     big_fish_id: fishId
                 })
             });
+
+            // Update parent record stats if any changes occurred
+            if (Object.keys(updates).length > 0) {
+                await fetch(`${API_BASE}/bigfish.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        action: 'update', 
+                        id: fishId, 
+                        updates 
+                    })
+                });
+            }
         } catch (e) { console.error("API Error during delete transaction", e); }
     },
     updateTransaction: async (fishId: string, txId: string, updates: { date: string, description: string, amount: number }) => {
