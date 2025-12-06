@@ -1331,24 +1331,44 @@ export const mockService = {
 
     // --- AD SWIPE FILE ---
     getAdInspirations: async (): Promise<AdInspiration[]> => {
+        let apiData: AdInspiration[] = [];
+        let apiSuccess = false;
         try {
             const res = await fetch(`${API_BASE}/ad_swipe.php`);
             if (res.ok) {
                 const data = await res.json();
-                if (Array.isArray(data)) return data;
+                if (Array.isArray(data)) {
+                    apiData = data;
+                    apiSuccess = true;
+                }
             }
-        } catch(e) { console.warn("API Error, using local", e); }
-        return getStorage<AdInspiration[]>('ad_swipe_file', []);
+        } catch(e) { 
+            // console.warn("API Error, using local", e); 
+        }
+        
+        const localData = getStorage<AdInspiration[]>('ad_swipe_file', []);
+        
+        // Return API data if available
+        if (apiSuccess && apiData.length > 0) {
+            return apiData;
+        }
+        
+        // Fallback to local storage if API is empty (mock/broken/new setup) but local has data
+        if (apiSuccess && apiData.length === 0 && localData.length > 0) {
+            return localData;
+        }
+
+        return apiSuccess ? apiData : localData;
     },
-    addAdInspiration: async (ad: Partial<AdInspiration>) => {
-        const newAd = {
+    addAdInspiration: async (ad: Partial<AdInspiration>): Promise<AdInspiration> => {
+        const newAd: AdInspiration = {
             id: uuid(),
             title: ad.title!,
             url: ad.url!,
-            image_url: ad.image_url,
+            image_url: ad.image_url || '',
             category: ad.category || 'Other',
             notes: ad.notes || '',
-            created_at: formatDateForMySQL(new Date().toISOString())
+            created_at: formatDateForMySQL(new Date().toISOString()) || new Date().toISOString()
         };
 
         try {
@@ -1363,8 +1383,10 @@ export const mockService = {
         } catch(e) { console.warn("API Error", e); }
 
         const list = getStorage<AdInspiration[]>('ad_swipe_file', []);
-        list.unshift(newAd as AdInspiration);
+        list.unshift(newAd);
         setStorage('ad_swipe_file', list);
+        
+        return newAd;
     },
     deleteAdInspiration: async (id: string) => {
         try {

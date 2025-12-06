@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { AdInspiration } from '../types';
@@ -32,16 +31,18 @@ const AdSwipeFile: React.FC = () => {
         e.preventDefault();
         if(!newAd.title || !newAd.url) return alert("Title and URL are required.");
         
-        await mockService.addAdInspiration(newAd);
+        // Optimistic UI Update: Create object and add to state immediately
+        const savedAd = await mockService.addAdInspiration(newAd);
+        setAds(prev => [savedAd, ...prev]);
+        
         setIsModalOpen(false);
         setNewAd({ title: '', url: '', image_url: '', category: 'Other', notes: '' });
-        loadAds();
     };
 
     const handleDelete = async (id: string) => {
         if(confirm("Remove this ad from your collection?")) {
             await mockService.deleteAdInspiration(id);
-            loadAds();
+            setAds(prev => prev.filter(ad => ad.id !== id));
         }
     };
 
