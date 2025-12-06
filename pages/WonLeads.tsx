@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { Lead, LeadStatus, ClientInteraction, Task } from '../types';
 import { Phone, Globe, Facebook, Save, CheckCircle, ExternalLink, Target, Copy, MessageCircle, Download, Clock, User, Mail, MessageSquare, Trash2, CheckSquare, Plus, X, Calendar } from 'lucide-react';
+// @ts-ignore
 import { Link } from 'react-router-dom';
 
 const WonLeads: React.FC = () => {

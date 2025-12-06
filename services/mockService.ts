@@ -1,9 +1,9 @@
-
 import { 
   Lead, LeadStatus, LeadSource, Interaction, MessageTemplate, Campaign, 
   SimpleAutomationRule, LeadForm, Customer, Task, Invoice, Snippet, 
   Document, BigFish, PaymentMethod, MessengerConversation, SystemSettings,
-  MonthlyTarget, SalesEntry, AdInspiration, ClientInteraction, Transaction
+  MonthlyTarget, SalesEntry, AdInspiration, ClientInteraction, Transaction,
+  InvoiceItem
 } from '../types';
 import { 
   INITIAL_TEMPLATES, INITIAL_LEAD_FORMS, INITIAL_SNIPPETS, INDUSTRIES, DEMO_LEADS 
@@ -11,836 +11,1005 @@ import {
 
 const uuid = () => Math.random().toString(36).substr(2, 9);
 
-// API Configuration
-// Changed to relative path './' so it works if the app is in a subfolder
-const API_URL = './api/index.php'; 
+// Fix Types for Constants
+const FULL_DEMO_LEADS: Lead[] = DEMO_LEADS.map(l => ({ ...l, download_count: 0 }));
+const FULL_TEMPLATES: MessageTemplate[] = INITIAL_TEMPLATES.map(t => ({ ...t, id: uuid() }));
+const FULL_SNIPPETS: Snippet[] = INITIAL_SNIPPETS.map(s => ({ ...s, id: uuid() }));
 
-class MockService {
-  
-  // --- CORE API HELPER ---
-  private async apiRequest<T>(collection: string, method: 'GET' | 'POST' | 'DELETE', data?: any, id?: string): Promise<T> {
-      try {
-          let url = `${API_URL}?collection=${collection}`;
-          if (id) url += `&id=${id}`;
-
-          const options: RequestInit = {
-              method,
-              headers: { 'Content-Type': 'application/json' }
-          };
-
-          if (data) {
-              options.body = JSON.stringify(data);
-          }
-
-          const response = await fetch(url, options);
-          if (!response.ok) {
-              // Fallback for local dev or network error: return empty array or handle error
-              console.warn(`API Error ${collection}:`, response.statusText);
-              // IF API FAILS (e.g. Localhost without PHP), Try LocalStorage as Fallback to not break UI
-              return this.fallbackLocalStorage(collection, method, data, id) as any;
-          }
-          
-          const result = await response.json();
-          return result;
-      } catch (error) {
-          console.error("API Request Failed, using fallback:", error);
-          return this.fallbackLocalStorage(collection, method, data, id) as any;
-      }
-  }
-
-  // Fallback for Local Development without PHP
-  private fallbackLocalStorage(collection: string, method: string, data: any, id: string | undefined) {
-      const key = `bk_${collection}`;
-      let items = JSON.parse(localStorage.getItem(key) || '[]');
-      
-      if (method === 'GET') return items;
-      if (method === 'POST') {
-          const idx = items.findIndex((i: any) => i.id === data.id);
-          if (idx > -1) items[idx] = data;
-          else items.unshift(data);
-          localStorage.setItem(key, JSON.stringify(items));
-          return data;
-      }
-      if (method === 'DELETE') {
-          items = items.filter((i: any) => i.id !== id);
-          localStorage.setItem(key, JSON.stringify(items));
-          return { success: true };
-      }
-  }
-
-  // --- LEADS ---
-  async getLeads(): Promise<Lead[]> {
-    const leads = await this.apiRequest<Lead[]>('leads', 'GET');
-    // If empty DB, return demo for first time
-    if (leads.length === 0 && !localStorage.getItem('demo_init')) {
-        return []; // Return empty, let user add leads or use fallback
+// Helper for local storage
+const getStorage = <T>(key: string, defaultVal: T): T => {
+    const stored = localStorage.getItem(key);
+    if (!stored) return defaultVal;
+    try {
+        return JSON.parse(stored);
+    } catch {
+        return defaultVal;
     }
-    return leads;
-  }
+};
 
-  async getLeadById(id: string): Promise<Lead | undefined> {
-    const leads = await this.getLeads();
-    return leads.find(l => l.id === id);
-  }
+const setStorage = (key: string, val: any) => {
+    localStorage.setItem(key, JSON.stringify(val));
+};
 
-  async createLead(data: Partial<Lead>): Promise<Lead> {
-    const newLead: Lead = {
-      id: uuid(),
-      full_name: data.full_name || 'Unknown',
-      primary_phone: data.primary_phone || '',
-      source: data.source || LeadSource.MANUAL,
-      status: data.status || LeadStatus.NEW,
-      is_starred: false,
-      is_unread: true,
-      total_messages_sent: 0,
-      download_count: 0,
-      interactions: [],
-      first_contact_at: new Date().toISOString(),
-      last_activity_at: new Date().toISOString(),
-      created_at: new Date().toISOString(),
-      ...data
-    } as Lead;
-    
-    await this.apiRequest('leads', 'POST', newLead);
-    return newLead;
-  }
+// API Helper
+// NOTE: Ensure this points to the correct location relative to your index.html
+// If your index.html is at public_html/, then api should be at public_html/api/
+const API_BASE = './api'; 
 
-  async updateLeadStatus(id: string, status: LeadStatus): Promise<void> {
-    const lead = await this.getLeadById(id);
-    if (lead) {
-      lead.status = status;
-      lead.last_activity_at = new Date().toISOString();
-      await this.apiRequest('leads', 'POST', lead);
-    }
-  }
-
-  async updateLeadIndustry(id: string, industry: string): Promise<void> {
-    const lead = await this.getLeadById(id);
-    if (lead) {
-      lead.industry = industry;
-      await this.apiRequest('leads', 'POST', lead);
-    }
-  }
-
-  async updateLeadNote(id: string, note: string): Promise<void> {
-      const lead = await this.getLeadById(id);
-      if (lead) {
-          lead.quick_note = note;
-          await this.apiRequest('leads', 'POST', lead);
-      }
-  }
-
-  async toggleLeadStar(id: string): Promise<void> {
-      const lead = await this.getLeadById(id);
-      if (lead) {
-          lead.is_starred = !lead.is_starred;
-          await this.apiRequest('leads', 'POST', lead);
-      }
-  }
-
-  async incrementDownloadCount(ids: string[]): Promise<void> {
-      const leads = await this.getLeads();
-      for (const id of ids) {
-          const lead = leads.find(l => l.id === id);
-          if (lead) {
-              lead.download_count = (lead.download_count || 0) + 1;
-              await this.apiRequest('leads', 'POST', lead);
-          }
-      }
-  }
-
-  // --- LEAD CRM INTERACTIONS ---
-  async addLeadInteraction(leadId: string, data: Partial<ClientInteraction>): Promise<void> {
-      const lead = await this.getLeadById(leadId);
-      if(lead) {
-          const interaction: ClientInteraction = {
-              id: uuid(),
-              date: data.date || new Date().toISOString(),
-              type: data.type || 'OTHER',
-              notes: data.notes || '',
-              next_follow_up: data.next_follow_up,
-              created_at: new Date().toISOString()
-          };
-          if (!lead.interactions) lead.interactions = [];
-          lead.interactions.unshift(interaction);
-          await this.apiRequest('leads', 'POST', lead);
-      }
-  }
-
-  async deleteLeadInteraction(leadId: string, interactionId: string): Promise<void> {
-      const lead = await this.getLeadById(leadId);
-      if(lead && lead.interactions) {
-          lead.interactions = lead.interactions.filter(i => i.id !== interactionId);
-          await this.apiRequest('leads', 'POST', lead);
-      }
-  }
-
-  // --- INDUSTRIES MANAGEMENT ---
-  async getIndustries(): Promise<string[]> {
-      const data = await this.apiRequest<{id: string, list: string[]}[]>('settings', 'GET');
-      const setting = data.find(d => d.id === 'industries_list');
-      return setting ? setting.list : INDUSTRIES;
-  }
-
-  async addIndustry(name: string): Promise<void> {
-      const list = await this.getIndustries();
-      if(!list.includes(name)) {
-          list.push(name);
-          await this.apiRequest('settings', 'POST', { id: 'industries_list', list });
-      }
-  }
-
-  async deleteIndustry(name: string): Promise<void> {
-      const list = await this.getIndustries();
-      const newList = list.filter(i => i !== name);
-      await this.apiRequest('settings', 'POST', { id: 'industries_list', list: newList });
-  }
-
-  // --- INTERACTIONS (Message Logs) ---
-  async getInteractions(leadId: string): Promise<Interaction[]> {
-    const all = await this.apiRequest<Interaction[]>('interactions', 'GET');
-    return all.filter(i => i.lead_id === leadId).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
-  }
-
-  // --- TEMPLATES ---
-  async getTemplates(): Promise<MessageTemplate[]> {
-    const tmpls = await this.apiRequest<MessageTemplate[]>('templates', 'GET');
-    if (tmpls.length === 0 && !localStorage.getItem('tmpl_init')) {
-        return INITIAL_TEMPLATES.map((t, i) => ({ ...t, id: `tmpl_${i}` })) as MessageTemplate[];
-    }
-    return tmpls;
-  }
-
-  async createTemplate(data: Omit<MessageTemplate, 'id'>): Promise<void> {
-    const tmpl = { ...data, id: uuid() };
-    await this.apiRequest('templates', 'POST', tmpl);
-  }
-
-  async updateTemplate(id: string, data: Partial<MessageTemplate>): Promise<void> {
-    const tmpls = await this.getTemplates();
-    const tmpl = tmpls.find(t => t.id === id);
-    if (tmpl) {
-        await this.apiRequest('templates', 'POST', { ...tmpl, ...data });
-    }
-  }
-
-  async deleteTemplate(id: string): Promise<void> {
-    await this.apiRequest('templates', 'DELETE', null, id);
-  }
-
-  // --- CAMPAIGNS ---
-  async getCampaigns(): Promise<Campaign[]> {
-    return this.apiRequest<Campaign[]>('campaigns', 'GET');
-  }
-
-  async createCampaign(data: Omit<Campaign, 'id' | 'active_leads_count'>): Promise<void> {
-    const campaign = { ...data, id: uuid(), active_leads_count: 0 };
-    await this.apiRequest('campaigns', 'POST', campaign);
-  }
-
-  // --- AUTOMATION RULES ---
-  async getSimpleAutomationRules(): Promise<SimpleAutomationRule[]> {
-    return this.apiRequest<SimpleAutomationRule[]>('automation_rules', 'GET');
-  }
-
-  async saveSimpleAutomationRule(status: string, steps: any[]): Promise<void> {
-    const rules = await this.getSimpleAutomationRules();
-    let rule = rules.find(r => r.status === status);
-    
-    if (rule) {
-      rule.steps = steps;
-    } else {
-      rule = { id: uuid(), status: status as LeadStatus, steps, is_active: true };
-    }
-    await this.apiRequest('automation_rules', 'POST', rule);
-  }
-
-  // --- MESSAGING ---
-  async resolvePhoneNumbersToIds(numbers: string[]): Promise<string[]> {
-    const leads = await this.getLeads();
-    const ids: string[] = [];
-    
-    for (const num of numbers) {
-      let lead = leads.find(l => l.primary_phone === num || l.primary_phone.includes(num));
-      if (!lead) {
-        lead = await this.createLead({ primary_phone: num, full_name: 'Unknown Mobile User' });
-      }
-      ids.push(lead.id);
-    }
-    return ids;
-  }
-
-  async sendBulkSMS(leadIds: string[], body: string): Promise<void> {
-    const leads = await this.getLeads();
-    
-    for (const id of leadIds) {
-      const lead = leads.find(l => l.id === id);
-      if (lead) {
-        lead.total_messages_sent = (lead.total_messages_sent || 0) + 1;
-        lead.last_activity_at = new Date().toISOString();
-        await this.apiRequest('leads', 'POST', lead);
-        
-        await this.apiRequest('interactions', 'POST', {
-          id: uuid(),
-          lead_id: id,
-          channel: 'sms',
-          direction: 'outgoing',
-          content: body,
-          created_at: new Date().toISOString()
-        });
-      }
-    }
-  }
-
-  async scheduleBulkMessages(leadIds: string[], messages: any[]): Promise<void> {
-    console.log(`Scheduled ${messages.length} messages for ${leadIds.length} leads.`);
-  }
-
-  // --- FORMS ---
-  async getForms(): Promise<LeadForm[]> {
-    const forms = await this.apiRequest<LeadForm[]>('lead_forms', 'GET');
-    return forms.length > 0 ? forms : INITIAL_LEAD_FORMS;
-  }
-
-  async getFormById(id: string): Promise<LeadForm | undefined> {
-    const forms = await this.getForms();
-    return forms.find(f => f.id === id);
-  }
-
-  async createForm(data: Omit<LeadForm, 'id' | 'created_at'>): Promise<void> {
-    const form = { ...data, id: uuid(), created_at: new Date().toISOString() };
-    await this.apiRequest('lead_forms', 'POST', form);
-  }
-
-  async updateForm(id: string, data: Partial<LeadForm>): Promise<void> {
-    const form = await this.getFormById(id);
-    if(form) {
-        await this.apiRequest('lead_forms', 'POST', { ...form, ...data });
-    }
-  }
-
-  async deleteForm(id: string): Promise<void> {
-    await this.apiRequest('lead_forms', 'DELETE', null, id);
-  }
-
-  async submitLeadForm(formId: string, data: any): Promise<void> {
-    await this.createLead({
-      full_name: data.name,
-      primary_phone: data.phone,
-      source: LeadSource.FORM,
-      website_url: data.website,
-      facebook_profile_link: data.facebook,
-      industry: data.industry
-    });
-  }
-
-  // --- ONLINE CUSTOMERS ---
-  async getCustomers(): Promise<Customer[]> {
-    return this.apiRequest<Customer[]>('customers', 'GET');
-  }
-
-  async getCustomerCategories(): Promise<string[]> {
-    const data = await this.apiRequest<{id: string, list: string[]}[]>('settings', 'GET');
-    const setting = data.find(d => d.id === 'customer_categories');
-    return setting ? setting.list : ['Dress', 'Bag', 'Watch', 'Shoe', 'Gadget'];
-  }
-
-  async addCustomerCategory(name: string): Promise<void> {
-    const list = await this.getCustomerCategories();
-    if (!list.includes(name)) {
-      list.push(name);
-      await this.apiRequest('settings', 'POST', { id: 'customer_categories', list });
-    }
-  }
-
-  async deleteCustomerCategory(name: string): Promise<void> {
-    const list = await this.getCustomerCategories();
-    const newList = list.filter(c => c !== name);
-    await this.apiRequest('settings', 'POST', { id: 'customer_categories', list: newList });
-  }
-
-  async addBulkCustomers(lines: string[], category: string): Promise<number> {
-    const customers = await this.getCustomers();
-    let added = 0;
-    const now = new Date().toISOString();
-
-    for (const line of lines) {
-      const phoneMatch = line.match(/(?:\+88|88)?(01[3-9]\d{8})/);
-      if (phoneMatch) {
-        const phone = phoneMatch[0];
-        if (!customers.some(c => c.phone === phone)) {
-          await this.apiRequest('customers', 'POST', {
-            id: uuid(),
-            phone,
-            category,
-            date_added: now
-          });
-          added++;
+export const mockService = {
+    // --- LEADS (CONNECTED TO PHP/MYSQL) ---
+    getLeads: async (): Promise<Lead[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/leads.php`);
+            if (!res.ok) throw new Error('API not available');
+            const data = await res.json();
+            if (Array.isArray(data)) return data;
+            return getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        } catch (e) {
+            console.warn("Running in Offline/Demo Mode (API fetch failed):", e);
+            return getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
         }
-      }
-    }
-    return added;
-  }
-
-  async deleteCustomer(id: string): Promise<void> {
-    await this.apiRequest('customers', 'DELETE', null, id);
-  }
-
-  // --- DAILY TASKS ---
-  async getTasks(): Promise<Task[]> {
-    return this.apiRequest<Task[]>('tasks', 'GET');
-  }
-
-  async createTask(text: string, dueDate?: string, leadId?: string): Promise<void> {
-    const task = { 
-        id: uuid(), 
-        text, 
-        is_completed: false, 
-        created_at: new Date().toISOString(),
-        due_date: dueDate,
-        lead_id: leadId
-    };
-    await this.apiRequest('tasks', 'POST', task);
-  }
-
-  async toggleTask(id: string): Promise<void> {
-    const tasks = await this.getTasks();
-    const task = tasks.find(t => t.id === id);
-    if (task) {
-      task.is_completed = !task.is_completed;
-      await this.apiRequest('tasks', 'POST', task);
-    }
-  }
-
-  async deleteTask(id: string): Promise<void> {
-    await this.apiRequest('tasks', 'DELETE', null, id);
-  }
-
-  // --- INVOICES ---
-  async getInvoices(): Promise<Invoice[]> {
-    return this.apiRequest<Invoice[]>('invoices', 'GET');
-  }
-
-  async createInvoice(data: Omit<Invoice, 'id' | 'number' | 'created_at'>): Promise<void> {
-    const invoices = await this.getInvoices();
-    const number = `INV-${new Date().getFullYear()}-${String(invoices.length + 1).padStart(3, '0')}`;
-    const invoice = { 
-        ...data, 
-        id: uuid(), 
-        number, 
-        created_at: new Date().toISOString() 
-    };
-    await this.apiRequest('invoices', 'POST', invoice);
-  }
-
-  async deleteInvoice(id: string): Promise<void> {
-    await this.apiRequest('invoices', 'DELETE', null, id);
-  }
-
-  // --- SNIPPETS ---
-  async getSnippets(): Promise<Snippet[]> {
-    const snippets = await this.apiRequest<Snippet[]>('snippets', 'GET');
-    return snippets.length > 0 ? snippets : INITIAL_SNIPPETS.map((s, i) => ({ ...s, id: `snp_${i}` }));
-  }
-
-  async createSnippet(data: Omit<Snippet, 'id'>): Promise<void> {
-    await this.apiRequest('snippets', 'POST', { ...data, id: uuid() });
-  }
-
-  async updateSnippet(id: string, data: Partial<Snippet>): Promise<void> {
-    const snippets = await this.getSnippets();
-    const snp = snippets.find(s => s.id === id);
-    if(snp) {
-        await this.apiRequest('snippets', 'POST', { ...snp, ...data });
-    }
-  }
-
-  async deleteSnippet(id: string): Promise<void> {
-    await this.apiRequest('snippets', 'DELETE', null, id);
-  }
-
-  // --- DOCUMENTS ---
-  async getDocuments(): Promise<Document[]> {
-    return this.apiRequest<Document[]>('documents', 'GET');
-  }
-
-  async saveDocument(data: any): Promise<void> {
-    const doc = { ...data, id: uuid(), created_at: new Date().toISOString() };
-    await this.apiRequest('documents', 'POST', doc);
-  }
-
-  async deleteDocument(id: string): Promise<void> {
-    await this.apiRequest('documents', 'DELETE', null, id);
-  }
-
-  // --- BIG FISH ---
-  async getBigFish(): Promise<BigFish[]> {
-    return this.apiRequest<BigFish[]>('big_fish', 'GET');
-  }
-
-  async getBigFishById(id: string): Promise<BigFish | undefined> {
-    const fish = await this.getBigFish();
-    return fish.find(f => f.id === id);
-  }
-
-  async createBigFish(data: Partial<BigFish>): Promise<BigFish> {
-    const newFish: BigFish = {
-      id: uuid(),
-      lead_id: data.lead_id || uuid(),
-      name: data.name || 'Unknown Client',
-      phone: data.phone || '',
-      status: 'Active Pool',
-      balance: 0,
-      spent_amount: 0,
-      target_sales: 100,
-      current_sales: 0,
-      transactions: [],
-      growth_tasks: [],
-      reports: [],
-      interactions: [],
-      start_date: new Date().toISOString(),
-      low_balance_alert_threshold: 10,
-      portal_config: { show_balance: true, show_history: true, is_suspended: false },
-      is_retainer: false,
-      retainer_amount: 0,
-      retainer_status: 'ACTIVE',
-      ...data
-    } as BigFish;
-    
-    await this.apiRequest('big_fish', 'POST', newFish);
-    return newFish;
-  }
-
-  async catchBigFish(leadId: string): Promise<BigFish | null> {
-    const leads = await this.getLeads();
-    const lead = leads.find(l => l.id === leadId);
-    if (!lead) return null;
-
-    const fish = await this.getBigFish();
-    if (fish.some(f => f.lead_id === leadId && f.status === 'Active Pool')) return null;
-
-    return this.createBigFish({
-      lead_id: lead.id,
-      name: lead.full_name,
-      phone: lead.primary_phone,
-      website_url: lead.website_url,
-      facebook_page: lead.facebook_profile_link,
-    });
-  }
-
-  async toggleBigFishStatus(id: string): Promise<void> {
-    const f = await this.getBigFishById(id);
-    if (f) {
-      f.status = f.status === 'Active Pool' ? 'Hall of Fame' : 'Active Pool';
-      if (f.status === 'Hall of Fame') f.end_date = new Date().toISOString();
-      else f.end_date = undefined;
-      await this.apiRequest('big_fish', 'POST', f);
-    }
-  }
-
-  async updateBigFish(id: string, updates: Partial<BigFish>): Promise<void> {
-    const f = await this.getBigFishById(id);
-    if (f) {
-        const updated = { ...f, ...updates };
-        await this.apiRequest('big_fish', 'POST', updated);
-    }
-  }
-
-  async updatePortalConfig(id: string, config: any): Promise<void> {
-    const f = await this.getBigFishById(id);
-    if (f) {
-      f.portal_config = { ...f.portal_config, ...config };
-      await this.apiRequest('big_fish', 'POST', f);
-    }
-  }
-
-  // --- CRM: INTERACTIONS (BIG FISH) ---
-  async addClientInteraction(fishId: string, data: Partial<ClientInteraction>): Promise<void> {
-      const f = await this.getBigFishById(fishId);
-      if(f) {
-          const interaction: ClientInteraction = {
-              id: uuid(),
-              date: data.date || new Date().toISOString(),
-              type: data.type || 'OTHER',
-              notes: data.notes || '',
-              next_follow_up: data.next_follow_up,
-              created_at: new Date().toISOString()
-          };
-          if (!f.interactions) f.interactions = [];
-          f.interactions.unshift(interaction);
-          await this.apiRequest('big_fish', 'POST', f);
-      }
-  }
-
-  async deleteClientInteraction(fishId: string, interactionId: string): Promise<void> {
-      const f = await this.getBigFishById(fishId);
-      if(f && f.interactions) {
-          f.interactions = f.interactions.filter(i => i.id !== interactionId);
-          await this.apiRequest('big_fish', 'POST', f);
-      }
-  }
-
-  // Transactions
-  async addTransaction(id: string, type: any, amount: number, desc: string, metadata?: any, date?: string): Promise<void> {
-    const f = await this.getBigFishById(id);
-    if (f) {
-      const tx: Transaction = {
-        id: uuid(),
-        date: date || new Date().toISOString(),
-        type,
-        amount,
-        description: desc,
-        metadata
-      };
-      f.transactions.unshift(tx);
-      
-      if (type === 'DEPOSIT') f.balance += amount;
-      if (type === 'DEDUCT' || type === 'AD_SPEND' || type === 'SERVICE_CHARGE') f.balance -= amount;
-      
-      if (type === 'AD_SPEND') {
-        f.spent_amount += amount;
-        f.reports.unshift({
+    },
+    getLeadById: async (id: string): Promise<Lead | undefined> => {
+        const leads = await mockService.getLeads();
+        return leads.find(l => l.id === id);
+    },
+    createLead: async (lead: Partial<Lead>): Promise<Lead> => {
+        const newLead: Lead = {
             id: uuid(),
-            date: date || new Date().toISOString(),
-            task: `Ad Spend Run: $${amount} (Results: ${metadata?.leads || 0})`
+            full_name: lead.full_name || 'Unknown',
+            primary_phone: lead.primary_phone || '',
+            source: lead.source || LeadSource.MANUAL,
+            status: lead.status || LeadStatus.NEW,
+            industry: lead.industry,
+            service_category: lead.service_category,
+            is_starred: false,
+            is_unread: true,
+            total_messages_sent: 0,
+            download_count: 0,
+            first_contact_at: new Date().toISOString(),
+            last_activity_at: new Date().toISOString(),
+            created_at: new Date().toISOString(),
+            ...lead
+        } as Lead;
+
+        try {
+            // Send to Server
+            await fetch(`${API_BASE}/leads.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newLead)
+            });
+        } catch (e) {
+            console.error("Failed to save to server, saving locally", e);
+        }
+
+        // Keep LocalStorage Sync for immediate UI update / Fallback
+        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        leads.unshift(newLead);
+        setStorage('leads', leads);
+        
+        return newLead;
+    },
+    updateLeadStatus: async (id: string, status: LeadStatus) => {
+        // Optimistic UI Update
+        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        const index = leads.findIndex(l => l.id === id);
+        if (index !== -1) {
+            leads[index].status = status;
+            leads[index].last_activity_at = new Date().toISOString();
+            setStorage('leads', leads);
+        }
+
+        try {
+            await fetch(`${API_BASE}/leads.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update_status', id, status })
+            });
+        } catch (e) { console.error("API Error", e); }
+    },
+    updateLeadIndustry: async (id: string, industry: string) => {
+        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        const index = leads.findIndex(l => l.id === id);
+        if (index !== -1) {
+            leads[index].industry = industry;
+            setStorage('leads', leads);
+        }
+        try {
+            await fetch(`${API_BASE}/leads.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update_industry', id, industry })
+            });
+        } catch (e) { console.error("API Error", e); }
+    },
+    toggleLeadStar: async (id: string) => {
+        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        const index = leads.findIndex(l => l.id === id);
+        if (index !== -1) {
+            leads[index].is_starred = !leads[index].is_starred;
+            setStorage('leads', leads);
+        }
+        try {
+            await fetch(`${API_BASE}/leads.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'toggle_star', id })
+            });
+        } catch (e) { console.error("API Error", e); }
+    },
+    updateLeadNote: async (id: string, note: string) => {
+        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        const index = leads.findIndex(l => l.id === id);
+        if (index !== -1) {
+            leads[index].quick_note = note;
+            setStorage('leads', leads);
+        }
+        // TODO: Add API support for notes
+    },
+    incrementDownloadCount: async (ids: string[]) => {
+        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        let updated = false;
+        leads.forEach(l => {
+            if (ids.includes(l.id)) {
+                l.download_count = (l.download_count || 0) + 1;
+                updated = true;
+            }
         });
-      }
-      await this.apiRequest('big_fish', 'POST', f);
+        if (updated) setStorage('leads', leads);
+    },
+    resolvePhoneNumbersToIds: async (phones: string[]): Promise<string[]> => {
+        const leads = await mockService.getLeads(); // Use getLeads to ensure we have latest
+        const ids: string[] = [];
+        let updated = false;
+
+        for (const phone of phones) {
+            const existing = leads.find(l => l.primary_phone.includes(phone) || phone.includes(l.primary_phone));
+            if (existing) {
+                ids.push(existing.id);
+            } else {
+                // Create new lead
+                const newLead: Lead = {
+                    id: uuid(),
+                    full_name: 'Unknown',
+                    primary_phone: phone,
+                    source: LeadSource.MANUAL,
+                    status: LeadStatus.NEW,
+                    is_starred: false,
+                    is_unread: true,
+                    total_messages_sent: 0,
+                    download_count: 0,
+                    first_contact_at: new Date().toISOString(),
+                    last_activity_at: new Date().toISOString(),
+                    created_at: new Date().toISOString(),
+                };
+                
+                // Create in DB
+                await mockService.createLead(newLead);
+                ids.push(newLead.id);
+            }
+        }
+        return ids;
+    },
+
+    // --- INDUSTRIES ---
+    getIndustries: async (): Promise<string[]> => {
+        return getStorage<string[]>('industries', INDUSTRIES);
+    },
+    addIndustry: async (name: string) => {
+        const list = getStorage<string[]>('industries', INDUSTRIES);
+        if (!list.includes(name)) {
+            list.push(name);
+            setStorage('industries', list);
+        }
+    },
+    deleteIndustry: async (name: string) => {
+        let list = getStorage<string[]>('industries', INDUSTRIES);
+        list = list.filter(i => i !== name);
+        setStorage('industries', list);
+    },
+
+    // --- INTERACTIONS ---
+    getInteractions: async (leadId: string): Promise<Interaction[]> => {
+        const interactions = getStorage<Interaction[]>('interactions', []);
+        return interactions.filter(i => i.lead_id === leadId).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    },
+    
+    // --- TEMPLATES ---
+    getTemplates: async (): Promise<MessageTemplate[]> => {
+        return getStorage<MessageTemplate[]>('templates', FULL_TEMPLATES);
+    },
+    createTemplate: async (template: Partial<MessageTemplate>) => {
+        const templates = getStorage<MessageTemplate[]>('templates', FULL_TEMPLATES);
+        const newT: MessageTemplate = {
+            id: uuid(),
+            name: template.name!,
+            category: template.category!,
+            channel: template.channel!,
+            type: template.type || 'custom',
+            body: template.body!,
+            is_active: true
+        };
+        templates.push(newT);
+        setStorage('templates', templates);
+    },
+    updateTemplate: async (id: string, updates: Partial<MessageTemplate>) => {
+        const templates = getStorage<MessageTemplate[]>('templates', FULL_TEMPLATES);
+        const idx = templates.findIndex(t => t.id === id);
+        if (idx !== -1) {
+            templates[idx] = { ...templates[idx], ...updates };
+            setStorage('templates', templates);
+        }
+    },
+    deleteTemplate: async (id: string) => {
+        let templates = getStorage<MessageTemplate[]>('templates', FULL_TEMPLATES);
+        templates = templates.filter(t => t.id !== id);
+        setStorage('templates', templates);
+    },
+
+    // --- CAMPAIGNS ---
+    getCampaigns: async (): Promise<Campaign[]> => {
+        return getStorage<Campaign[]>('campaigns', []);
+    },
+    createCampaign: async (campaign: Partial<Campaign>) => {
+        const campaigns = getStorage<Campaign[]>('campaigns', []);
+        const newC: Campaign = {
+            id: uuid(),
+            name: campaign.name!,
+            description: campaign.description || '',
+            steps: campaign.steps || [],
+            active_leads_count: 0,
+            is_active: true
+        };
+        campaigns.push(newC);
+        setStorage('campaigns', campaigns);
+    },
+
+    // --- AUTOMATION RULES ---
+    getSimpleAutomationRules: async (): Promise<SimpleAutomationRule[]> => {
+        return getStorage<SimpleAutomationRule[]>('automation_rules', []);
+    },
+    saveSimpleAutomationRule: async (status: LeadStatus, steps: any[]) => {
+        let rules = getStorage<SimpleAutomationRule[]>('automation_rules', []);
+        const idx = rules.findIndex(r => r.status === status);
+        if (idx !== -1) {
+            rules[idx].steps = steps.map(s => ({ ...s, id: uuid() }));
+        } else {
+            rules.push({
+                id: uuid(),
+                status,
+                steps: steps.map(s => ({ ...s, id: uuid() })),
+                is_active: true
+            });
+        }
+        setStorage('automation_rules', rules);
+    },
+
+    // --- MESSAGING ---
+    sendBulkSMS: async (leadIds: string[], body: string) => {
+        // Simulate API call
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Log interactions
+        const interactions = getStorage<Interaction[]>('interactions', []);
+        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        
+        leadIds.forEach(id => {
+            interactions.push({
+                id: uuid(),
+                lead_id: id,
+                channel: 'sms',
+                direction: 'outgoing', // MessageDirection.OUTGOING
+                content: body,
+                created_at: new Date().toISOString()
+            } as any);
+
+            const leadIdx = leads.findIndex(l => l.id === id);
+            if (leadIdx !== -1) {
+                leads[leadIdx].total_messages_sent = (leads[leadIdx].total_messages_sent || 0) + 1;
+                leads[leadIdx].last_activity_at = new Date().toISOString();
+            }
+        });
+        
+        setStorage('interactions', interactions);
+        setStorage('leads', leads);
+    },
+    scheduleBulkMessages: async (leadIds: string[], messages: any[]) => {
+        // Just simulate success for now
+        await new Promise(resolve => setTimeout(resolve, 500));
+    },
+
+    // --- FORMS ---
+    getForms: async (): Promise<LeadForm[]> => {
+        return getStorage<LeadForm[]>('lead_forms', INITIAL_LEAD_FORMS);
+    },
+    getFormById: async (id: string): Promise<LeadForm | undefined> => {
+        const forms = getStorage<LeadForm[]>('lead_forms', INITIAL_LEAD_FORMS);
+        return forms.find(f => f.id === id);
+    },
+    createForm: async (form: Omit<LeadForm, 'id' | 'created_at'>) => {
+        const forms = getStorage<LeadForm[]>('lead_forms', INITIAL_LEAD_FORMS);
+        forms.push({ ...form, id: uuid(), created_at: new Date().toISOString() });
+        setStorage('lead_forms', forms);
+    },
+    updateForm: async (id: string, updates: Partial<LeadForm>) => {
+        const forms = getStorage<LeadForm[]>('lead_forms', INITIAL_LEAD_FORMS);
+        const idx = forms.findIndex(f => f.id === id);
+        if(idx !== -1) {
+            forms[idx] = { ...forms[idx], ...updates };
+            setStorage('lead_forms', forms);
+        }
+    },
+    deleteForm: async (id: string) => {
+        let forms = getStorage<LeadForm[]>('lead_forms', INITIAL_LEAD_FORMS);
+        forms = forms.filter(f => f.id !== id);
+        setStorage('lead_forms', forms);
+    },
+    submitLeadForm: async (formId: string, data: any) => {
+        const newLead: Partial<Lead> = {
+            full_name: data.name,
+            primary_phone: data.phone,
+            source: LeadSource.FORM,
+            status: LeadStatus.NEW,
+            industry: data.industry,
+            website_url: data.website,
+            facebook_profile_link: data.facebook
+        };
+        await mockService.createLead(newLead);
+    },
+
+    // --- CUSTOMERS (ONLINE) ---
+    getCustomers: async (): Promise<Customer[]> => {
+        return getStorage<Customer[]>('online_customers', []);
+    },
+    getCustomerCategories: async (): Promise<string[]> => {
+        return getStorage<string[]>('customer_categories', ['Dress', 'Bag', 'Shoes', 'Watch', 'Gadget']);
+    },
+    addCustomerCategory: async (name: string) => {
+        const cats = getStorage<string[]>('customer_categories', ['Dress', 'Bag', 'Shoes', 'Watch', 'Gadget']);
+        if (!cats.includes(name)) {
+            cats.push(name);
+            setStorage('customer_categories', cats);
+        }
+    },
+    deleteCustomerCategory: async (name: string) => {
+        let cats = getStorage<string[]>('customer_categories', ['Dress', 'Bag', 'Shoes', 'Watch', 'Gadget']);
+        cats = cats.filter(c => c !== name);
+        setStorage('customer_categories', cats);
+    },
+    addBulkCustomers: async (lines: string[], category: string): Promise<number> => {
+        const customers = getStorage<Customer[]>('online_customers', []);
+        let added = 0;
+        
+        lines.forEach(line => {
+            const phone = line.trim();
+            if (phone && !customers.some(c => c.phone === phone)) {
+                customers.push({
+                    id: uuid(),
+                    phone,
+                    category,
+                    date_added: new Date().toISOString()
+                });
+                added++;
+            }
+        });
+        setStorage('online_customers', customers);
+        return added;
+    },
+    deleteCustomer: async (id: string) => {
+        let customers = getStorage<Customer[]>('online_customers', []);
+        customers = customers.filter(c => c.id !== id);
+        setStorage('online_customers', customers);
+    },
+
+    // --- TASKS ---
+    getTasks: async (): Promise<Task[]> => {
+        return getStorage<Task[]>('tasks', []);
+    },
+    createTask: async (text: string, dueDate?: string, leadId?: string) => {
+        const tasks = getStorage<Task[]>('tasks', []);
+        tasks.push({
+            id: uuid(),
+            text,
+            is_completed: false,
+            created_at: new Date().toISOString(),
+            due_date: dueDate,
+            lead_id: leadId
+        });
+        setStorage('tasks', tasks);
+    },
+    toggleTask: async (id: string) => {
+        const tasks = getStorage<Task[]>('tasks', []);
+        const t = tasks.find(x => x.id === id);
+        if (t) {
+            t.is_completed = !t.is_completed;
+            setStorage('tasks', tasks);
+        }
+    },
+    deleteTask: async (id: string) => {
+        let tasks = getStorage<Task[]>('tasks', []);
+        tasks = tasks.filter(t => t.id !== id);
+        setStorage('tasks', tasks);
+    },
+
+    // --- INVOICES (API Connected) ---
+    getInvoices: async (): Promise<Invoice[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/invoices.php`);
+            if (res.ok) {
+                return await res.json();
+            }
+        } catch(e) { console.warn("API Error, using local", e); }
+        return getStorage<Invoice[]>('invoices', []);
+    },
+    createInvoice: async (inv: Partial<Invoice>) => {
+        const invoices = getStorage<Invoice[]>('invoices', []);
+        // Generate number INV-0001
+        const num = invoices.length + 1;
+        const padded = num.toString().padStart(4, '0');
+        
+        const newInv = {
+            id: uuid(),
+            number: `INV-${padded}`,
+            client_name: inv.client_name!,
+            client_phone: inv.client_phone,
+            client_address: inv.client_address,
+            items: inv.items || [],
+            status: inv.status || 'new',
+            date: inv.date || new Date().toISOString().slice(0, 10),
+            created_at: new Date().toISOString(),
+            paid_amount: inv.paid_amount || 0,
+            terms_enabled: inv.terms_enabled || false,
+            terms_content: inv.terms_content
+        };
+
+        try {
+            await fetch(`${API_BASE}/invoices.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newInv)
+            });
+        } catch(e) { console.warn("API Error", e); }
+
+        invoices.unshift(newInv as Invoice);
+        setStorage('invoices', invoices);
+    },
+    deleteInvoice: async (id: string) => {
+        try {
+            await fetch(`${API_BASE}/invoices.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete', id })
+            });
+        } catch(e) { console.warn("API Error", e); }
+
+        let invoices = getStorage<Invoice[]>('invoices', []);
+        invoices = invoices.filter(i => i.id !== id);
+        setStorage('invoices', invoices);
+    },
+
+    // --- SNIPPETS ---
+    getSnippets: async (): Promise<Snippet[]> => {
+        return getStorage<Snippet[]>('snippets', FULL_SNIPPETS);
+    },
+    createSnippet: async (s: Partial<Snippet>) => {
+        const snippets = getStorage<Snippet[]>('snippets', FULL_SNIPPETS);
+        snippets.push({ ...s, id: uuid() } as Snippet);
+        setStorage('snippets', snippets);
+    },
+    updateSnippet: async (id: string, updates: Partial<Snippet>) => {
+        const snippets = getStorage<Snippet[]>('snippets', FULL_SNIPPETS);
+        const idx = snippets.findIndex(s => s.id === id);
+        if (idx !== -1) {
+            snippets[idx] = { ...snippets[idx], ...updates };
+            setStorage('snippets', snippets);
+        }
+    },
+    deleteSnippet: async (id: string) => {
+        let snippets = getStorage<Snippet[]>('snippets', FULL_SNIPPETS);
+        snippets = snippets.filter(s => s.id !== id);
+        setStorage('snippets', snippets);
+    },
+
+    // --- DOCUMENTS (LETTERHEAD) ---
+    getDocuments: async (): Promise<Document[]> => {
+        return getStorage<Document[]>('documents', []);
+    },
+    saveDocument: async (doc: Partial<Document>) => {
+        const docs = getStorage<Document[]>('documents', []);
+        docs.unshift({
+            id: uuid(),
+            title: doc.title || 'Untitled',
+            client_id: doc.client_id,
+            client_name: doc.client_name,
+            content: doc.content || '',
+            created_at: new Date().toISOString()
+        });
+        setStorage('documents', docs);
+    },
+    deleteDocument: async (id: string) => {
+        let docs = getStorage<Document[]>('documents', []);
+        docs = docs.filter(d => d.id !== id);
+        setStorage('documents', docs);
+    },
+
+    // --- BIG FISH (VIP CLIENTS) - API Connected ---
+    getBigFish: async (): Promise<BigFish[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/bigfish.php`);
+            if(res.ok) return await res.json();
+        } catch (e) { console.warn("API Error", e); }
+        return getStorage<BigFish[]>('big_fish', []);
+    },
+    getBigFishById: async (id: string): Promise<BigFish | undefined> => {
+        const fish = await mockService.getBigFish();
+        return fish.find(f => f.id === id);
+    },
+    createBigFish: async (data: Partial<BigFish>) => {
+        const newFish = {
+            id: uuid(),
+            lead_id: uuid(), // Dummy if manual
+            name: data.name!,
+            phone: data.phone!,
+            status: 'Active Pool',
+            package_name: data.package_name,
+            balance: 0,
+            low_balance_alert_threshold: 10,
+            total_budget: 0,
+            spent_amount: 0,
+            target_sales: 0,
+            current_sales: 0,
+            transactions: [],
+            growth_tasks: [],
+            reports: [],
+            interactions: [],
+            portal_config: { show_balance: true, show_history: true, is_suspended: false },
+            start_date: new Date().toISOString()
+        };
+
+        try {
+            await fetch(`${API_BASE}/bigfish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newFish)
+            });
+        } catch(e) { console.warn("API Error", e); }
+
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        fish.push(newFish as any);
+        setStorage('big_fish', fish);
+    },
+    catchBigFish: async (leadId: string): Promise<boolean> => {
+        const leads = await mockService.getLeads();
+        const lead = leads.find(l => l.id === leadId);
+        if (!lead) return false;
+
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        if (fish.some(f => f.lead_id === leadId)) return false;
+
+        const newFish = {
+            id: uuid(),
+            lead_id: leadId,
+            name: lead.full_name,
+            phone: lead.primary_phone,
+            status: 'Active Pool',
+            package_name: lead.service_category,
+            balance: 0,
+            low_balance_alert_threshold: 10,
+            total_budget: 0,
+            spent_amount: 0,
+            target_sales: 0,
+            current_sales: 0,
+            transactions: [],
+            growth_tasks: [],
+            reports: [],
+            interactions: [],
+            portal_config: { show_balance: true, show_history: true, is_suspended: false },
+            start_date: new Date().toISOString()
+        };
+
+        try {
+            await fetch(`${API_BASE}/bigfish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newFish)
+            });
+        } catch(e) { console.warn("API Error", e); }
+
+        fish.push(newFish as any);
+        setStorage('big_fish', fish);
+        return true;
+    },
+    toggleBigFishStatus: async (id: string) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === id);
+        if (f) {
+            f.status = f.status === 'Active Pool' ? 'Hall of Fame' : 'Active Pool';
+            if (f.status === 'Hall of Fame') f.end_date = new Date().toISOString();
+            setStorage('big_fish', fish);
+        }
+    },
+    updateBigFish: async (id: string, updates: Partial<BigFish>) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const idx = fish.findIndex(f => f.id === id);
+        if(idx !== -1) {
+            fish[idx] = { ...fish[idx], ...updates };
+            setStorage('big_fish', fish);
+        }
+    },
+    addTransaction: async (fishId: string, type: Transaction['type'], amount: number, desc: string, metadata?: any, dateOverride?: string) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f) {
+            const tx: Transaction = {
+                id: uuid(),
+                date: dateOverride || new Date().toISOString(),
+                type,
+                amount,
+                description: desc,
+                metadata
+            };
+            f.transactions.unshift(tx);
+            
+            // Recalculate Balance
+            if (type === 'DEPOSIT') f.balance += amount;
+            else f.balance -= amount;
+
+            if (type === 'AD_SPEND') {
+                f.spent_amount += amount;
+                // Auto create work log
+                f.reports.unshift({
+                    id: uuid(),
+                    date: dateOverride || new Date().toISOString(),
+                    task: `Ad Run: Spent $${amount} (${desc})`
+                });
+                
+                // Update sales/messages count
+                if (metadata && metadata.leads) {
+                    if (metadata.resultType === 'SALES') {
+                        f.current_sales += metadata.leads;
+                    }
+                }
+            }
+            setStorage('big_fish', fish);
+        }
+    },
+    deleteTransaction: async (fishId: string, txId: string) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f) {
+            const tx = f.transactions.find(t => t.id === txId);
+            if (tx) {
+                // Reverse Balance
+                if (tx.type === 'DEPOSIT') f.balance -= tx.amount;
+                else f.balance += tx.amount;
+
+                if (tx.type === 'AD_SPEND') f.spent_amount -= tx.amount;
+
+                f.transactions = f.transactions.filter(t => t.id !== txId);
+                setStorage('big_fish', fish);
+            }
+        }
+    },
+    updateTransaction: async (fishId: string, txId: string, updates: { date: string, description: string, amount: number }) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f) {
+            const txIndex = f.transactions.findIndex(t => t.id === txId);
+            if (txIndex !== -1) {
+                const oldTx = f.transactions[txIndex];
+                
+                // Revert old effect
+                if (oldTx.type === 'DEPOSIT') f.balance -= oldTx.amount;
+                else f.balance += oldTx.amount;
+                if (oldTx.type === 'AD_SPEND') f.spent_amount -= oldTx.amount;
+
+                // Apply new effect
+                const newAmount = updates.amount;
+                if (oldTx.type === 'DEPOSIT') f.balance += newAmount;
+                else f.balance -= newAmount;
+                if (oldTx.type === 'AD_SPEND') f.spent_amount += newAmount;
+
+                f.transactions[txIndex] = { ...oldTx, ...updates };
+                setStorage('big_fish', fish);
+            }
+        }
+    },
+    getLifetimeDeposit: (fish: BigFish) => {
+        return fish.transactions.filter(t => t.type === 'DEPOSIT').reduce((acc, t) => acc + t.amount, 0);
+    },
+    addGrowthTask: async (fishId: string, title: string, dueDate?: string) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f) {
+            f.growth_tasks.push({
+                id: uuid(),
+                title,
+                is_completed: false,
+                due_date: dueDate
+            });
+            setStorage('big_fish', fish);
+        }
+    },
+    toggleGrowthTask: async (fishId: string, taskId: string) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f) {
+            const t = f.growth_tasks.find(x => x.id === taskId);
+            if (t) t.is_completed = !t.is_completed;
+            setStorage('big_fish', fish);
+        }
+    },
+    updatePortalConfig: async (fishId: string, config: any) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f) {
+            f.portal_config = { ...f.portal_config, ...config };
+            setStorage('big_fish', fish);
+        }
+    },
+    updateTargets: async (fishId: string, target: number, current: number) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f) {
+            f.target_sales = target;
+            f.current_sales = current;
+            setStorage('big_fish', fish);
+        }
+    },
+    addWorkLog: async (fishId: string, task: string) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f) {
+            f.reports.unshift({
+                id: uuid(),
+                date: new Date().toISOString(),
+                task
+            });
+            setStorage('big_fish', fish);
+        }
+    },
+    checkExpiringCampaigns: async (): Promise<BigFish[]> => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const now = new Date();
+        const tomorrow = new Date();
+        tomorrow.setDate(now.getDate() + 1);
+        
+        return fish.filter(f => {
+            if (f.status !== 'Active Pool' || !f.campaign_end_date) return false;
+            const end = new Date(f.campaign_end_date);
+            return end <= tomorrow && end >= now;
+        });
+    },
+    checkRetainerRenewals: async (): Promise<BigFish[]> => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const now = new Date();
+        const nextWeek = new Date();
+        nextWeek.setDate(now.getDate() + 7);
+
+        return fish.filter(f => {
+            if (f.status !== 'Active Pool' || !f.is_retainer || !f.retainer_renewal_date) return false;
+            const renew = new Date(f.retainer_renewal_date);
+            return renew <= nextWeek; // Alerts if renewal is within 7 days or past due
+        });
+    },
+    renewRetainer: async (fishId: string) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f && f.retainer_renewal_date) {
+            const current = new Date(f.retainer_renewal_date);
+            current.setDate(current.getDate() + 30); // Add 30 days
+            f.retainer_renewal_date = current.toISOString().slice(0, 10);
+            setStorage('big_fish', fish);
+        }
+    },
+    addClientInteraction: async (fishId: string, interaction: Omit<ClientInteraction, 'id' | 'created_at'>) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f) {
+            if (!f.interactions) f.interactions = [];
+            f.interactions.unshift({
+                id: uuid(),
+                created_at: new Date().toISOString(),
+                ...interaction
+            });
+            setStorage('big_fish', fish);
+        }
+    },
+    deleteClientInteraction: async (fishId: string, interactionId: string) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f && f.interactions) {
+            f.interactions = f.interactions.filter(i => i.id !== interactionId);
+            setStorage('big_fish', fish);
+        }
+    },
+
+    // --- PAYMENT METHODS ---
+    getPaymentMethods: async (): Promise<PaymentMethod[]> => {
+        return getStorage<PaymentMethod[]>('payment_methods', []);
+    },
+    savePaymentMethod: async (pm: Partial<PaymentMethod>) => {
+        const list = getStorage<PaymentMethod[]>('payment_methods', []);
+        list.push({ ...pm, id: uuid() } as PaymentMethod);
+        setStorage('payment_methods', list);
+    },
+    deletePaymentMethod: async (id: string) => {
+        let list = getStorage<PaymentMethod[]>('payment_methods', []);
+        list = list.filter(p => p.id !== id);
+        setStorage('payment_methods', list);
+    },
+
+    // --- SYSTEM SETTINGS ---
+    getSystemSettings: async (): Promise<SystemSettings> => {
+        return getStorage<SystemSettings>('system_settings', {
+            facebook_page_token: '',
+            facebook_verify_token: '',
+            sms_api_key: '',
+            sms_sender_id: '',
+            sms_base_url: '',
+            timezone: 'Asia/Dhaka',
+            system_api_key: ''
+        });
+    },
+    saveSystemSettings: async (s: SystemSettings) => {
+        setStorage('system_settings', s);
+    },
+
+    // --- MESSENGER BABA (Mock) ---
+    getMessengerConversations: async (): Promise<MessengerConversation[]> => {
+        return getStorage<MessengerConversation[]>('messenger_convs', []);
+    },
+    simulateIncomingMessage: async (text: string, senderName: string) => {
+        const convs = getStorage<MessengerConversation[]>('messenger_convs', []);
+        let conv = convs.find(c => c.customer_name === senderName);
+        
+        if (!conv) {
+            conv = {
+                id: uuid(),
+                facebook_user_id: 'fb_' + Math.floor(Math.random() * 10000),
+                customer_name: senderName,
+                messages: [],
+                last_message: '',
+                last_updated: new Date().toISOString(),
+                is_lead_linked: false
+            };
+            convs.push(conv);
+        }
+
+        // Add message
+        conv.messages.push({
+            id: uuid(),
+            sender: 'customer',
+            type: 'text',
+            content: text,
+            timestamp: new Date().toISOString()
+        });
+        conv.last_message = text;
+        conv.last_updated = new Date().toISOString();
+
+        // Phone Extraction Logic
+        const phoneMatch = text.match(/(?:\+88|88)?01[3-9]\d{8}/);
+        if (phoneMatch) {
+            const phone = phoneMatch[0];
+            conv.customer_phone = phone;
+            
+            // Check if lead exists or create
+            const leads = await mockService.getLeads();
+            const exists = leads.find(l => l.primary_phone === phone);
+            
+            if (!exists) {
+                const newLead: Lead = {
+                    id: uuid(),
+                    full_name: senderName,
+                    primary_phone: phone,
+                    source: LeadSource.FACEBOOK_MESSENGER,
+                    status: LeadStatus.NEW,
+                    is_starred: false,
+                    is_unread: true,
+                    total_messages_sent: 0,
+                    download_count: 0,
+                    first_contact_at: new Date().toISOString(),
+                    last_activity_at: new Date().toISOString(),
+                    created_at: new Date().toISOString(),
+                };
+                await mockService.createLead(newLead);
+                conv.is_lead_linked = true;
+            } else {
+                conv.is_lead_linked = true;
+            }
+        }
+
+        setStorage('messenger_convs', convs);
+    },
+
+    // --- SALES GOALS ---
+    getSalesTargets: async (): Promise<MonthlyTarget[]> => {
+        return getStorage<MonthlyTarget[]>('sales_targets', []);
+    },
+    setSalesTarget: async (target: Omit<MonthlyTarget, 'id'>) => {
+        let targets = getStorage<MonthlyTarget[]>('sales_targets', []);
+        const idx = targets.findIndex(t => t.month === target.month && t.service === target.service);
+        if (idx !== -1) {
+            targets[idx] = { ...targets[idx], ...target };
+        } else {
+            targets.push({ ...target, id: uuid() });
+        }
+        setStorage('sales_targets', targets);
+    },
+    getSalesEntries: async (): Promise<SalesEntry[]> => {
+        return getStorage<SalesEntry[]>('sales_entries', []);
+    },
+    addSalesEntry: async (entry: Partial<SalesEntry>) => {
+        const entries = getStorage<SalesEntry[]>('sales_entries', []);
+        entries.push({
+            id: uuid(),
+            date: entry.date || new Date().toISOString(),
+            service: entry.service!,
+            amount: entry.amount!,
+            description: entry.description!,
+            created_at: new Date().toISOString()
+        });
+        setStorage('sales_entries', entries);
+    },
+    updateSalesEntry: async (id: string, updates: Partial<SalesEntry>) => {
+        const entries = getStorage<SalesEntry[]>('sales_entries', []);
+        const idx = entries.findIndex(e => e.id === id);
+        if (idx !== -1) {
+            entries[idx] = { ...entries[idx], ...updates };
+            setStorage('sales_entries', entries);
+        }
+    },
+    deleteSalesEntry: async (id: string) => {
+        let entries = getStorage<SalesEntry[]>('sales_entries', []);
+        entries = entries.filter(e => e.id !== id);
+        setStorage('sales_entries', entries);
+    },
+
+    // --- LEAD CRM INTERACTIONS ---
+    addLeadInteraction: async (leadId: string, interaction: Omit<ClientInteraction, 'id' | 'created_at'>) => {
+        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        const l = leads.find(x => x.id === leadId);
+        if (l) {
+            if (!l.interactions) l.interactions = [];
+            l.interactions.unshift({
+                id: uuid(),
+                created_at: new Date().toISOString(),
+                ...interaction
+            });
+            setStorage('leads', leads);
+        }
+    },
+    deleteLeadInteraction: async (leadId: string, interactionId: string) => {
+        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        const l = leads.find(x => x.id === leadId);
+        if (l && l.interactions) {
+            l.interactions = l.interactions.filter(i => i.id !== interactionId);
+            setStorage('leads', leads);
+        }
+    },
+
+    // --- AD SWIPE FILE ---
+    getAdInspirations: async (): Promise<AdInspiration[]> => {
+        return getStorage<AdInspiration[]>('ad_swipe_file', []);
+    },
+    addAdInspiration: async (ad: Partial<AdInspiration>) => {
+        const list = getStorage<AdInspiration[]>('ad_swipe_file', []);
+        list.unshift({
+            id: uuid(),
+            title: ad.title!,
+            url: ad.url!,
+            image_url: ad.image_url,
+            category: ad.category || 'Other',
+            notes: ad.notes || '',
+            created_at: new Date().toISOString()
+        });
+        setStorage('ad_swipe_file', list);
+    },
+    deleteAdInspiration: async (id: string) => {
+        let list = getStorage<AdInspiration[]>('ad_swipe_file', []);
+        list = list.filter(a => a.id !== id);
+        setStorage('ad_swipe_file', list);
     }
-  }
-
-  async deleteTransaction(fishId: string, txId: string): Promise<void> {
-      const f = await this.getBigFishById(fishId);
-      if(f) {
-          const tx = f.transactions.find(t => t.id === txId);
-          if(!tx) return;
-          if (tx.type === 'DEPOSIT') f.balance -= tx.amount;
-          else f.balance += tx.amount;
-          if (tx.type === 'AD_SPEND') f.spent_amount -= tx.amount;
-          f.transactions = f.transactions.filter(t => t.id !== txId);
-          await this.apiRequest('big_fish', 'POST', f);
-      }
-  }
-
-  async updateTransaction(fishId: string, txId: string, updates: Partial<Transaction>): Promise<void> {
-      const f = await this.getBigFishById(fishId);
-      if(f) {
-          const tx = f.transactions.find(t => t.id === txId);
-          if(!tx) return;
-          
-          // Revert old
-          if (tx.type === 'DEPOSIT') f.balance -= tx.amount;
-          else f.balance += tx.amount;
-          if (tx.type === 'AD_SPEND') f.spent_amount -= tx.amount;
-
-          Object.assign(tx, updates);
-
-          // Apply new
-          if (tx.type === 'DEPOSIT') f.balance += tx.amount;
-          else f.balance -= tx.amount;
-          if (tx.type === 'AD_SPEND') f.spent_amount += tx.amount;
-
-          await this.apiRequest('big_fish', 'POST', f);
-      }
-  }
-
-  async addGrowthTask(fishId: string, title: string, dueDate: string): Promise<void> {
-      const f = await this.getBigFishById(fishId);
-      if(f) {
-          f.growth_tasks.unshift({ id: uuid(), title, is_completed: false, due_date: dueDate });
-          await this.apiRequest('big_fish', 'POST', f);
-      }
-  }
-
-  async toggleGrowthTask(fishId: string, taskId: string): Promise<void> {
-      const f = await this.getBigFishById(fishId);
-      if(f) {
-          const t = f.growth_tasks.find(x => x.id === taskId);
-          if(t) t.is_completed = !t.is_completed;
-          await this.apiRequest('big_fish', 'POST', f);
-      }
-  }
-
-  async updateTargets(fishId: string, target: number, current: number): Promise<void> {
-      const f = await this.getBigFishById(fishId);
-      if(f) {
-          f.target_sales = target;
-          f.current_sales = current;
-          await this.apiRequest('big_fish', 'POST', f);
-      }
-  }
-
-  async addWorkLog(fishId: string, task: string): Promise<void> {
-      const f = await this.getBigFishById(fishId);
-      if(f) {
-          f.reports.unshift({ id: uuid(), date: new Date().toISOString(), task });
-          await this.apiRequest('big_fish', 'POST', f);
-      }
-  }
-
-  async checkExpiringCampaigns(): Promise<BigFish[]> {
-      const fish = await this.getBigFish();
-      const now = new Date();
-      return fish.filter(f => {
-          if (f.status !== 'Active Pool' || !f.campaign_end_date) return false;
-          const end = new Date(f.campaign_end_date);
-          const diff = end.getTime() - now.getTime();
-          const days = diff / (1000 * 3600 * 24);
-          return days <= 1 && days >= 0;
-      });
-  }
-
-  async checkRetainerRenewals(): Promise<BigFish[]> {
-      const fish = await this.getBigFish();
-      const now = new Date();
-      return fish.filter(f => {
-          if (f.status !== 'Active Pool' || !f.is_retainer || !f.retainer_renewal_date) return false;
-          const renewal = new Date(f.retainer_renewal_date);
-          const diff = renewal.getTime() - now.getTime();
-          const days = Math.ceil(diff / (1000 * 3600 * 24));
-          return days <= 7 && days >= -5;
-      });
-  }
-
-  async renewRetainer(id: string): Promise<void> {
-      const f = await this.getBigFishById(id);
-      if (f && f.retainer_renewal_date) {
-          const current = new Date(f.retainer_renewal_date);
-          current.setDate(current.getDate() + 30);
-          f.retainer_renewal_date = current.toISOString().slice(0, 10);
-          await this.apiRequest('big_fish', 'POST', f);
-      }
-  }
-
-  getLifetimeDeposit(fish: BigFish): number {
-      return fish.transactions
-          .filter(t => t.type === 'DEPOSIT')
-          .reduce((sum, t) => sum + t.amount, 0);
-  }
-
-  // --- PAYMENT METHODS ---
-  async getPaymentMethods(): Promise<PaymentMethod[]> {
-      return this.apiRequest<PaymentMethod[]>('payment_methods', 'GET');
-  }
-
-  async savePaymentMethod(data: Omit<PaymentMethod, 'id'>): Promise<void> {
-      await this.apiRequest('payment_methods', 'POST', { ...data, id: uuid() });
-  }
-
-  async deletePaymentMethod(id: string): Promise<void> {
-      await this.apiRequest('payment_methods', 'DELETE', null, id);
-  }
-
-  // --- MESSENGER BABA (MOCK) ---
-  async getMessengerConversations(): Promise<MessengerConversation[]> {
-      return this.apiRequest<MessengerConversation[]>('messenger_conversations', 'GET');
-  }
-
-  async simulateIncomingMessage(text: string, senderName: string): Promise<void> {
-      const convs = await this.getMessengerConversations();
-      let conv = convs.find(c => c.customer_name === senderName);
-      let newConv = false;
-      
-      if(!conv) {
-          newConv = true;
-          conv = {
-              id: uuid(),
-              facebook_user_id: uuid(),
-              customer_name: senderName,
-              messages: [],
-              last_message: '',
-              last_updated: '',
-              is_lead_linked: false
-          };
-      }
-      
-      conv.messages.push({
-          id: uuid(),
-          sender: 'customer' as const,
-          type: 'text' as const,
-          content: text,
-          timestamp: new Date().toISOString()
-      });
-      conv.last_message = text;
-      conv.last_updated = new Date().toISOString();
-
-      const phoneMatch = text.match(/(?:\+88|88)?(01[3-9]\d{8})/);
-      if(phoneMatch && !conv.customer_phone) {
-          conv.customer_phone = phoneMatch[0];
-          conv.is_lead_linked = true;
-          await this.createLead({
-              full_name: senderName,
-              primary_phone: phoneMatch[0],
-              source: LeadSource.FACEBOOK_MESSENGER
-          });
-      }
-
-      await this.apiRequest('messenger_conversations', 'POST', conv);
-  }
-
-  // --- SYSTEM SETTINGS ---
-  async getSystemSettings(): Promise<SystemSettings> {
-      const data = await this.apiRequest<{id: string, value: SystemSettings}[]>('settings', 'GET');
-      const settings = data.find(d => d.id === 'system_settings');
-      return settings ? settings.value : {
-          facebook_page_token: '',
-          facebook_verify_token: '',
-          sms_api_key: '',
-          sms_sender_id: '',
-          sms_base_url: '',
-          timezone: 'Asia/Dhaka',
-          system_api_key: 'lg_' + uuid()
-      };
-  }
-
-  async saveSystemSettings(settings: SystemSettings): Promise<void> {
-      await this.apiRequest('settings', 'POST', { id: 'system_settings', value: settings });
-  }
-
-  // --- SALES GOALS ---
-  async getSalesTargets(): Promise<MonthlyTarget[]> {
-      return this.apiRequest<MonthlyTarget[]>('sales_targets', 'GET');
-  }
-
-  async setSalesTarget(target: Omit<MonthlyTarget, 'id'>): Promise<void> {
-      const targets = await this.getSalesTargets();
-      const existing = targets.find(t => t.month === target.month && t.service === target.service);
-      const data = existing ? { ...existing, ...target } : { ...target, id: uuid() };
-      await this.apiRequest('sales_targets', 'POST', data);
-  }
-
-  async getSalesEntries(): Promise<SalesEntry[]> {
-      return this.apiRequest<SalesEntry[]>('sales_entries', 'GET');
-  }
-
-  async addSalesEntry(entry: Omit<SalesEntry, 'id' | 'created_at'>): Promise<void> {
-      await this.apiRequest('sales_entries', 'POST', { ...entry, id: uuid(), created_at: new Date().toISOString() });
-  }
-
-  async updateSalesEntry(id: string, entry: Partial<SalesEntry>): Promise<void> {
-      const entries = await this.getSalesEntries();
-      const existing = entries.find(e => e.id === id);
-      if(existing) {
-          await this.apiRequest('sales_entries', 'POST', { ...existing, ...entry });
-      }
-  }
-
-  async deleteSalesEntry(id: string): Promise<void> {
-      await this.apiRequest('sales_entries', 'DELETE', null, id);
-  }
-
-  // --- AD SWIPE FILE ---
-  async getAdInspirations(): Promise<AdInspiration[]> {
-      return this.apiRequest<AdInspiration[]>('ad_inspirations', 'GET');
-  }
-
-  async addAdInspiration(data: Omit<AdInspiration, 'id' | 'created_at'>): Promise<void> {
-      await this.apiRequest('ad_inspirations', 'POST', { ...data, id: uuid(), created_at: new Date().toISOString() });
-  }
-
-  async deleteAdInspiration(id: string): Promise<void> {
-      await this.apiRequest('ad_inspirations', 'DELETE', null, id);
-  }
-}
-
-export const mockService = new MockService();
+};

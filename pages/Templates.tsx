@@ -1,9 +1,8 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { MessageTemplate, Channel } from '../types';
-import { Plus, Edit2, Trash2, MessageSquare, Save, X, Layers, Layout, Target, Briefcase } from 'lucide-react';
+import { Plus, Edit2, Trash2, MessageSquare, Save, Layers, Layout, Target, Briefcase } from 'lucide-react';
 
 const CATEGORIES = ['All', 'General', 'Facebook Marketing', 'Landing Page', 'Business Plan'];
 

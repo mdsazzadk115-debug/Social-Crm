@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { mockService } from '../services/mockService';
 import { Document, Lead } from '../types';
-import { Plus, Printer, Download, Trash2, Eye, FileText, CheckCircle, Search, LayoutTemplate, PenTool, Bold, Italic, List, Type, Undo, Redo, X } from 'lucide-react';
+import { Plus, Printer, Download, Trash2, Eye, FileText, CheckCircle, LayoutTemplate, PenTool, Bold, Italic, List, Type, X } from 'lucide-react';
 import { LETTERHEAD_TEMPLATES } from '../constants';
 
 const BRAND_COLOR = '#4f46e5'; // Unified Brand Color (Indigo-600)

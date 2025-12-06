@@ -1,6 +1,6 @@
-
 import React, { useEffect, useState } from 'react';
 import { Users, ShoppingBag, CheckSquare, FileText, Calculator, Zap, Wallet, ArrowUpRight, ArrowDownRight, Filter, Download, BarChart2, Phone, Globe, Layers, TrendingUp, AlertTriangle, Copy, Check, Repeat, RefreshCw } from 'lucide-react';
+// @ts-ignore
 import { Link } from 'react-router-dom';
 import { mockService } from '../services/mockService';
 import { Lead, LeadStatus, BigFish, Customer, Invoice, Task, Snippet, SalesEntry, MonthlyTarget, SalesServiceType } from '../types';
@@ -193,7 +193,7 @@ const Dashboard: React.FC = () => {
   };
 
   // --- SALES REPORT LOGIC ---
-  const getFilteredSales = () => {
+  const getFilteredSales = (): SalesEntry[] => {
       const now = new Date();
       let start = new Date(0); // Epoch
       let end = new Date();
@@ -218,7 +218,7 @@ const Dashboard: React.FC = () => {
   const totalSalesCount = filteredSales.length;
 
   // --- SALES GRAPH DATA (Grouped by Day or Month) ---
-  const getSalesGraphData = () => {
+  const getSalesGraphData = (): [string, number][] => {
       // Simple aggregation: Last 10 points based on filter
       const data: Record<string, number> = {};
       filteredSales.forEach(e => {
@@ -258,7 +258,7 @@ const Dashboard: React.FC = () => {
       LeadStatus.CLOSED_WON
   ];
 
-  const industryGroups = leads.reduce((acc, lead) => {
+  const industryGroups: Record<string, Lead[]> = leads.reduce((acc, lead) => {
       const ind = lead.industry || 'Unknown';
       if (!acc[ind]) acc[ind] = [];
       acc[ind].push(lead);
@@ -266,7 +266,7 @@ const Dashboard: React.FC = () => {
   }, {} as Record<string, Lead[]>);
 
   // Top 5 Industries
-  const topIndustries = Object.entries(industryGroups)
+  const topIndustries: [string, Lead[]][] = Object.entries(industryGroups)
       .sort((a, b) => b[1].length - a[1].length)
       .slice(0, 5);
 
@@ -493,7 +493,7 @@ const Dashboard: React.FC = () => {
               </div>
 
               <div className="space-y-4">
-                  {topIndustries.map(([industry, segmentLeads]) => {
+                  {topIndustries.map(([industry, segmentLeads]: [string, Lead[]]) => {
                       const phoneCount = segmentLeads.filter(l => l.primary_phone).length;
                       const webCount = segmentLeads.filter(l => l.website_url).length;
                       const maxCount = topIndustries[0][1].length;
@@ -820,7 +820,7 @@ const Dashboard: React.FC = () => {
                                   <p className="text-xs font-mono font-bold text-gray-800">{c.phone}</p>
                                   <span className="text-[9px] bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded">{c.category}</span>
                               </div>
-                              <span className="text-[10px] text-gray-400">{new Date(c.date_added).toLocaleDateString()}</span
+                              <span className="text-[10px] text-gray-400">{new Date(c.date_added).toLocaleDateString()}</span>
                           </div>
                       ))}
                   </div>

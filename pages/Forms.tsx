@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { LeadForm } from '../types';
-import { Plus, Edit2, Trash2, Link as LinkIcon, Copy, Check, Save } from 'lucide-react';
+import { Plus, Edit2, Trash2, Link as LinkIcon, Copy, Check } from 'lucide-react';
 
 const THEME_COLORS: Record<string, string> = {
     indigo: '#4f46e5',

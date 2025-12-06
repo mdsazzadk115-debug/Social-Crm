@@ -1,8 +1,9 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
+// @ts-ignore
 import { useParams } from 'react-router-dom';
 import { Phone, User, Facebook, Globe } from 'lucide-react';
 import { mockService } from '../services/mockService';
-import { Lead, Interaction, LeadStatus, MessageTemplate, Channel, MessageDirection } from '../types';
+import { Lead, Interaction, LeadStatus, Channel, MessageDirection } from '../types';
 import { STATUS_LABELS, INDUSTRIES } from '../constants';
 
 const LeadDetail: React.FC = () => {

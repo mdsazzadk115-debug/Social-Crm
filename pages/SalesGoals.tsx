@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { SalesEntry, MonthlyTarget, SalesServiceType } from '../types';
-import { Target, TrendingUp, Plus, Trash2, Calendar, DollarSign, Users, ArrowUpRight, History, Edit2 } from 'lucide-react';
+import { Target, TrendingUp, Plus, Trash2, Calendar, Users, History, Edit2 } from 'lucide-react';
 import { useCurrency } from '../context/CurrencyContext';
 
 const SERVICES: { id: SalesServiceType; label: string; color: string }[] = [

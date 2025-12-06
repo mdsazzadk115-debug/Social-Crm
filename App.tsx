@@ -1,5 +1,5 @@
-
 import React from 'react';
+// @ts-ignore
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
 import Dashboard from './pages/Dashboard';

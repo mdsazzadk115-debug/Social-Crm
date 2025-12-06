@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { Customer } from '../types';
-import { UploadCloud, Search, Trash2, ShoppingBag, Download, Filter, Plus, X } from 'lucide-react';
+import { UploadCloud, Search, Trash2, ShoppingBag, Download, Filter, X } from 'lucide-react';
 
 const OnlineCustomers: React.FC = () => {
     const [customers, setCustomers] = useState<Customer[]>([]);

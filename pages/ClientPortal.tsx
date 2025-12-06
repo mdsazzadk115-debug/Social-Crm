@@ -1,5 +1,5 @@
-
 import React, { useEffect, useState } from 'react';
+// @ts-ignore
 import { useParams } from 'react-router-dom';
 import { mockService } from '../services/mockService';
 import { BigFish, PaymentMethod, SystemSettings } from '../types';

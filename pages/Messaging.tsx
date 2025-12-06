@@ -1,7 +1,4 @@
 
-
-
-
 import React, { useState, useEffect } from 'react';
 import { Send, Search, CheckSquare, Square, Save, Plus, Trash2, Calendar, Clock, Repeat, List, Clipboard, Zap, Flame, Briefcase, CheckCircle, Edit3 } from 'lucide-react';
 import { mockService } from '../services/mockService';
@@ -24,7 +21,7 @@ const Messaging: React.FC = () => {
     // List Mode State
     const [searchTerm, setSearchTerm] = useState('');
     const [filterStatus, setFilterStatus] = useState('all');
-    const [filterIndustry, setFilterIndustry] = useState('all'); // Not currently used in dropdown but ready
+    const [filterIndustry] = useState('all'); // Not currently used in dropdown but ready
     const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
 
     // Input Mode State
@@ -345,7 +342,6 @@ const Messaging: React.FC = () => {
                                         >
                                             <option value="all">All Status ({counts.all})</option>
                                             {Object.keys(STATUS_LABELS).map(k => {
-                                                const count = leads.filter(l => l.status === k).length;
                                                 return <option key={k} value={k}>{STATUS_LABELS[k as LeadStatus]}</option>
                                             })}
                                         </select>

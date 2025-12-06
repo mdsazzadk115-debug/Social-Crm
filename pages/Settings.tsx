@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { SystemSettings } from '../types';
-import { Save, Facebook, MessageSquare, Globe, Copy, Check, Info, Users, Layout, Workflow, RefreshCw, Lock, FileText, ExternalLink } from 'lucide-react';
+import { Save, Facebook, MessageSquare, Globe, Copy, Check, Info, Layout, Workflow, RefreshCw, Lock, FileText } from 'lucide-react';
 
 const Settings: React.FC = () => {
     const [settings, setSettings] = useState<SystemSettings>({

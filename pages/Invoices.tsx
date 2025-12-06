@@ -1,15 +1,13 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { Invoice, InvoiceItem, Lead } from '../types';
-import { Plus, Printer, Download, Search, Trash2, Eye, PenTool, CheckSquare } from 'lucide-react';
+import { Plus, Printer, Download, Trash2, Eye, PenTool, CheckSquare } from 'lucide-react';
 import { INVOICE_SERVICE_TYPES, DEFAULT_INVOICE_TERMS } from '../constants';
-import { useCurrency } from '../context/CurrencyContext';
 
 const BRAND_COLOR = '#4f46e5'; // Unified Brand Color (Indigo-600)
 
 const Invoices: React.FC = () => {
-    const { formatCurrency } = useCurrency(); // Currency Context
     const [invoices, setInvoices] = useState<Invoice[]>([]);
     const [leads, setLeads] = useState<Lead[]>([]);
     const [isCreateMode, setIsCreateMode] = useState(false);

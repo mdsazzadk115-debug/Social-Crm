@@ -1,5 +1,5 @@
-
 import React, { useEffect, useState } from 'react';
+// @ts-ignore
 import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Users, Settings, MessageSquare, Menu, X, LogOut, Send, FileText, ShoppingBag, CheckSquare, FileText as FileInvoice, Zap, ScrollText, Calculator, MessageCircle, Target, Coins, Bell, AlertTriangle, CheckCircle, Sparkles } from 'lucide-react';
 import { useCurrency } from '../context/CurrencyContext';

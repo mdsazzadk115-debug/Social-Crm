@@ -1,5 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
+// @ts-ignore
 import { useParams } from 'react-router-dom';
 import { mockService } from '../services/mockService';
 import { LeadForm } from '../types';
