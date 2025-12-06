@@ -1,3 +1,4 @@
+
 import { 
   Lead, LeadStatus, LeadSource, Interaction, MessageTemplate, Campaign, 
   SimpleAutomationRule, LeadForm, Customer, Task, Invoice, Snippet, 
@@ -10,117 +11,7 @@ import {
 } from '../constants';
 
 const uuid = () => Math.random().toString(36).substr(2, 9);
-// ... existing code ...
-    addTransaction: async (fishId: string, type: Transaction['type'], amount: number, desc: string, metadata?: any, dateOverride?: string) => {
-        // 1. Prepare Local Data
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const f = fish.find(x => x.id === fishId);
-        if (f) {
-            const tx: Transaction = {
-                id: uuid(),
-                date: dateOverride || new Date().toISOString(),
-                type,
-                amount,
-                description: desc,
-                metadata
-            };
-            f.transactions.unshift(tx);
-            
-            if (type === 'DEPOSIT') f.balance += amount;
-            else f.balance -= amount;
 
-            if (type === 'AD_SPEND') {
-                f.spent_amount += amount;
-                f.reports.unshift({
-                    id: uuid(),
-                    date: dateOverride || new Date().toISOString(),
-                    task: `Ad Run: Spent $${amount} (${desc})`
-                });
-                if (metadata && metadata.leads) {
-                    if (metadata.resultType === 'SALES') {
-                        f.current_sales += metadata.leads;
-                    }
-                }
-            }
-            setStorage('big_fish', fish);
-
-            // 2. Send to PHP API
-            try {
-                await fetch(`${API_BASE}/bigfish.php`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        action: 'add_transaction',
-                        id: tx.id,
-                        big_fish_id: fishId,
-                        type,
-                        amount,
-                        description: desc,
-                        date: tx.date,
-                        metadata
-                    })
-                });
-            } catch (e) { console.error("API Error", e); }
-        }
-    },
-    deleteTransaction: async (fishId: string, txId: string) => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const f = fish.find(x => x.id === fishId);
-        if (f) {
-            const tx = f.transactions.find(t => t.id === txId);
-            if (tx) {
-                if (tx.type === 'DEPOSIT') f.balance -= tx.amount;
-                else f.balance += tx.amount;
-                if (tx.type === 'AD_SPEND') f.spent_amount -= tx.amount;
-                f.transactions = f.transactions.filter(t => t.id !== txId);
-                setStorage('big_fish', fish);
-
-                try {
-                    await fetch(`${API_BASE}/bigfish.php`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'delete_transaction', big_fish_id: fishId, id: txId })
-                    });
-                } catch (e) { console.error("API Error", e); }
-            }
-        }
-    },
-    updateTransaction: async (fishId: string, txId: string, updates: { date: string, description: string, amount: number }) => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const f = fish.find(x => x.id === fishId);
-        if (f) {
-            const txIndex = f.transactions.findIndex(t => t.id === txId);
-            if (txIndex !== -1) {
-                const oldTx = f.transactions[txIndex];
-                if (oldTx.type === 'DEPOSIT') f.balance -= oldTx.amount;
-                else f.balance += oldTx.amount;
-                if (oldTx.type === 'AD_SPEND') f.spent_amount -= oldTx.amount;
-
-                const newAmount = updates.amount;
-                if (oldTx.type === 'DEPOSIT') f.balance += newAmount;
-                else f.balance -= newAmount;
-                if (oldTx.type === 'AD_SPEND') f.spent_amount += newAmount;
-
-                f.transactions[txIndex] = { ...oldTx, ...updates };
-                setStorage('big_fish', fish);
-
-                try {
-                    await fetch(`${API_BASE}/bigfish.php`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            action: 'update_transaction', 
-                            big_fish_id: fishId, 
-                            id: txId, 
-                            updates 
-                        })
-                    });
-                } catch (e) { console.error("API Error", e); }
-            }
-        }
-    },
-    getLifetimeDeposit: (fish: BigFish) => {
-// ... existing code ...
 
 // Fix Types for Constants
 const FULL_DEMO_LEADS: Lead[] = DEMO_LEADS.map(l => ({ ...l, download_count: 0 }));
@@ -842,6 +733,7 @@ export const mockService = {
         }
     },
     deleteTransaction: async (fishId: string, txId: string) => {
+        // 1. Update Local Storage
         const fish = getStorage<BigFish[]>('big_fish', []);
         const f = fish.find(x => x.id === fishId);
         if (f) {
@@ -854,18 +746,34 @@ export const mockService = {
                 setStorage('big_fish', fish);
             }
         }
+
+        // 2. Update Server
+        try {
+            await fetch(`${API_BASE}/bigfish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'delete_transaction',
+                    id: txId,
+                    big_fish_id: fishId
+                })
+            });
+        } catch (e) { console.error("API Error during delete transaction", e); }
     },
     updateTransaction: async (fishId: string, txId: string, updates: { date: string, description: string, amount: number }) => {
+        // 1. Update Local Storage
         const fish = getStorage<BigFish[]>('big_fish', []);
         const f = fish.find(x => x.id === fishId);
         if (f) {
             const txIndex = f.transactions.findIndex(t => t.id === txId);
             if (txIndex !== -1) {
                 const oldTx = f.transactions[txIndex];
+                // Revert old balance effect
                 if (oldTx.type === 'DEPOSIT') f.balance -= oldTx.amount;
                 else f.balance += oldTx.amount;
                 if (oldTx.type === 'AD_SPEND') f.spent_amount -= oldTx.amount;
 
+                // Apply new balance effect
                 const newAmount = updates.amount;
                 if (oldTx.type === 'DEPOSIT') f.balance += newAmount;
                 else f.balance -= newAmount;
@@ -875,6 +783,20 @@ export const mockService = {
                 setStorage('big_fish', fish);
             }
         }
+
+        // 2. Update Server
+        try {
+            await fetch(`${API_BASE}/bigfish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'update_transaction',
+                    id: txId,
+                    big_fish_id: fishId,
+                    ...updates
+                })
+            });
+        } catch (e) { console.error("API Error during update transaction", e); }
     },
     getLifetimeDeposit: (fish: BigFish) => {
         return fish.transactions.filter(t => t.type === 'DEPOSIT').reduce((acc, t) => acc + t.amount, 0);
