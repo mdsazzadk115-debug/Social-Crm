@@ -35,6 +35,17 @@ const setStorage = (key: string, val: any) => {
 // API Helper
 const API_BASE = './api'; 
 
+// --- DATE HELPER FOR MYSQL ---
+const formatDateForMySQL = (dateString: string) => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return null;
+    
+    // Format: YYYY-MM-DD HH:MM:SS
+    const pad = (num: number) => num.toString().padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+};
+
 // --- JSON PARSER HELPER ---
 const safeJSONParse = (data: any, fallback: any = {}) => {
     if (!data) return fallback;
@@ -52,14 +63,14 @@ export const mockService = {
     getLeads: async (): Promise<Lead[]> => {
         try {
             const res = await fetch(`${API_BASE}/leads.php`);
-            if (!res.ok) throw new Error('API not available');
-            const data = await res.json();
-            if (Array.isArray(data)) return data;
-            return getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data)) return data;
+            }
         } catch (e) {
-            console.warn("Running in Offline/Demo Mode (API fetch failed):", e);
-            return getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+            // console.warn("Running in Offline/Demo Mode (API fetch failed):", e);
         }
+        return getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
     },
     getLeadById: async (id: string): Promise<Lead | undefined> => {
         const leads = await mockService.getLeads();
@@ -428,7 +439,12 @@ export const mockService = {
     getTasks: async (): Promise<Task[]> => {
         try {
             const res = await fetch(`${API_BASE}/tasks.php`);
-            if (res.ok) return await res.json();
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data)) return data;
+            } else {
+                console.warn(`Tasks API Error: ${res.status}`);
+            }
         } catch (e) { console.warn("API Error", e); }
         return getStorage<Task[]>('tasks', []);
     },
@@ -446,9 +462,15 @@ export const mockService = {
             await fetch(`${API_BASE}/tasks.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'create', ...newTask })
+                body: JSON.stringify({ 
+                    action: 'create', 
+                    ...newTask,
+                    // Format dates for MySQL to avoid errors
+                    created_at: formatDateForMySQL(newTask.created_at),
+                    due_date: dueDate ? formatDateForMySQL(dueDate) : null
+                })
             });
-        } catch (e) { console.error("API Error", e); }
+        } catch (e) { console.error("API Error Creating Task", e); }
 
         const tasks = getStorage<Task[]>('tasks', []);
         tasks.push(newTask);
