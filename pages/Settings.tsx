@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { SystemSettings } from '../types';
-import { Save, Facebook, MessageSquare, Globe, Copy, Check, Info, Layout, Workflow, RefreshCw, Lock, FileText } from 'lucide-react';
+import { Save, Facebook, MessageSquare, Globe, Copy, Check, Info, Layout, Workflow, RefreshCw, Lock, FileText, AlertTriangle } from 'lucide-react';
 
 const Settings: React.FC = () => {
     const [settings, setSettings] = useState<SystemSettings>({
@@ -18,6 +18,7 @@ const Settings: React.FC = () => {
     });
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [error, setError] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'facebook' | 'sms' | 'portal' | 'general' | 'api'>('facebook');
     const [copied, setCopied] = useState(false);
     const [scriptCopied, setScriptCopied] = useState(false);
@@ -36,15 +37,19 @@ const Settings: React.FC = () => {
 
     const handleChange = (field: keyof SystemSettings, value: string) => {
         setSettings(prev => ({ ...prev, [field]: value }));
+        // Clear error when user starts typing
+        if(error) setError(null);
     };
 
     const handleSave = async () => {
         setIsSaving(true);
+        setError(null);
         try {
             await mockService.saveSystemSettings(settings);
             alert('Settings saved successfully!');
         } catch (e: any) {
-            alert('Failed to save settings to database. ' + e.message);
+            console.error(e);
+            setError(e.message || "Failed to save settings. Check connection.");
         } finally {
             setIsSaving(false);
         }
@@ -81,17 +86,16 @@ function onFormSubmit(e) {
   var API_KEY = "${settings.system_api_key}";
   
   // Mapping: Google Form Question Title -> System Field
-  // Change the values on the left to match your Google Form Questions exactly
   var fieldMapping = {
-    "Name": "name",           // Form has a question "Name"
-    "Full Name": "name",      // Alternative
-    "Phone": "phone",         // Form has a question "Phone"
-    "Mobile Number": "phone", // Alternative
+    "Name": "name",           
+    "Full Name": "name",      
+    "Phone": "phone",         
+    "Mobile Number": "phone", 
     "Facebook Link": "fb_link",
     "Website": "website",
     "Message": "message",
     "Comments": "message",
-    "Category": "category"    // For Service Category
+    "Category": "category"
   };
   
   // ---------------------
@@ -146,6 +150,24 @@ function onFormSubmit(e) {
                     <Save className="h-4 w-4 mr-2" /> {isSaving ? 'Saving...' : 'Save Changes'}
                 </button>
             </div>
+
+            {error && (
+                <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-4 rounded-md shadow-sm flex justify-between items-start animate-fade-in">
+                    <div className="flex items-start">
+                        <AlertTriangle className="h-5 w-5 text-red-600 mr-3 mt-0.5" />
+                        <div>
+                            <h3 className="text-red-800 font-bold text-sm">Save Failed</h3>
+                            <p className="text-red-700 text-sm mt-1">{error}</p>
+                            {error.includes('db.php') && (
+                                <p className="text-red-600 text-xs mt-2 italic">
+                                    Tip: Ensure <strong>api/db.php</strong> exists and has the correct database credentials.
+                                </p>
+                            )}
+                        </div>
+                    </div>
+                    <button onClick={() => setError(null)} className="text-red-400 hover:text-red-600"><span className="text-xl">×</span></button>
+                </div>
+            )}
 
             <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
                 {/* TABS */}
