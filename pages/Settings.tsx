@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { SystemSettings } from '../types';
-import { Save, Facebook, MessageSquare, Globe, Copy, Check, Info, Layout, Workflow, RefreshCw, Lock, FileText } from 'lucide-react';
+import { Save, Facebook, MessageSquare, Globe, Copy, Check, Info, Layout, Workflow, RefreshCw, Lock, FileText, Database, Trash2, RotateCcw } from 'lucide-react';
 
 const Settings: React.FC = () => {
     const [settings, setSettings] = useState<SystemSettings>({
@@ -18,7 +18,7 @@ const Settings: React.FC = () => {
         system_api_key: ''
     });
     const [isLoading, setIsLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'facebook' | 'sms' | 'portal' | 'general' | 'api'>('facebook');
+    const [activeTab, setActiveTab] = useState<'facebook' | 'sms' | 'portal' | 'general' | 'api' | 'database'>('facebook');
     const [copied, setCopied] = useState(false);
     const [scriptCopied, setScriptCopied] = useState(false);
 
@@ -47,6 +47,22 @@ const Settings: React.FC = () => {
         if(confirm("Are you sure? This will invalidate the old key and break existing n8n connections.")) {
             const newKey = 'lg_' + Math.random().toString(36).substr(2, 16) + Math.random().toString(36).substr(2, 6);
             handleChange('system_api_key', newKey);
+        }
+    };
+
+    const handleClearData = async () => {
+        if (confirm("⚠️ DANGER: This will delete ALL leads, clients, invoices, and history. This action cannot be undone. Are you sure?")) {
+            await mockService.clearAllData();
+            alert("Database cleared successfully. You can now start fresh.");
+            window.location.reload();
+        }
+    };
+
+    const handleRestoreDemo = async () => {
+        if (confirm("This will overwrite your current data with the default Demo Data. Continue?")) {
+            await mockService.restoreDemoData();
+            alert("Demo data restored.");
+            window.location.reload();
         }
     };
 
@@ -171,6 +187,12 @@ function onFormSubmit(e) {
                         className={`flex-1 py-4 px-4 text-sm font-medium text-center border-b-2 transition-colors flex items-center justify-center whitespace-nowrap ${activeTab === 'general' ? 'border-gray-600 text-gray-600 bg-gray-50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                     >
                         <Globe className="h-4 w-4 mr-2"/> General
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('database')}
+                        className={`flex-1 py-4 px-4 text-sm font-medium text-center border-b-2 transition-colors flex items-center justify-center whitespace-nowrap ${activeTab === 'database' ? 'border-red-600 text-red-600 bg-red-50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <Database className="h-4 w-4 mr-2"/> Database
                     </button>
                 </div>
 
@@ -459,6 +481,38 @@ function onFormSubmit(e) {
                                     onChange={(e) => handleChange('portal_fb_group', e.target.value)}
                                     placeholder="https://facebook.com/groups/..."
                                 />
+                            </div>
+                        </div>
+                    )}
+
+                    {/* DATABASE MANAGEMENT TAB */}
+                    {activeTab === 'database' && (
+                        <div className="space-y-8">
+                            <div className="bg-red-50 border border-red-200 p-6 rounded-xl shadow-sm">
+                                <h3 className="font-bold text-lg text-red-800 mb-2 flex items-center">
+                                    <Database className="mr-2 h-5 w-5"/> Database Management
+                                </h3>
+                                <p className="text-sm text-red-600 mb-6">
+                                    Manage your local application data. Use "Clear All Data" if you want to remove the default demo content and start entering your real business data.
+                                </p>
+
+                                <div className="flex flex-col md:flex-row gap-4">
+                                    <button 
+                                        onClick={handleClearData} 
+                                        className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg flex items-center justify-center transition-colors shadow-md"
+                                    >
+                                        <Trash2 className="mr-2 h-5 w-5"/> Clear All Data (Start Fresh)
+                                    </button>
+                                    <button 
+                                        onClick={handleRestoreDemo} 
+                                        className="flex-1 bg-white border border-red-300 text-red-700 font-bold py-3 px-6 rounded-lg flex items-center justify-center hover:bg-red-50 transition-colors"
+                                    >
+                                        <RotateCcw className="mr-2 h-5 w-5"/> Restore Demo Data
+                                    </button>
+                                </div>
+                                <p className="text-xs text-red-500 mt-3 text-center">
+                                    *Actions are immediate and use browser local storage.
+                                </p>
                             </div>
                         </div>
                     )}

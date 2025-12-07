@@ -37,6 +37,41 @@ const setStorage = (key: string, val: any) => {
 const API_BASE = './api'; 
 
 export const mockService = {
+    // --- DATABASE MANAGEMENT ---
+    clearAllData: async () => {
+        // Sets everything to empty arrays, effectively "wiping" the DB without triggering default demo data on next load
+        setStorage('leads', []);
+        setStorage('big_fish', []);
+        setStorage('invoices', []);
+        setStorage('daily_tasks', []);
+        setStorage('online_customers', []);
+        setStorage('sales_entries', []);
+        setStorage('sales_targets', []);
+        setStorage('messenger_convs', []);
+        setStorage('interactions', []);
+        setStorage('documents', []);
+        setStorage('ad_swipe', []);
+        // We keep settings and templates usually, but let's clear templates to default
+        // setStorage('templates', []); 
+    },
+    restoreDemoData: async () => {
+        // Removes keys so getStorage uses the default constants (Demo Data)
+        localStorage.removeItem('leads');
+        localStorage.removeItem('big_fish');
+        localStorage.removeItem('invoices');
+        localStorage.removeItem('daily_tasks');
+        localStorage.removeItem('online_customers');
+        localStorage.removeItem('sales_entries');
+        localStorage.removeItem('sales_targets');
+        localStorage.removeItem('messenger_convs');
+        localStorage.removeItem('interactions');
+        localStorage.removeItem('documents');
+        localStorage.removeItem('ad_swipe');
+        localStorage.removeItem('templates');
+        localStorage.removeItem('snippets');
+        localStorage.removeItem('lead_forms');
+    },
+
     // --- LEADS (CONNECTED TO PHP/MYSQL) ---
     getLeads: async (): Promise<Lead[]> => {
         return getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
