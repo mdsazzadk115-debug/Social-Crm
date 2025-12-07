@@ -308,9 +308,37 @@ export const mockService = {
 
     // --- MESSAGING ---
     sendBulkSMS: async (leadIds: string[], body: string) => {
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // 1. Resolve Lead IDs to Phone Numbers
+        const leads = await mockService.getLeads();
+        const targets = leads.filter(l => leadIds.includes(l.id));
+        const phoneNumbers = targets.map(l => l.primary_phone).filter(p => p);
+
+        if (phoneNumbers.length === 0) {
+            throw new Error("No valid phone numbers found for selected leads.");
+        }
+
+        // 2. Call the Backend API (sms.php)
+        try {
+            const res = await fetch(`${API_BASE}/sms.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ numbers: phoneNumbers, message: body })
+            });
+            const result = await res.json();
+            
+            if (!result.success) {
+                throw new Error(result.message || "Failed to send SMS via Gateway.");
+            }
+            
+            console.log("SMS Send Result:", result);
+        } catch (e: any) {
+            console.error("SMS Error:", e);
+            throw new Error(e.message || "Network error sending SMS.");
+        }
+
+        // 3. Log Interaction & Update Stats (Local UI Update)
         const interactions = getStorage<Interaction[]>('interactions', []);
-        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        const localLeads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
         
         leadIds.forEach(id => {
             interactions.push({
@@ -322,17 +350,18 @@ export const mockService = {
                 created_at: new Date().toISOString()
             } as any);
 
-            const leadIdx = leads.findIndex(l => l.id === id);
+            const leadIdx = localLeads.findIndex(l => l.id === id);
             if (leadIdx !== -1) {
-                leads[leadIdx].total_messages_sent = (leads[leadIdx].total_messages_sent || 0) + 1;
-                leads[leadIdx].last_activity_at = new Date().toISOString();
+                localLeads[leadIdx].total_messages_sent = (localLeads[leadIdx].total_messages_sent || 0) + 1;
+                localLeads[leadIdx].last_activity_at = new Date().toISOString();
             }
         });
         setStorage('interactions', interactions);
-        setStorage('leads', leads);
+        setStorage('leads', localLeads);
     },
     scheduleBulkMessages: async (leadIds: string[], messages: any[]) => {
         await new Promise(resolve => setTimeout(resolve, 500));
+        console.log("Scheduling not fully implemented on server yet.");
     },
 
     // --- FORMS ---
