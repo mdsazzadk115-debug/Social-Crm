@@ -1274,68 +1274,34 @@ export const mockService = {
         setStorage('system_settings', s);
     },
 
-    // --- MESSENGER BABA (Mock) ---
+    // --- MESSENGER BABA (Real API) ---
     getMessengerConversations: async (): Promise<MessengerConversation[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/messenger.php?action=get_conversations`);
+            if (res.ok) {
+                return await res.json();
+            }
+        } catch (e) { console.error("Messenger API Error", e); }
+        // Fallback to local
         return getStorage<MessengerConversation[]>('messenger_convs', []);
     },
-    simulateIncomingMessage: async (text: string, senderName: string) => {
-        const convs = getStorage<MessengerConversation[]>('messenger_convs', []);
-        let conv = convs.find(c => c.customer_name === senderName);
+    
+    // Send Message (Reply)
+    simulateIncomingMessage: async (text: string, recipientId: string) => {
+        // Renaming this function mentally to 'sendReply' but keeping name for compatibility
+        try {
+            await fetch(`${API_BASE}/messenger.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    action: 'send_message',
+                    recipient_id: recipientId, // This is the user ID we are replying to
+                    message: text
+                })
+            });
+        } catch (e) { console.error("Send API Error", e); }
         
-        if (!conv) {
-            conv = {
-                id: uuid(),
-                facebook_user_id: 'fb_' + Math.floor(Math.random() * 10000),
-                customer_name: senderName,
-                messages: [],
-                last_message: '',
-                last_updated: new Date().toISOString(),
-                is_lead_linked: false
-            };
-            convs.push(conv);
-        }
-
-        conv.messages.push({
-            id: uuid(),
-            sender: 'customer',
-            type: 'text',
-            content: text,
-            timestamp: new Date().toISOString()
-        });
-        conv.last_message = text;
-        conv.last_updated = new Date().toISOString();
-
-        const phoneMatch = text.match(/(?:\+88|88)?01[3-9]\d{8}/);
-        if (phoneMatch) {
-            const phone = phoneMatch[0];
-            conv.customer_phone = phone;
-            
-            const leads = await mockService.getLeads();
-            const exists = leads.find(l => l.primary_phone === phone);
-            
-            if (!exists) {
-                const newLead: Lead = {
-                    id: uuid(),
-                    full_name: senderName,
-                    primary_phone: phone,
-                    source: LeadSource.FACEBOOK_MESSENGER,
-                    status: LeadStatus.NEW,
-                    is_starred: false,
-                    is_unread: true,
-                    total_messages_sent: 0,
-                    download_count: 0,
-                    first_contact_at: new Date().toISOString(),
-                    last_activity_at: new Date().toISOString(),
-                    created_at: new Date().toISOString(),
-                };
-                await mockService.createLead(newLead);
-                conv.is_lead_linked = true;
-            } else {
-                conv.is_lead_linked = true;
-            }
-        }
-
-        setStorage('messenger_convs', convs);
+        // Optimistic UI Update (Mock Logic removed, purely relying on re-fetch or manual state update)
     },
 
     // --- SALES GOALS ---
