@@ -1,4 +1,3 @@
-
 import { 
   Lead, LeadStatus, LeadSource, Interaction, MessageTemplate, Campaign, 
   SimpleAutomationRule, LeadForm, Customer, Task, Invoice, Snippet, 
@@ -21,8 +20,6 @@ const FULL_SNIPPETS: Snippet[] = INITIAL_SNIPPETS.map(s => ({ ...s, id: uuid() }
 // Helper for local storage
 const getStorage = <T>(key: string, defaultVal: T): T => {
     const stored = localStorage.getItem(key);
-    // If specifically "[]" (empty array), return empty array
-    if (stored === '[]') return [] as unknown as T;
     if (!stored) return defaultVal;
     try {
         return JSON.parse(stored);
@@ -35,92 +32,45 @@ const setStorage = (key: string, val: any) => {
     localStorage.setItem(key, JSON.stringify(val));
 };
 
-// --- SYNC HELPER ---
-const getSettings = (): SystemSettings => {
-    return getStorage<SystemSettings>('system_settings', {
-        facebook_page_token: '',
-        facebook_verify_token: '',
-        sms_api_key: '',
-        sms_sender_id: '',
-        sms_base_url: '',
-        timezone: 'Asia/Dhaka',
-        system_api_key: 'lg_demo_key',
-        server_url: '',
-        sync_enabled: false
-    });
+// API Helper
+const API_BASE = './api'; 
+
+// --- DATE HELPER FOR MYSQL ---
+const formatDateForMySQL = (dateString: string) => {
+    if (!dateString) return null;
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return null;
+    
+    // Format: YYYY-MM-DD HH:MM:SS
+    const pad = (num: number) => num.toString().padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 };
 
-const syncToServer = async (action: string, data: any) => {
-    const settings = getSettings();
-    if (settings.sync_enabled && settings.server_url) {
-        try {
-            console.log(`[Server Sync] ${action} -> ${settings.server_url}`);
-            // Attempt to send data to PHP backend
-            // Using 'no-cors' mode just in case of simple testing, but real API needs CORS enabled on PHP
-            await fetch(settings.server_url, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-Action': action
-                },
-                body: JSON.stringify({ action, data })
-            });
-        } catch (e) {
-            console.error("[Server Sync Failed] Check your PHP URL or CORS settings", e);
-        }
+// --- JSON PARSER HELPER ---
+const safeJSONParse = (data: any, fallback: any = {}) => {
+    if (!data) return fallback;
+    if (typeof data === 'object') return data; // Already an object
+    try {
+        return JSON.parse(data);
+    } catch (e) {
+        console.warn("JSON Parse failed for:", data);
+        return fallback;
     }
 };
 
 export const mockService = {
-    // --- DATABASE MANAGEMENT ---
-    clearAllData: async () => {
-        setStorage('leads', []);
-        setStorage('big_fish', []);
-        setStorage('invoices', []);
-        setStorage('daily_tasks', []);
-        setStorage('online_customers', []);
-        setStorage('sales_entries', []);
-        setStorage('sales_targets', []);
-        setStorage('messenger_convs', []);
-        setStorage('interactions', []);
-        setStorage('documents', []);
-        setStorage('ad_swipe', []);
-        // Don't clear settings/templates to keep app usable
-    },
-    restoreDemoData: async () => {
-        setStorage('leads', FULL_DEMO_LEADS);
-        setStorage('templates', FULL_TEMPLATES);
-        setStorage('snippets', FULL_SNIPPETS);
-        setStorage('lead_forms', INITIAL_LEAD_FORMS);
-        // Clear others to reset
-        localStorage.removeItem('big_fish');
-        localStorage.removeItem('invoices');
-        localStorage.removeItem('daily_tasks');
-    },
-
-    // --- LEADS (CONNECTED TO LOCAL STORAGE + SERVER SYNC) ---
+    // --- LEADS (CONNECTED TO PHP/MYSQL) ---
     getLeads: async (): Promise<Lead[]> => {
-        const settings = getSettings();
-        
-        // If Sync is enabled, try to fetch from server first
-        if (settings.sync_enabled && settings.server_url) {
-            try {
-                const response = await fetch(`${settings.server_url}?action=get_leads`);
-                if (response.ok) {
-                    const data = await response.json();
-                    if (Array.isArray(data)) {
-                        // Update local cache
-                        setStorage('leads', data);
-                        return data;
-                    }
-                }
-            } catch (e) {
-                console.warn("Could not fetch from server, falling back to local storage.", e);
+        try {
+            const res = await fetch(`${API_BASE}/leads.php`);
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data)) return data;
             }
+        } catch (e) {
+            // console.warn("Running in Offline/Demo Mode (API fetch failed):", e);
         }
-
-        // Fallback to Local Storage
-        return getStorage<Lead[]>('leads', []);
+        return getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
     },
     getLeadById: async (id: string): Promise<Lead | undefined> => {
         const leads = await mockService.getLeads();
@@ -145,69 +95,82 @@ export const mockService = {
             ...lead
         } as Lead;
 
-        // Local Save
-        const leads = getStorage<Lead[]>('leads', []);
+        try {
+            // Send to Server
+            await fetch(`${API_BASE}/leads.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(newLead)
+            });
+        } catch (e) {
+            console.error("Failed to save to server, saving locally", e);
+        }
+
+        // Keep LocalStorage Sync for immediate UI update / Fallback
+        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
         leads.unshift(newLead);
         setStorage('leads', leads);
         
-        // Server Sync
-        await syncToServer('create_lead', newLead);
-
         return newLead;
     },
-    deleteLead: async (id: string) => {
-        let leads = getStorage<Lead[]>('leads', []);
-        leads = leads.filter(l => l.id !== id);
-        setStorage('leads', leads);
-        
-        // Server Sync
-        await syncToServer('delete_lead', { id });
-    },
-    deleteAllLeads: async () => {
-        setStorage('leads', []);
-        // Server Sync
-        await syncToServer('delete_all_leads', {});
-    },
     updateLeadStatus: async (id: string, status: LeadStatus) => {
-        const leads = getStorage<Lead[]>('leads', []);
+        // Optimistic UI Update
+        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
         const index = leads.findIndex(l => l.id === id);
         if (index !== -1) {
             leads[index].status = status;
             leads[index].last_activity_at = new Date().toISOString();
             setStorage('leads', leads);
-            // Server Sync
-            await syncToServer('update_lead', leads[index]);
         }
+
+        try {
+            await fetch(`${API_BASE}/leads.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update_status', id, status })
+            });
+        } catch (e) { console.error("API Error", e); }
     },
     updateLeadIndustry: async (id: string, industry: string) => {
-        const leads = getStorage<Lead[]>('leads', []);
+        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
         const index = leads.findIndex(l => l.id === id);
         if (index !== -1) {
             leads[index].industry = industry;
             setStorage('leads', leads);
-            await syncToServer('update_lead', leads[index]);
         }
+        try {
+            await fetch(`${API_BASE}/leads.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update_industry', id, industry })
+            });
+        } catch (e) { console.error("API Error", e); }
     },
     toggleLeadStar: async (id: string) => {
-        const leads = getStorage<Lead[]>('leads', []);
+        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
         const index = leads.findIndex(l => l.id === id);
         if (index !== -1) {
             leads[index].is_starred = !leads[index].is_starred;
             setStorage('leads', leads);
-            await syncToServer('update_lead', leads[index]);
         }
+        try {
+            await fetch(`${API_BASE}/leads.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'toggle_star', id })
+            });
+        } catch (e) { console.error("API Error", e); }
     },
     updateLeadNote: async (id: string, note: string) => {
-        const leads = getStorage<Lead[]>('leads', []);
+        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
         const index = leads.findIndex(l => l.id === id);
         if (index !== -1) {
             leads[index].quick_note = note;
             setStorage('leads', leads);
-            await syncToServer('update_lead', leads[index]);
         }
     },
     incrementDownloadCount: async (ids: string[]) => {
-        const leads = getStorage<Lead[]>('leads', []);
+        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
         let updated = false;
         leads.forEach(l => {
             if (ids.includes(l.id)) {
@@ -218,7 +181,7 @@ export const mockService = {
         if (updated) setStorage('leads', leads);
     },
     resolvePhoneNumbersToIds: async (phones: string[]): Promise<string[]> => {
-        const leads = await mockService.getLeads(); 
+        const leads = await mockService.getLeads(); // Use getLeads to ensure we have latest
         const ids: string[] = [];
 
         for (const phone of phones) {
@@ -226,12 +189,24 @@ export const mockService = {
             if (existing) {
                 ids.push(existing.id);
             } else {
-                const newLead = await mockService.createLead({
+                // Create new lead
+                const newLead: Lead = {
+                    id: uuid(),
                     full_name: 'Unknown',
                     primary_phone: phone,
                     source: LeadSource.MANUAL,
                     status: LeadStatus.NEW,
-                });
+                    is_starred: false,
+                    is_unread: true,
+                    total_messages_sent: 0,
+                    download_count: 0,
+                    first_contact_at: new Date().toISOString(),
+                    last_activity_at: new Date().toISOString(),
+                    created_at: new Date().toISOString(),
+                };
+                
+                // Create in DB
+                await mockService.createLead(newLead);
                 ids.push(newLead.id);
             }
         }
@@ -260,31 +235,9 @@ export const mockService = {
         const interactions = getStorage<Interaction[]>('interactions', []);
         return interactions.filter(i => i.lead_id === leadId).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     },
-    addLeadInteraction: async (leadId: string, data: Partial<ClientInteraction>) => {
-        const interactions = getStorage<Interaction[]>('interactions', []);
-        const newInt = {
-            id: uuid(),
-            lead_id: leadId,
-            channel: 'other',
-            direction: 'incoming',
-            content: `${data.type}: ${data.notes}`,
-            created_at: data.date || new Date().toISOString()
-        } as any;
-        
-        interactions.push(newInt);
-        setStorage('interactions', interactions);
-        
-        await syncToServer('add_interaction', newInt);
-    },
-    deleteLeadInteraction: async (leadId: string, interactionId: string) => {
-        let interactions = getStorage<Interaction[]>('interactions', []);
-        interactions = interactions.filter(i => i.id !== interactionId);
-        setStorage('interactions', interactions);
-    },
     
     // --- TEMPLATES ---
     getTemplates: async (): Promise<MessageTemplate[]> => {
-        // Keep default templates for utility, but allow deletion
         return getStorage<MessageTemplate[]>('templates', FULL_TEMPLATES);
     },
     createTemplate: async (template: Partial<MessageTemplate>) => {
@@ -357,7 +310,7 @@ export const mockService = {
     sendBulkSMS: async (leadIds: string[], body: string) => {
         await new Promise(resolve => setTimeout(resolve, 500));
         const interactions = getStorage<Interaction[]>('interactions', []);
-        const leads = getStorage<Lead[]>('leads', []);
+        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
         
         leadIds.forEach(id => {
             interactions.push({
@@ -421,14 +374,13 @@ export const mockService = {
         await mockService.createLead(newLead);
     },
 
-    // --- CUSTOMERS (ONLINE) ---
+    // --- CUSTOMERS (ONLINE) - API Connected ---
     getCustomers: async (): Promise<Customer[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/customers.php?action=get_customers`);
+            if (res.ok) return await res.json();
+        } catch (e) { console.warn("API Error", e); }
         return getStorage<Customer[]>('online_customers', []);
-    },
-    deleteCustomer: async (id: string) => {
-        let customers = getStorage<Customer[]>('online_customers', []);
-        customers = customers.filter(c => c.id !== id);
-        setStorage('online_customers', customers);
     },
     getCustomerCategories: async (): Promise<string[]> => {
         return getStorage<string[]>('customer_categories', ['Dress', 'Bag', 'Shoes', 'Watch', 'Gadget']);
@@ -446,399 +398,175 @@ export const mockService = {
         setStorage('customer_categories', cats);
     },
     addBulkCustomers: async (lines: string[], category: string): Promise<number> => {
-        let customers = getStorage<Customer[]>('online_customers', []);
         let added = 0;
         
-        lines.forEach(line => {
+        // Loop through lines and send API requests
+        const promises = lines.map(async (line) => {
             const phone = line.trim();
-            if (phone && !customers.find(c => c.phone === phone)) {
-                customers.unshift({
-                    id: uuid(),
-                    phone,
-                    category,
-                    date_added: new Date().toISOString()
-                });
-                added++;
+            if (phone) {
+                try {
+                    const res = await fetch(`${API_BASE}/customers.php`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            action: 'add_customer',
+                            id: uuid(),
+                            phone, 
+                            category,
+                            date_added: new Date().toISOString()
+                        })
+                    });
+                    const result = await res.json();
+                    if (result.added) added++;
+                } catch (e) { console.error("Error adding customer", e); }
             }
         });
-        setStorage('online_customers', customers);
+
+        await Promise.all(promises);
         return added;
     },
-
-    // --- BIG FISH (VIP CLIENTS) ---
-    getBigFish: async (): Promise<BigFish[]> => {
-        return getStorage<BigFish[]>('big_fish', []);
-    },
-    getBigFishById: async (id: string): Promise<BigFish | undefined> => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        return fish.find(f => f.id === id);
-    },
-    createBigFish: async (fish: Partial<BigFish>) => {
-        const allFish = getStorage<BigFish[]>('big_fish', []);
-        const newFish: BigFish = {
-            id: uuid(),
-            lead_id: fish.lead_id || uuid(),
-            name: fish.name!,
-            status: 'Active Pool',
-            package_name: fish.package_name,
-            balance: 0,
-            low_balance_alert_threshold: 10,
-            total_budget: 0,
-            spent_amount: 0,
-            target_sales: 100,
-            current_sales: 0,
-            phone: fish.phone || '',
-            transactions: [],
-            growth_tasks: [],
-            reports: [],
-            portal_config: { show_balance: true, show_history: true, is_suspended: false },
-            start_date: new Date().toISOString(),
-            interactions: []
-        };
-        allFish.unshift(newFish);
-        setStorage('big_fish', allFish);
-        return newFish;
-    },
-    updateBigFish: async (id: string, updates: Partial<BigFish>) => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const idx = fish.findIndex(f => f.id === id);
-        if (idx !== -1) {
-            fish[idx] = { ...fish[idx], ...updates };
-            setStorage('big_fish', fish);
-        }
-    },
-    catchBigFish: async (leadId: string): Promise<BigFish | null> => {
-        const leads = getStorage<Lead[]>('leads', []);
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        
-        const lead = leads.find(l => l.id === leadId);
-        if (!lead) return null;
-        
-        if (fish.find(f => f.lead_id === leadId)) return null; // Already caught
-
-        const newFish: BigFish = {
-            id: uuid(),
-            lead_id: lead.id,
-            name: lead.full_name,
-            status: 'Active Pool',
-            package_name: lead.service_category || 'Standard Plan',
-            balance: 0,
-            low_balance_alert_threshold: 10,
-            total_budget: 0,
-            spent_amount: 0,
-            target_sales: 100,
-            current_sales: 0,
-            phone: lead.primary_phone,
-            transactions: [],
-            growth_tasks: [],
-            reports: [],
-            portal_config: { show_balance: true, show_history: true, is_suspended: false },
-            start_date: new Date().toISOString(),
-            interactions: []
-        };
-        
-        fish.unshift(newFish);
-        setStorage('big_fish', fish);
-        
-        // Optionally update lead status to WON
-        await mockService.updateLeadStatus(leadId, LeadStatus.CLOSED_WON);
-        
-        return newFish;
-    },
-    toggleBigFishStatus: async (id: string) => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const idx = fish.findIndex(f => f.id === id);
-        if (idx !== -1) {
-            fish[idx].status = fish[idx].status === 'Active Pool' ? 'Hall of Fame' : 'Active Pool';
-            fish[idx].end_date = fish[idx].status === 'Hall of Fame' ? new Date().toISOString() : undefined;
-            setStorage('big_fish', fish);
-        }
-    },
-    addTransaction: async (fishId: string, type: Transaction['type'], amount: number, desc: string, metadata?: any, dateStr?: string) => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const idx = fish.findIndex(f => f.id === fishId);
-        if (idx !== -1) {
-            const tx: Transaction = {
-                id: uuid(),
-                date: dateStr || new Date().toISOString(),
-                type,
-                amount,
-                description: desc,
-                metadata
-            };
-            fish[idx].transactions.unshift(tx);
-            
-            // Recalculate Balance
-            if (type === 'DEPOSIT') {
-                fish[idx].balance = (fish[idx].balance || 0) + amount;
-                fish[idx].total_budget = (fish[idx].total_budget || 0) + amount;
-            } else {
-                fish[idx].balance = (fish[idx].balance || 0) - amount;
-                if(type === 'AD_SPEND') {
-                    fish[idx].spent_amount = (fish[idx].spent_amount || 0) + amount;
-                    // Auto-update sales if metadata provided
-                    if(metadata && metadata.resultType === 'SALES' && metadata.leads) {
-                        fish[idx].current_sales = (fish[idx].current_sales || 0) + metadata.leads;
-                    }
-                    // Auto-add Report Log
-                    fish[idx].reports.unshift({
-                        id: uuid(),
-                        date: dateStr || new Date().toISOString(),
-                        task: `Ad Spend: $${amount} | Results: ${metadata?.leads || 0} (${metadata?.resultType})`
-                    });
-                }
-            }
-            setStorage('big_fish', fish);
-        }
-    },
-    updateTransaction: async (fishId: string, txId: string, updates: Partial<Transaction>) => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const fIdx = fish.findIndex(f => f.id === fishId);
-        if (fIdx !== -1) {
-            const txIdx = fish[fIdx].transactions.findIndex(t => t.id === txId);
-            if (txIdx !== -1) {
-                // Revert old balance effect
-                const oldTx = fish[fIdx].transactions[txIdx];
-                if (oldTx.type === 'DEPOSIT') fish[fIdx].balance -= oldTx.amount;
-                else fish[fIdx].balance += oldTx.amount;
-                if (oldTx.type === 'AD_SPEND') fish[fIdx].spent_amount -= oldTx.amount;
-
-                // Update
-                const newTx = { ...oldTx, ...updates };
-                fish[fIdx].transactions[txIdx] = newTx;
-
-                // Apply new balance effect
-                if (newTx.type === 'DEPOSIT') fish[fIdx].balance += newTx.amount;
-                else fish[fIdx].balance -= newTx.amount;
-                if (newTx.type === 'AD_SPEND') fish[fIdx].spent_amount += newTx.amount;
-
-                setStorage('big_fish', fish);
-            }
-        }
-    },
-    deleteTransaction: async (fishId: string, txId: string) => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const fIdx = fish.findIndex(f => f.id === fishId);
-        if (fIdx !== -1) {
-            const tx = fish[fIdx].transactions.find(t => t.id === txId);
-            if (tx) {
-                // Revert balance
-                if (tx.type === 'DEPOSIT') fish[fIdx].balance -= tx.amount;
-                else fish[fIdx].balance += tx.amount;
-                if (tx.type === 'AD_SPEND') fish[fIdx].spent_amount -= tx.amount;
-
-                // Remove
-                fish[fIdx].transactions = fish[fIdx].transactions.filter(t => t.id !== txId);
-                setStorage('big_fish', fish);
-            }
-        }
-    },
-    addGrowthTask: async (fishId: string, title: string, dueDate?: string) => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const idx = fish.findIndex(f => f.id === fishId);
-        if (idx !== -1) {
-            fish[idx].growth_tasks.push({
-                id: uuid(),
-                title,
-                is_completed: false,
-                due_date: dueDate
+    deleteCustomer: async (id: string) => {
+        try {
+            await fetch(`${API_BASE}/customers.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete_customer', id })
             });
-            setStorage('big_fish', fish);
-        }
-    },
-    toggleGrowthTask: async (fishId: string, taskId: string) => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const idx = fish.findIndex(f => f.id === fishId);
-        if (idx !== -1) {
-            const task = fish[idx].growth_tasks.find(t => t.id === taskId);
-            if (task) task.is_completed = !task.is_completed;
-            setStorage('big_fish', fish);
-        }
-    },
-    updatePortalConfig: async (fishId: string, config: any) => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const idx = fish.findIndex(f => f.id === fishId);
-        if (idx !== -1) {
-            fish[idx].portal_config = { ...fish[idx].portal_config, ...config };
-            setStorage('big_fish', fish);
-        }
-    },
-    updateTargets: async (fishId: string, target: number, current: number) => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const idx = fish.findIndex(f => f.id === fishId);
-        if (idx !== -1) {
-            fish[idx].target_sales = target;
-            fish[idx].current_sales = current;
-            setStorage('big_fish', fish);
-        }
-    },
-    addWorkLog: async (fishId: string, text: string) => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const idx = fish.findIndex(f => f.id === fishId);
-        if (idx !== -1) {
-            fish[idx].reports.unshift({
-                id: uuid(),
-                date: new Date().toISOString(),
-                task: text
-            });
-            setStorage('big_fish', fish);
-        }
-    },
-    checkExpiringCampaigns: async (): Promise<BigFish[]> => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const now = new Date();
-        return fish.filter(f => {
-            if (!f.campaign_end_date || f.status !== 'Active Pool') return false;
-            const end = new Date(f.campaign_end_date);
-            const diffHours = (end.getTime() - now.getTime()) / (1000 * 60 * 60);
-            return diffHours > 0 && diffHours <= 24;
-        });
-    },
-    checkRetainerRenewals: async (): Promise<BigFish[]> => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const now = new Date();
-        const sevenDaysFromNow = new Date();
-        sevenDaysFromNow.setDate(now.getDate() + 7);
-        
-        return fish.filter(f => {
-            if (!f.is_retainer || !f.retainer_renewal_date || f.status !== 'Active Pool') return false;
-            const renew = new Date(f.retainer_renewal_date);
-            return renew <= sevenDaysFromNow;
-        });
-    },
-    renewRetainer: async (fishId: string) => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const idx = fish.findIndex(f => f.id === fishId);
-        if (idx !== -1 && fish[idx].retainer_renewal_date) {
-            // Add 30 days
-            const current = new Date(fish[idx].retainer_renewal_date!);
-            current.setDate(current.getDate() + 30);
-            fish[idx].retainer_renewal_date = current.toISOString().slice(0, 10);
-            
-            // Add Log
-            fish[idx].reports.unshift({
-                id: uuid(),
-                date: new Date().toISOString(),
-                task: `Subscription Renewed. Next due: ${fish[idx].retainer_renewal_date}`
-            });
-            
-            setStorage('big_fish', fish);
-        }
-    },
-    getLifetimeDeposit: (fish: BigFish): number => {
-        return fish.transactions
-            .filter(t => t.type === 'DEPOSIT')
-            .reduce((sum, t) => sum + t.amount, 0);
-    },
-    addClientInteraction: async (fishId: string, data: Partial<ClientInteraction>) => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const idx = fish.findIndex(f => f.id === fishId);
-        if (idx !== -1) {
-            const newInteraction: ClientInteraction = {
-                id: uuid(),
-                type: data.type || 'CALL',
-                date: data.date || new Date().toISOString(),
-                notes: data.notes || '',
-                next_follow_up: data.next_follow_up,
-                created_at: new Date().toISOString()
-            };
-            if (!fish[idx].interactions) fish[idx].interactions = [];
-            fish[idx].interactions!.unshift(newInteraction);
-            setStorage('big_fish', fish);
-        }
-    },
-    deleteClientInteraction: async (fishId: string, interactionId: string) => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const idx = fish.findIndex(f => f.id === fishId);
-        if (idx !== -1 && fish[idx].interactions) {
-            fish[idx].interactions = fish[idx].interactions!.filter(i => i.id !== interactionId);
-            setStorage('big_fish', fish);
-        }
+        } catch (e) { console.error("API Error", e); }
     },
 
-    // --- TASKS (DAILY) ---
+    // --- TASKS (API Connected) ---
     getTasks: async (): Promise<Task[]> => {
-        return getStorage<Task[]>('daily_tasks', []);
+        try {
+            const res = await fetch(`${API_BASE}/tasks.php`);
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data)) return data;
+            } else {
+                console.warn(`Tasks API Error: ${res.status}`);
+            }
+        } catch (e) { console.warn("API Error", e); }
+        return getStorage<Task[]>('tasks', []);
     },
     createTask: async (text: string, dueDate?: string, leadId?: string) => {
-        const tasks = getStorage<Task[]>('daily_tasks', []);
-        tasks.unshift({
+        const newTask = {
             id: uuid(),
             text,
             is_completed: false,
             created_at: new Date().toISOString(),
             due_date: dueDate,
             lead_id: leadId
-        });
-        setStorage('daily_tasks', tasks);
+        };
+
+        try {
+            await fetch(`${API_BASE}/tasks.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    action: 'create', 
+                    ...newTask,
+                    // Format dates for MySQL to avoid errors
+                    created_at: formatDateForMySQL(newTask.created_at),
+                    due_date: dueDate ? formatDateForMySQL(dueDate) : null
+                })
+            });
+        } catch (e) { console.error("API Error Creating Task", e); }
+
+        const tasks = getStorage<Task[]>('tasks', []);
+        tasks.push(newTask);
+        setStorage('tasks', tasks);
     },
     toggleTask: async (id: string) => {
-        const tasks = getStorage<Task[]>('daily_tasks', []);
-        const idx = tasks.findIndex(t => t.id === id);
-        if (idx !== -1) {
-            tasks[idx].is_completed = !tasks[idx].is_completed;
-            setStorage('daily_tasks', tasks);
+        const tasks = getStorage<Task[]>('tasks', []);
+        const t = tasks.find(x => x.id === id);
+        if (t) {
+            t.is_completed = !t.is_completed;
+            setStorage('tasks', tasks);
+
+            try {
+                await fetch(`${API_BASE}/tasks.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'toggle', id, is_completed: t.is_completed })
+                });
+            } catch (e) { console.error("API Error", e); }
         }
     },
     deleteTask: async (id: string) => {
-        let tasks = getStorage<Task[]>('daily_tasks', []);
+        try {
+            await fetch(`${API_BASE}/tasks.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete', id })
+            });
+        } catch (e) { console.error("API Error", e); }
+
+        let tasks = getStorage<Task[]>('tasks', []);
         tasks = tasks.filter(t => t.id !== id);
-        setStorage('daily_tasks', tasks);
+        setStorage('tasks', tasks);
     },
 
-    // --- SALES GOALS ---
-    getSalesTargets: async (): Promise<MonthlyTarget[]> => {
-        return getStorage<MonthlyTarget[]>('sales_targets', []);
-    },
-    setSalesTarget: async (target: Partial<MonthlyTarget>) => {
-        const targets = getStorage<MonthlyTarget[]>('sales_targets', []);
-        const idx = targets.findIndex(t => t.month === target.month && t.service === target.service);
-        if (idx !== -1) {
-            targets[idx] = { ...targets[idx], ...target };
-        } else {
-            targets.push({ id: uuid(), ...target } as MonthlyTarget);
-        }
-        setStorage('sales_targets', targets);
-    },
-    getSalesEntries: async (): Promise<SalesEntry[]> => {
-        return getStorage<SalesEntry[]>('sales_entries', []);
-    },
-    addSalesEntry: async (entry: Partial<SalesEntry>) => {
-        const entries = getStorage<SalesEntry[]>('sales_entries', []);
-        entries.push({ id: uuid(), created_at: new Date().toISOString(), ...entry } as SalesEntry);
-        setStorage('sales_entries', entries);
-    },
-    updateSalesEntry: async (id: string, updates: Partial<SalesEntry>) => {
-        const entries = getStorage<SalesEntry[]>('sales_entries', []);
-        const idx = entries.findIndex(e => e.id === id);
-        if(idx !== -1) {
-            entries[idx] = { ...entries[idx], ...updates };
-            setStorage('sales_entries', entries);
-        }
-    },
-    deleteSalesEntry: async (id: string) => {
-        let entries = getStorage<SalesEntry[]>('sales_entries', []);
-        entries = entries.filter(e => e.id !== id);
-        setStorage('sales_entries', entries);
-    },
-
-    // --- INVOICES ---
+    // --- INVOICES (API Connected) ---
     getInvoices: async (): Promise<Invoice[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/invoices.php`);
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data)) return data;
+            }
+        } catch(e) { console.warn("API Error, using local", e); }
         return getStorage<Invoice[]>('invoices', []);
     },
-    createInvoice: async (data: any) => {
+    createInvoice: async (inv: Partial<Invoice>) => {
         const invoices = getStorage<Invoice[]>('invoices', []);
-        const nextNum = (invoices.length + 1).toString().padStart(4, '0');
-        const newInv: Invoice = {
-            id: uuid(),
-            number: `INV-${nextNum}`,
-            created_at: new Date().toISOString(),
-            ...data
+        // Generate a simple number if creating new
+        const num = invoices.length + 1;
+        const padded = num.toString().padStart(4, '0');
+        
+        const newInv = {
+            id: inv.id || uuid(),
+            number: inv.number || `INV-${padded}`,
+            client_name: inv.client_name!,
+            client_phone: inv.client_phone,
+            client_address: inv.client_address,
+            items: inv.items || [],
+            status: inv.status || 'new',
+            date: inv.date || new Date().toISOString().slice(0, 10),
+            created_at: formatDateForMySQL(new Date().toISOString()),
+            paid_amount: inv.paid_amount || 0,
+            terms_enabled: inv.terms_enabled || false,
+            terms_content: inv.terms_content
         };
-        invoices.unshift(newInv);
+
+        try {
+            await fetch(`${API_BASE}/invoices.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'create',
+                    ...newInv
+                })
+            });
+        } catch(e) { console.warn("API Error", e); }
+
+        // Local Fallback
+        const idx = invoices.findIndex(i => i.id === newInv.id);
+        if (idx !== -1) {
+            invoices[idx] = newInv as Invoice;
+        } else {
+            invoices.unshift(newInv as Invoice);
+        }
         setStorage('invoices', invoices);
     },
     deleteInvoice: async (id: string) => {
+        try {
+            await fetch(`${API_BASE}/invoices.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete', id })
+            });
+        } catch(e) { console.warn("API Error", e); }
+
         let invoices = getStorage<Invoice[]>('invoices', []);
         invoices = invoices.filter(i => i.id !== id);
         setStorage('invoices', invoices);
@@ -848,29 +576,553 @@ export const mockService = {
     getSnippets: async (): Promise<Snippet[]> => {
         return getStorage<Snippet[]>('snippets', FULL_SNIPPETS);
     },
-    createSnippet: async (data: any) => {
-        const list = getStorage<Snippet[]>('snippets', FULL_SNIPPETS);
-        list.push({ id: uuid(), ...data });
-        setStorage('snippets', list);
+    createSnippet: async (s: Partial<Snippet>) => {
+        const snippets = getStorage<Snippet[]>('snippets', FULL_SNIPPETS);
+        snippets.push({ ...s, id: uuid() } as Snippet);
+        setStorage('snippets', snippets);
     },
-    updateSnippet: async (id: string, data: any) => {
-        const list = getStorage<Snippet[]>('snippets', FULL_SNIPPETS);
-        const idx = list.findIndex(s => s.id === id);
-        if(idx !== -1) { list[idx] = { ...list[idx], ...data }; setStorage('snippets', list); }
+    updateSnippet: async (id: string, updates: Partial<Snippet>) => {
+        const snippets = getStorage<Snippet[]>('snippets', FULL_SNIPPETS);
+        const idx = snippets.findIndex(s => s.id === id);
+        if (idx !== -1) {
+            snippets[idx] = { ...snippets[idx], ...updates };
+            setStorage('snippets', snippets);
+        }
     },
     deleteSnippet: async (id: string) => {
-        let list = getStorage<Snippet[]>('snippets', FULL_SNIPPETS);
-        list = list.filter(s => s.id !== id);
-        setStorage('snippets', list);
+        let snippets = getStorage<Snippet[]>('snippets', FULL_SNIPPETS);
+        snippets = snippets.filter(s => s.id !== id);
+        setStorage('snippets', snippets);
+    },
+
+    // --- DOCUMENTS ---
+    getDocuments: async (): Promise<Document[]> => {
+        return getStorage<Document[]>('documents', []);
+    },
+    saveDocument: async (doc: Partial<Document>) => {
+        const docs = getStorage<Document[]>('documents', []);
+        docs.unshift({
+            id: uuid(),
+            title: doc.title || 'Untitled',
+            client_id: doc.client_id,
+            client_name: doc.client_name,
+            content: doc.content || '',
+            created_at: new Date().toISOString()
+        });
+        setStorage('documents', docs);
+    },
+    deleteDocument: async (id: string) => {
+        let docs = getStorage<Document[]>('documents', []);
+        docs = docs.filter(d => d.id !== id);
+        setStorage('documents', docs);
+    },
+
+    // --- BIG FISH (VIP CLIENTS) - API Connected ---
+    getBigFish: async (): Promise<BigFish[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/bigfish.php`);
+            if(res.ok) {
+                const rawData = await res.json();
+                if (!Array.isArray(rawData)) return [];
+                
+                // Sanitize Data
+                return rawData.map((fish: any) => {
+                    const config = safeJSONParse(fish.portal_config, { show_balance: true, show_history: true, is_suspended: false });
+                    let transactions = fish.transactions;
+                    if (!Array.isArray(transactions)) transactions = [];
+                    
+                    transactions = transactions.map((t: any) => ({
+                        ...t,
+                        amount: parseFloat(t.amount || 0),
+                        metadata: safeJSONParse(t.metadata)
+                    }));
+
+                    return {
+                        ...fish,
+                        balance: parseFloat(fish.balance || 0),
+                        spent_amount: parseFloat(fish.spent_amount || 0),
+                        target_sales: parseInt(fish.target_sales || 0),
+                        current_sales: parseInt(fish.current_sales || 0),
+                        retainer_amount: parseFloat(fish.retainer_amount || 0),
+                        portal_config: config,
+                        transactions: transactions,
+                        growth_tasks: Array.isArray(fish.growth_tasks) ? fish.growth_tasks : [],
+                        reports: Array.isArray(fish.reports) ? fish.reports : [],
+                        interactions: Array.isArray(fish.interactions) ? fish.interactions : [],
+                    };
+                });
+            }
+        } catch (e) { console.warn("API Error", e); }
+        return getStorage<BigFish[]>('big_fish', []);
+    },
+    getBigFishById: async (id: string): Promise<BigFish | undefined> => {
+        const fish = await mockService.getBigFish();
+        return fish.find(f => f.id === id);
+    },
+    createBigFish: async (data: Partial<BigFish>) => {
+        const newFish = {
+            id: uuid(),
+            lead_id: uuid(),
+            name: data.name!,
+            phone: data.phone!,
+            status: 'Active Pool',
+            package_name: data.package_name,
+            balance: 0,
+            low_balance_alert_threshold: 10,
+            total_budget: 0,
+            spent_amount: 0,
+            target_sales: 0,
+            current_sales: 0,
+            transactions: [],
+            growth_tasks: [],
+            reports: [],
+            interactions: [],
+            portal_config: { show_balance: true, show_history: true, is_suspended: false },
+            start_date: new Date().toISOString()
+        };
+
+        try {
+            await fetch(`${API_BASE}/bigfish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'create', ...newFish })
+            });
+        } catch(e) { console.warn("API Error", e); }
+
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        fish.push(newFish as any);
+        setStorage('big_fish', fish);
+    },
+    catchBigFish: async (leadId: string): Promise<boolean> => {
+        const leads = await mockService.getLeads();
+        const lead = leads.find(l => l.id === leadId);
+        if (!lead) return false;
+
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        if (fish.some(f => f.lead_id === leadId)) return false;
+
+        const newFish = {
+            id: uuid(),
+            lead_id: leadId,
+            name: lead.full_name,
+            phone: lead.primary_phone,
+            status: 'Active Pool',
+            package_name: lead.service_category,
+            balance: 0,
+            low_balance_alert_threshold: 10,
+            total_budget: 0,
+            spent_amount: 0,
+            target_sales: 0,
+            current_sales: 0,
+            transactions: [],
+            growth_tasks: [],
+            reports: [],
+            interactions: [],
+            portal_config: { show_balance: true, show_history: true, is_suspended: false },
+            start_date: new Date().toISOString()
+        };
+
+        try {
+            await fetch(`${API_BASE}/bigfish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'create', ...newFish })
+            });
+        } catch(e) { console.warn("API Error", e); }
+
+        fish.push(newFish as any);
+        setStorage('big_fish', fish);
+        return true;
+    },
+    toggleBigFishStatus: async (id: string) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === id);
+        if (f) {
+            f.status = f.status === 'Active Pool' ? 'Hall of Fame' : 'Active Pool';
+            if (f.status === 'Hall of Fame') f.end_date = new Date().toISOString();
+            else f.end_date = undefined; // Clear end date if reactivated
+            
+            setStorage('big_fish', fish);
+
+            // Sync with Server (Fix for Mark Complete Bug)
+            try {
+                await fetch(`${API_BASE}/bigfish.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        action: 'update', 
+                        id, 
+                        updates: { 
+                            status: f.status,
+                            end_date: f.end_date 
+                        } 
+                    })
+                });
+            } catch (e) { console.error("API Error", e); }
+        }
+    },
+    updateBigFish: async (id: string, updates: Partial<BigFish>) => {
+        // Optimistic UI Update
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const idx = fish.findIndex(f => f.id === id);
+        if(idx !== -1) {
+            fish[idx] = { ...fish[idx], ...updates };
+            setStorage('big_fish', fish);
+        }
+        // Send to Server
+        try {
+            await fetch(`${API_BASE}/bigfish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update', id, updates })
+            });
+        } catch(e) { console.warn("API Error", e); }
+    },
+    addTransaction: async (fishId: string, type: Transaction['type'], amount: number, desc: string, metadata?: any, dateOverride?: string) => {
+        // 1. Prepare Local Data
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f) {
+            const tx: Transaction = {
+                id: uuid(),
+                date: dateOverride || new Date().toISOString(),
+                type,
+                amount,
+                description: desc,
+                metadata
+            };
+            f.transactions.unshift(tx);
+            
+            // Force balance to be number before calculation (Fix for Balance Bug)
+            const currentBalance = parseFloat(f.balance as any) || 0;
+            
+            if (type === 'DEPOSIT') f.balance = currentBalance + amount;
+            else f.balance = currentBalance - amount;
+
+            if (type === 'AD_SPEND') {
+                const currentSpent = parseFloat(f.spent_amount as any) || 0;
+                f.spent_amount = currentSpent + amount;
+                
+                f.reports.unshift({
+                    id: uuid(),
+                    date: dateOverride || new Date().toISOString(),
+                    task: `Ad Run: Spent $${amount} (${desc})`
+                });
+                if (metadata && metadata.leads) {
+                    if (metadata.resultType === 'SALES') {
+                        f.current_sales = (f.current_sales || 0) + metadata.leads;
+                    }
+                }
+            }
+            setStorage('big_fish', fish);
+
+            // 2. Send to PHP API
+            try {
+                await fetch(`${API_BASE}/bigfish.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'add_transaction',
+                        id: tx.id,
+                        big_fish_id: fishId,
+                        type,
+                        amount,
+                        description: desc,
+                        date: tx.date,
+                        metadata
+                    })
+                });
+            } catch (e) { console.error("API Error", e); }
+        }
+    },
+    deleteTransaction: async (fishId: string, txId: string) => {
+        // 1. Update Local Storage
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        
+        let updates: Partial<BigFish> = {}; // Capture changes to sync
+
+        if (f) {
+            const tx = f.transactions.find(t => t.id === txId);
+            if (tx) {
+                // Force number conversion (Fix for Balance Bug)
+                const currentBalance = parseFloat(f.balance as any) || 0;
+                
+                if (tx.type === 'DEPOSIT') {
+                    f.balance = currentBalance - tx.amount;
+                } else {
+                    f.balance = currentBalance + tx.amount;
+                }
+                updates.balance = f.balance;
+                
+                if (tx.type === 'AD_SPEND') {
+                    const currentSpent = parseFloat(f.spent_amount as any) || 0;
+                    f.spent_amount = currentSpent - tx.amount;
+                    updates.spent_amount = f.spent_amount;
+                    
+                    // Revert Sales Count if applicable (Fix for Sales Count Bug)
+                    if (tx.metadata && tx.metadata.resultType === 'SALES' && tx.metadata.leads) {
+                         const currentSales = (f.current_sales || 0);
+                         let newSales = currentSales - tx.metadata.leads;
+                         if (newSales < 0) newSales = 0;
+                         f.current_sales = newSales;
+                         updates.current_sales = newSales;
+                    }
+                }
+                
+                f.transactions = f.transactions.filter(t => t.id !== txId);
+                setStorage('big_fish', fish);
+            }
+        }
+
+        // 2. Update Server
+        try {
+            // Delete the transaction record
+            await fetch(`${API_BASE}/bigfish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'delete_transaction',
+                    id: txId,
+                    big_fish_id: fishId
+                })
+            });
+
+            // Update parent record stats if any changes occurred
+            if (Object.keys(updates).length > 0) {
+                await fetch(`${API_BASE}/bigfish.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        action: 'update', 
+                        id: fishId, 
+                        updates 
+                    })
+                });
+            }
+        } catch (e) { console.error("API Error during delete transaction", e); }
+    },
+    updateTransaction: async (fishId: string, txId: string, updates: { date: string, description: string, amount: number }) => {
+        // 1. Update Local Storage
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f) {
+            const txIndex = f.transactions.findIndex(t => t.id === txId);
+            if (txIndex !== -1) {
+                const oldTx = f.transactions[txIndex];
+                // Force number conversion
+                let currentBalance = parseFloat(f.balance as any) || 0;
+
+                // Revert old balance effect
+                if (oldTx.type === 'DEPOSIT') currentBalance -= oldTx.amount;
+                else currentBalance += oldTx.amount;
+                
+                if (oldTx.type === 'AD_SPEND') {
+                    const currentSpent = parseFloat(f.spent_amount as any) || 0;
+                    f.spent_amount = currentSpent - oldTx.amount;
+                }
+
+                // Apply new balance effect
+                const newAmount = updates.amount;
+                if (oldTx.type === 'DEPOSIT') currentBalance += newAmount;
+                else currentBalance -= newAmount;
+                
+                if (oldTx.type === 'AD_SPEND') {
+                    const currentSpent = parseFloat(f.spent_amount as any) || 0;
+                    f.spent_amount = currentSpent + newAmount;
+                }
+
+                f.balance = currentBalance;
+                f.transactions[txIndex] = { ...oldTx, ...updates };
+                setStorage('big_fish', fish);
+            }
+        }
+
+        // 2. Update Server
+        try {
+            await fetch(`${API_BASE}/bigfish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'update_transaction',
+                    id: txId,
+                    big_fish_id: fishId,
+                    ...updates
+                })
+            });
+        } catch (e) { console.error("API Error during update transaction", e); }
+    },
+    getLifetimeDeposit: (fish: BigFish) => {
+        return fish.transactions.filter(t => t.type === 'DEPOSIT').reduce((acc, t) => acc + t.amount, 0);
+    },
+    addGrowthTask: async (fishId: string, title: string, dueDate?: string) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f) {
+            const newTask = {
+                id: uuid(),
+                title,
+                is_completed: false,
+                due_date: dueDate
+            };
+            f.growth_tasks.push(newTask);
+            setStorage('big_fish', fish);
+
+            try {
+                await fetch(`${API_BASE}/bigfish.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'add_task',
+                        id: fishId,
+                        task_id: newTask.id,
+                        title,
+                        due_date: dueDate
+                    })
+                });
+            } catch (e) { console.error("API Error", e); }
+        }
+    },
+    toggleGrowthTask: async (fishId: string, taskId: string) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f) {
+            const t = f.growth_tasks.find(x => x.id === taskId);
+            if (t) t.is_completed = !t.is_completed;
+            setStorage('big_fish', fish);
+
+            try {
+                await fetch(`${API_BASE}/bigfish.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'toggle_task', task_id: taskId })
+                });
+            } catch (e) { console.error("API Error", e); }
+        }
+    },
+    updatePortalConfig: async (fishId: string, config: any) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f) {
+            f.portal_config = { ...f.portal_config, ...config };
+            setStorage('big_fish', fish);
+
+            try {
+                await fetch(`${API_BASE}/bigfish.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'update_config', id: fishId, config: f.portal_config })
+                });
+            } catch (e) { console.error("API Error", e); }
+        }
+    },
+    updateTargets: async (fishId: string, target: number, current: number) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f) {
+            f.target_sales = target;
+            f.current_sales = current;
+            setStorage('big_fish', fish);
+
+            try {
+                await fetch(`${API_BASE}/bigfish.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'update_targets', id: fishId, target, current })
+                });
+            } catch (e) { console.error("API Error", e); }
+        }
+    },
+    addWorkLog: async (fishId: string, task: string) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f) {
+            const newLog = {
+                id: uuid(),
+                date: new Date().toISOString(),
+                task
+            };
+            f.reports.unshift(newLog);
+            setStorage('big_fish', fish);
+
+            try {
+                await fetch(`${API_BASE}/bigfish.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        action: 'add_log', 
+                        id: fishId, 
+                        log_id: newLog.id, 
+                        task,
+                        date: newLog.date 
+                    })
+                });
+            } catch (e) { console.error("API Error", e); }
+        }
+    },
+    checkExpiringCampaigns: async (): Promise<BigFish[]> => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const now = new Date();
+        const tomorrow = new Date();
+        tomorrow.setDate(now.getDate() + 1);
+        
+        return fish.filter(f => {
+            if (f.status !== 'Active Pool' || !f.campaign_end_date) return false;
+            const end = new Date(f.campaign_end_date);
+            return end <= tomorrow && end >= now;
+        });
+    },
+    checkRetainerRenewals: async (): Promise<BigFish[]> => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const now = new Date();
+        const nextWeek = new Date();
+        nextWeek.setDate(now.getDate() + 7);
+
+        return fish.filter(f => {
+            if (f.status !== 'Active Pool' || !f.is_retainer || !f.retainer_renewal_date) return false;
+            const renew = new Date(f.retainer_renewal_date);
+            return renew <= nextWeek; 
+        });
+    },
+    renewRetainer: async (fishId: string) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f && f.retainer_renewal_date) {
+            const current = new Date(f.retainer_renewal_date);
+            current.setDate(current.getDate() + 30); 
+            f.retainer_renewal_date = current.toISOString().slice(0, 10);
+            setStorage('big_fish', fish);
+        }
+    },
+    addClientInteraction: async (fishId: string, interaction: Omit<ClientInteraction, 'id' | 'created_at'>) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f) {
+            if (!f.interactions) f.interactions = [];
+            f.interactions.unshift({
+                id: uuid(),
+                created_at: new Date().toISOString(),
+                ...interaction
+            });
+            setStorage('big_fish', fish);
+        }
+    },
+    deleteClientInteraction: async (fishId: string, interactionId: string) => {
+        const fish = getStorage<BigFish[]>('big_fish', []);
+        const f = fish.find(x => x.id === fishId);
+        if (f && f.interactions) {
+            f.interactions = f.interactions.filter(i => i.id !== interactionId);
+            setStorage('big_fish', fish);
+        }
     },
 
     // --- PAYMENT METHODS ---
     getPaymentMethods: async (): Promise<PaymentMethod[]> => {
         return getStorage<PaymentMethod[]>('payment_methods', []);
     },
-    savePaymentMethod: async (pm: any) => {
+    savePaymentMethod: async (pm: Partial<PaymentMethod>) => {
         const list = getStorage<PaymentMethod[]>('payment_methods', []);
-        list.push({ id: uuid(), ...pm });
+        list.push({ ...pm, id: uuid() } as PaymentMethod);
         setStorage('payment_methods', list);
     },
     deletePaymentMethod: async (id: string) => {
@@ -879,47 +1131,23 @@ export const mockService = {
         setStorage('payment_methods', list);
     },
 
-    // --- AD SWIPE ---
-    getAdInspirations: async (): Promise<AdInspiration[]> => {
-        return getStorage<AdInspiration[]>('ad_swipe', []);
-    },
-    addAdInspiration: async (ad: any) => {
-        const list = getStorage<AdInspiration[]>('ad_swipe', []);
-        const newAd = { id: uuid(), created_at: new Date().toISOString(), ...ad };
-        list.unshift(newAd);
-        setStorage('ad_swipe', list);
-        return newAd;
-    },
-    deleteAdInspiration: async (id: string) => {
-        let list = getStorage<AdInspiration[]>('ad_swipe', []);
-        list = list.filter(a => a.id !== id);
-        setStorage('ad_swipe', list);
-    },
-
-    // --- DOCUMENTS (Letterhead) ---
-    getDocuments: async (): Promise<Document[]> => {
-        return getStorage<Document[]>('documents', []);
-    },
-    saveDocument: async (doc: any) => {
-        const list = getStorage<Document[]>('documents', []);
-        list.unshift({ id: uuid(), created_at: new Date().toISOString(), ...doc });
-        setStorage('documents', list);
-    },
-    deleteDocument: async (id: string) => {
-        let list = getStorage<Document[]>('documents', []);
-        list = list.filter(d => d.id !== id);
-        setStorage('documents', list);
-    },
-
     // --- SYSTEM SETTINGS ---
     getSystemSettings: async (): Promise<SystemSettings> => {
-        return getSettings();
+        return getStorage<SystemSettings>('system_settings', {
+            facebook_page_token: '',
+            facebook_verify_token: '',
+            sms_api_key: '',
+            sms_sender_id: '',
+            sms_base_url: '',
+            timezone: 'Asia/Dhaka',
+            system_api_key: ''
+        });
     },
-    saveSystemSettings: async (settings: SystemSettings) => {
-        setStorage('system_settings', settings);
+    saveSystemSettings: async (s: SystemSettings) => {
+        setStorage('system_settings', s);
     },
 
-    // --- MESSENGER MOCK ---
+    // --- MESSENGER BABA (Mock) ---
     getMessengerConversations: async (): Promise<MessengerConversation[]> => {
         return getStorage<MessengerConversation[]>('messenger_convs', []);
     },
@@ -930,7 +1158,7 @@ export const mockService = {
         if (!conv) {
             conv = {
                 id: uuid(),
-                facebook_user_id: uuid(),
+                facebook_user_id: 'fb_' + Math.floor(Math.random() * 10000),
                 customer_name: senderName,
                 messages: [],
                 last_message: '',
@@ -940,7 +1168,6 @@ export const mockService = {
             convs.push(conv);
         }
 
-        // Add Customer Message
         conv.messages.push({
             id: uuid(),
             sender: 'customer',
@@ -951,25 +1178,227 @@ export const mockService = {
         conv.last_message = text;
         conv.last_updated = new Date().toISOString();
 
-        // Regex for phone parsing
         const phoneMatch = text.match(/(?:\+88|88)?01[3-9]\d{8}/);
         if (phoneMatch) {
-            conv.customer_phone = phoneMatch[0];
-            conv.is_lead_linked = true;
+            const phone = phoneMatch[0];
+            conv.customer_phone = phone;
             
-            // Check if Lead exists, if not create
             const leads = await mockService.getLeads();
-            const exists = leads.find(l => l.primary_phone === phoneMatch[0]);
+            const exists = leads.find(l => l.primary_phone === phone);
+            
             if (!exists) {
-                await mockService.createLead({
+                const newLead: Lead = {
+                    id: uuid(),
                     full_name: senderName,
-                    primary_phone: phoneMatch[0],
+                    primary_phone: phone,
                     source: LeadSource.FACEBOOK_MESSENGER,
-                    status: LeadStatus.NEW
-                });
+                    status: LeadStatus.NEW,
+                    is_starred: false,
+                    is_unread: true,
+                    total_messages_sent: 0,
+                    download_count: 0,
+                    first_contact_at: new Date().toISOString(),
+                    last_activity_at: new Date().toISOString(),
+                    created_at: new Date().toISOString(),
+                };
+                await mockService.createLead(newLead);
+                conv.is_lead_linked = true;
+            } else {
+                conv.is_lead_linked = true;
             }
         }
 
         setStorage('messenger_convs', convs);
+    },
+
+    // --- SALES GOALS ---
+    getSalesTargets: async (): Promise<MonthlyTarget[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/sales_goals.php?action=get_targets`);
+            if (res.ok) return await res.json();
+        } catch (e) { console.warn("API Error", e); }
+        return getStorage<MonthlyTarget[]>('sales_targets', []);
+    },
+    setSalesTarget: async (target: Omit<MonthlyTarget, 'id'>) => {
+        // Local Update
+        let targets = getStorage<MonthlyTarget[]>('sales_targets', []);
+        const idx = targets.findIndex(t => t.month === target.month && t.service === target.service);
+        const newTarget = { ...target, id: idx !== -1 ? targets[idx].id : uuid() };
+        
+        if (idx !== -1) {
+            targets[idx] = { ...targets[idx], ...target };
+        } else {
+            targets.push(newTarget as MonthlyTarget);
+        }
+        setStorage('sales_targets', targets);
+
+        // Server Update
+        try {
+            await fetch(`${API_BASE}/sales_goals.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'set_target', ...newTarget })
+            });
+        } catch (e) { console.error("API Error", e); }
+    },
+    getSalesEntries: async (): Promise<SalesEntry[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/sales_goals.php?action=get_entries`);
+            if (res.ok) return await res.json();
+        } catch (e) { console.warn("API Error", e); }
+        return getStorage<SalesEntry[]>('sales_entries', []);
+    },
+    addSalesEntry: async (entry: Partial<SalesEntry>) => {
+        const newEntry = {
+            id: uuid(),
+            date: entry.date || new Date().toISOString(),
+            service: entry.service!,
+            amount: entry.amount!,
+            description: entry.description!,
+            created_at: new Date().toISOString()
+        };
+        
+        // Local
+        const entries = getStorage<SalesEntry[]>('sales_entries', []);
+        entries.push(newEntry);
+        setStorage('sales_entries', entries);
+
+        // Server
+        try {
+            await fetch(`${API_BASE}/sales_goals.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'add_entry', ...newEntry })
+            });
+        } catch (e) { console.error("API Error", e); }
+    },
+    updateSalesEntry: async (id: string, updates: Partial<SalesEntry>) => {
+        // Local
+        const entries = getStorage<SalesEntry[]>('sales_entries', []);
+        const idx = entries.findIndex(e => e.id === id);
+        if (idx !== -1) {
+            entries[idx] = { ...entries[idx], ...updates };
+            setStorage('sales_entries', entries);
+        }
+
+        // Server
+        try {
+            await fetch(`${API_BASE}/sales_goals.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update_entry', id, ...updates })
+            });
+        } catch (e) { console.error("API Error", e); }
+    },
+    deleteSalesEntry: async (id: string) => {
+        // Local
+        let entries = getStorage<SalesEntry[]>('sales_entries', []);
+        entries = entries.filter(e => e.id !== id);
+        setStorage('sales_entries', entries);
+
+        // Server
+        try {
+            await fetch(`${API_BASE}/sales_goals.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete_entry', id })
+            });
+        } catch (e) { console.error("API Error", e); }
+    },
+
+    // --- LEAD CRM INTERACTIONS ---
+    addLeadInteraction: async (leadId: string, interaction: Omit<ClientInteraction, 'id' | 'created_at'>) => {
+        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        const l = leads.find(x => x.id === leadId);
+        if (l) {
+            if (!l.interactions) l.interactions = [];
+            l.interactions.unshift({
+                id: uuid(),
+                created_at: new Date().toISOString(),
+                ...interaction
+            });
+            setStorage('leads', leads);
+        }
+    },
+    deleteLeadInteraction: async (leadId: string, interactionId: string) => {
+        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        const l = leads.find(x => x.id === leadId);
+        if (l && l.interactions) {
+            l.interactions = l.interactions.filter(i => i.id !== interactionId);
+            setStorage('leads', leads);
+        }
+    },
+
+    // --- AD SWIPE FILE ---
+    getAdInspirations: async (): Promise<AdInspiration[]> => {
+        let apiData: AdInspiration[] = [];
+        let apiSuccess = false;
+        try {
+            const res = await fetch(`${API_BASE}/ad_swipe.php`);
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    apiData = data;
+                    apiSuccess = true;
+                }
+            }
+        } catch(e) { 
+            // console.warn("API Error, using local", e); 
+        }
+        
+        const localData = getStorage<AdInspiration[]>('ad_swipe_file', []);
+        
+        // Return API data if available
+        if (apiSuccess && apiData.length > 0) {
+            return apiData;
+        }
+        
+        // Fallback to local storage if API is empty (mock/broken/new setup) but local has data
+        if (apiSuccess && apiData.length === 0 && localData.length > 0) {
+            return localData;
+        }
+
+        return apiSuccess ? apiData : localData;
+    },
+    addAdInspiration: async (ad: Partial<AdInspiration>): Promise<AdInspiration> => {
+        const newAd: AdInspiration = {
+            id: uuid(),
+            title: ad.title!,
+            url: ad.url!,
+            image_url: ad.image_url || '',
+            category: ad.category || 'Other',
+            notes: ad.notes || '',
+            created_at: formatDateForMySQL(new Date().toISOString()) || new Date().toISOString()
+        };
+
+        try {
+            await fetch(`${API_BASE}/ad_swipe.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    action: 'create',
+                    ...newAd
+                })
+            });
+        } catch(e) { console.warn("API Error", e); }
+
+        const list = getStorage<AdInspiration[]>('ad_swipe_file', []);
+        list.unshift(newAd);
+        setStorage('ad_swipe_file', list);
+        
+        return newAd;
+    },
+    deleteAdInspiration: async (id: string) => {
+        try {
+            await fetch(`${API_BASE}/ad_swipe.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete', id })
+            });
+        } catch(e) { console.warn("API Error", e); }
+
+        let list = getStorage<AdInspiration[]>('ad_swipe_file', []);
+        list = list.filter(a => a.id !== id);
+        setStorage('ad_swipe_file', list);
     }
 };
