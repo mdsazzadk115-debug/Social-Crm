@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { SystemSettings } from '../types';
@@ -18,6 +17,7 @@ const Settings: React.FC = () => {
         system_api_key: ''
     });
     const [isLoading, setIsLoading] = useState(true);
+    const [isSaving, setIsSaving] = useState(false);
     const [activeTab, setActiveTab] = useState<'facebook' | 'sms' | 'portal' | 'general' | 'api'>('facebook');
     const [copied, setCopied] = useState(false);
     const [scriptCopied, setScriptCopied] = useState(false);
@@ -39,8 +39,15 @@ const Settings: React.FC = () => {
     };
 
     const handleSave = async () => {
-        await mockService.saveSystemSettings(settings);
-        alert('Settings saved successfully!');
+        setIsSaving(true);
+        try {
+            await mockService.saveSystemSettings(settings);
+            alert('Settings saved successfully!');
+        } catch (e: any) {
+            alert('Failed to save settings to database. ' + e.message);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const regenerateApiKey = async () => {
@@ -133,9 +140,10 @@ function onFormSubmit(e) {
                 </div>
                 <button 
                     onClick={handleSave}
-                    className="bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 flex items-center font-medium shadow-sm"
+                    disabled={isSaving}
+                    className={`bg-indigo-600 text-white px-6 py-2 rounded-md hover:bg-indigo-700 flex items-center font-medium shadow-sm disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
-                    <Save className="h-4 w-4 mr-2" /> Save Changes
+                    <Save className="h-4 w-4 mr-2" /> {isSaving ? 'Saving...' : 'Save Changes'}
                 </button>
             </div>
 

@@ -1158,12 +1158,29 @@ export const mockService = {
     },
     saveSystemSettings: async (s: SystemSettings) => {
         try {
-            await fetch(`${API_BASE}/settings.php`, {
+            const res = await fetch(`${API_BASE}/settings.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'update', ...s })
             });
-        } catch (e) { console.error("API Error", e); }
+            
+            const text = await res.text();
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch(e) {
+                console.error("Invalid JSON from server", text);
+                throw new Error("Invalid server response. Check console.");
+            }
+
+            if (!res.ok || data.error) {
+                throw new Error(data.error || "Server returned error");
+            }
+            console.log("Settings saved:", data);
+        } catch (e) { 
+            console.error("API Error", e); 
+            throw e; // Rethrow so UI can handle it
+        }
         setStorage('system_settings', s);
     },
 
