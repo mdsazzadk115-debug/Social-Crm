@@ -1133,6 +1133,16 @@ export const mockService = {
 
     // --- SYSTEM SETTINGS ---
     getSystemSettings: async (): Promise<SystemSettings> => {
+        try {
+            const res = await fetch(`${API_BASE}/settings.php`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data && !Array.isArray(data) && typeof data === 'object') return data;
+            }
+        } catch (e) {
+             // console.warn("Settings API not available, using local");
+        }
+
         return getStorage<SystemSettings>('system_settings', {
             facebook_page_token: '',
             facebook_verify_token: '',
@@ -1140,10 +1150,20 @@ export const mockService = {
             sms_sender_id: '',
             sms_base_url: '',
             timezone: 'Asia/Dhaka',
-            system_api_key: ''
+            system_api_key: '',
+            portal_support_phone: '',
+            portal_support_url: '',
+            portal_fb_group: ''
         });
     },
     saveSystemSettings: async (s: SystemSettings) => {
+        try {
+            await fetch(`${API_BASE}/settings.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update', ...s })
+            });
+        } catch (e) { console.error("API Error", e); }
         setStorage('system_settings', s);
     },
 
