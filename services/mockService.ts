@@ -21,6 +21,8 @@ const FULL_SNIPPETS: Snippet[] = INITIAL_SNIPPETS.map(s => ({ ...s, id: uuid() }
 // Helper for local storage
 const getStorage = <T>(key: string, defaultVal: T): T => {
     const stored = localStorage.getItem(key);
+    // If specifically "[]" (empty array), return empty array
+    if (stored === '[]') return [] as unknown as T;
     if (!stored) return defaultVal;
     try {
         return JSON.parse(stored);
@@ -33,13 +35,9 @@ const setStorage = (key: string, val: any) => {
     localStorage.setItem(key, JSON.stringify(val));
 };
 
-// API Helper
-const API_BASE = './api'; 
-
 export const mockService = {
     // --- DATABASE MANAGEMENT ---
     clearAllData: async () => {
-        // Sets everything to empty arrays, effectively "wiping" the DB without triggering default demo data on next load
         setStorage('leads', []);
         setStorage('big_fish', []);
         setStorage('invoices', []);
@@ -51,30 +49,23 @@ export const mockService = {
         setStorage('interactions', []);
         setStorage('documents', []);
         setStorage('ad_swipe', []);
-        // We keep settings and templates usually, but let's clear templates to default
-        // setStorage('templates', []); 
+        // Don't clear settings/templates to keep app usable
     },
     restoreDemoData: async () => {
-        // Removes keys so getStorage uses the default constants (Demo Data)
-        localStorage.removeItem('leads');
+        setStorage('leads', FULL_DEMO_LEADS);
+        setStorage('templates', FULL_TEMPLATES);
+        setStorage('snippets', FULL_SNIPPETS);
+        setStorage('lead_forms', INITIAL_LEAD_FORMS);
+        // Clear others to reset
         localStorage.removeItem('big_fish');
         localStorage.removeItem('invoices');
         localStorage.removeItem('daily_tasks');
-        localStorage.removeItem('online_customers');
-        localStorage.removeItem('sales_entries');
-        localStorage.removeItem('sales_targets');
-        localStorage.removeItem('messenger_convs');
-        localStorage.removeItem('interactions');
-        localStorage.removeItem('documents');
-        localStorage.removeItem('ad_swipe');
-        localStorage.removeItem('templates');
-        localStorage.removeItem('snippets');
-        localStorage.removeItem('lead_forms');
     },
 
-    // --- LEADS (CONNECTED TO PHP/MYSQL) ---
+    // --- LEADS (CONNECTED TO LOCAL STORAGE) ---
     getLeads: async (): Promise<Lead[]> => {
-        return getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        // Default to EMPTY array instead of DEMO leads for production feel
+        return getStorage<Lead[]>('leads', []);
     },
     getLeadById: async (id: string): Promise<Lead | undefined> => {
         const leads = await mockService.getLeads();
@@ -99,15 +90,16 @@ export const mockService = {
             ...lead
         } as Lead;
 
-        // Force read from storage to ensure we have the latest state including any deletions/edits
-        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        // Force read from storage to ensure we have the latest state
+        // Default to [] to ensure we don't accidentally load demo data if empty
+        const leads = getStorage<Lead[]>('leads', []);
         leads.unshift(newLead);
         setStorage('leads', leads);
         
         return newLead;
     },
     deleteLead: async (id: string) => {
-        let leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        let leads = getStorage<Lead[]>('leads', []);
         leads = leads.filter(l => l.id !== id);
         setStorage('leads', leads);
     },
@@ -115,7 +107,7 @@ export const mockService = {
         setStorage('leads', []);
     },
     updateLeadStatus: async (id: string, status: LeadStatus) => {
-        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        const leads = getStorage<Lead[]>('leads', []);
         const index = leads.findIndex(l => l.id === id);
         if (index !== -1) {
             leads[index].status = status;
@@ -124,7 +116,7 @@ export const mockService = {
         }
     },
     updateLeadIndustry: async (id: string, industry: string) => {
-        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        const leads = getStorage<Lead[]>('leads', []);
         const index = leads.findIndex(l => l.id === id);
         if (index !== -1) {
             leads[index].industry = industry;
@@ -132,7 +124,7 @@ export const mockService = {
         }
     },
     toggleLeadStar: async (id: string) => {
-        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        const leads = getStorage<Lead[]>('leads', []);
         const index = leads.findIndex(l => l.id === id);
         if (index !== -1) {
             leads[index].is_starred = !leads[index].is_starred;
@@ -140,7 +132,7 @@ export const mockService = {
         }
     },
     updateLeadNote: async (id: string, note: string) => {
-        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        const leads = getStorage<Lead[]>('leads', []);
         const index = leads.findIndex(l => l.id === id);
         if (index !== -1) {
             leads[index].quick_note = note;
@@ -148,7 +140,7 @@ export const mockService = {
         }
     },
     incrementDownloadCount: async (ids: string[]) => {
-        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        const leads = getStorage<Lead[]>('leads', []);
         let updated = false;
         leads.forEach(l => {
             if (ids.includes(l.id)) {
@@ -167,22 +159,12 @@ export const mockService = {
             if (existing) {
                 ids.push(existing.id);
             } else {
-                const newLead: Lead = {
-                    id: uuid(),
+                const newLead = await mockService.createLead({
                     full_name: 'Unknown',
                     primary_phone: phone,
                     source: LeadSource.MANUAL,
                     status: LeadStatus.NEW,
-                    is_starred: false,
-                    is_unread: true,
-                    total_messages_sent: 0,
-                    download_count: 0,
-                    first_contact_at: new Date().toISOString(),
-                    last_activity_at: new Date().toISOString(),
-                    created_at: new Date().toISOString(),
-                };
-                
-                await mockService.createLead(newLead);
+                });
                 ids.push(newLead.id);
             }
         }
@@ -231,6 +213,7 @@ export const mockService = {
     
     // --- TEMPLATES ---
     getTemplates: async (): Promise<MessageTemplate[]> => {
+        // Keep default templates for utility, but allow deletion
         return getStorage<MessageTemplate[]>('templates', FULL_TEMPLATES);
     },
     createTemplate: async (template: Partial<MessageTemplate>) => {
@@ -303,7 +286,7 @@ export const mockService = {
     sendBulkSMS: async (leadIds: string[], body: string) => {
         await new Promise(resolve => setTimeout(resolve, 500));
         const interactions = getStorage<Interaction[]>('interactions', []);
-        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        const leads = getStorage<Lead[]>('leads', []);
         
         leadIds.forEach(id => {
             interactions.push({
@@ -454,7 +437,7 @@ export const mockService = {
         }
     },
     catchBigFish: async (leadId: string): Promise<BigFish | null> => {
-        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        const leads = getStorage<Lead[]>('leads', []);
         const fish = getStorage<BigFish[]>('big_fish', []);
         
         const lead = leads.find(l => l.id === leadId);

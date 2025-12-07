@@ -99,10 +99,10 @@ const LeadList: React.FC = () => {
   };
 
   const handleClearAllLeads = async () => {
-      if(confirm("⚠️ This will delete ALL leads from your database. This action cannot be undone. Are you sure you want to clear the list?")) {
+      if(confirm("⚠️ WARNING: This will delete ALL leads from your list. This is useful if you want to clear the 'Demo Data' and start fresh.\n\nAre you sure you want to delete everything?")) {
           await mockService.deleteAllLeads();
           loadLeads();
-          alert("All leads have been cleared.");
+          alert("All leads have been cleared. You can now add your own data.");
       }
   };
 
@@ -151,18 +151,25 @@ const LeadList: React.FC = () => {
   // Manual Lead Entry
   const handleAddLead = async () => {
       if(!newLeadData.full_name || !newLeadData.primary_phone) return alert("Name and Phone are required");
-      await mockService.createLead(newLeadData);
-      setIsAddLeadOpen(false);
-      // Reset form
-      setNewLeadData({
-          full_name: '',
-          primary_phone: '',
-          industry: '',
-          source: LeadSource.MANUAL,
-          status: LeadStatus.NEW,
-          service_category: 'Facebook Marketing'
-      });
-      loadLeads();
+      
+      try {
+          await mockService.createLead(newLeadData);
+          setIsAddLeadOpen(false);
+          // Reset form
+          setNewLeadData({
+              full_name: '',
+              primary_phone: '',
+              industry: '',
+              source: LeadSource.MANUAL,
+              status: LeadStatus.NEW,
+              service_category: 'Facebook Marketing'
+          });
+          
+          await loadLeads();
+          alert("Lead Saved Successfully!");
+      } catch (e) {
+          alert("Error saving lead. Please try again.");
+      }
   };
 
   const isRecent = (dateString: string) => {
@@ -275,8 +282,8 @@ const LeadList: React.FC = () => {
             <button onClick={(e) => handleDownload(e, filteredLeads, 'visible_leads')} className="inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
                 <Download className="h-4 w-4 mr-2" /> Export View
             </button>
-            <button onClick={handleClearAllLeads} className="inline-flex items-center px-4 py-2 border border-red-200 rounded-md shadow-sm text-sm font-medium text-red-700 bg-white hover:bg-red-50 hover:border-red-300">
-                <Trash2 className="h-4 w-4 mr-2" /> Clear All
+            <button onClick={handleClearAllLeads} className="inline-flex items-center px-4 py-2 border border-red-200 rounded-md shadow-sm text-sm font-bold text-white bg-red-600 hover:bg-red-700 hover:border-red-300 transition-colors">
+                <Trash2 className="h-4 w-4 mr-2" /> Clear All Data
             </button>
         </div>
       </div>
@@ -604,21 +611,23 @@ const LeadList: React.FC = () => {
                   </div>
                   <div className="p-6 space-y-4">
                       <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Full Name <span className="text-red-500">*</span></label>
                           <input 
                             className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:ring-indigo-500 focus:border-indigo-500" 
                             placeholder="Customer Name"
                             value={newLeadData.full_name}
                             onChange={e => setNewLeadData({...newLeadData, full_name: e.target.value})}
+                            required
                           />
                       </div>
                       <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number <span className="text-red-500">*</span></label>
                           <input 
                             className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:ring-indigo-500 focus:border-indigo-500 font-mono" 
                             placeholder="017..."
                             value={newLeadData.primary_phone}
                             onChange={e => setNewLeadData({...newLeadData, primary_phone: e.target.value})}
+                            required
                           />
                       </div>
                       <div>
