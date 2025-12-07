@@ -99,11 +99,20 @@ export const mockService = {
             ...lead
         } as Lead;
 
+        // Force read from storage to ensure we have the latest state including any deletions/edits
         const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
         leads.unshift(newLead);
         setStorage('leads', leads);
         
         return newLead;
+    },
+    deleteLead: async (id: string) => {
+        let leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        leads = leads.filter(l => l.id !== id);
+        setStorage('leads', leads);
+    },
+    deleteAllLeads: async () => {
+        setStorage('leads', []);
     },
     updateLeadStatus: async (id: string, status: LeadStatus) => {
         const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
