@@ -27,6 +27,14 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   useEffect(() => {
       checkTaskReminders();
       checkLowBalance();
+      // Run Automation Check (Heartbeat)
+      mockService.triggerAutomationCheck();
+      
+      // Optional: Poll every 60 seconds if the tab is open
+      const interval = setInterval(() => {
+          mockService.triggerAutomationCheck();
+      }, 60000);
+      return () => clearInterval(interval);
   }, [location.pathname]);
 
   const checkTaskReminders = async () => {

@@ -286,11 +286,47 @@ export const mockService = {
         setStorage('campaigns', campaigns);
     },
 
-    // --- AUTOMATION RULES ---
+    // --- AUTOMATION RULES (Connected to Backend) ---
     getSimpleAutomationRules: async (): Promise<SimpleAutomationRule[]> => {
+        try {
+            const res = await fetch(`${API_BASE}/automation.php?action=get_rules`);
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data)) return data;
+            }
+        } catch(e) { console.warn("API Error getting rules", e); }
         return getStorage<SimpleAutomationRule[]>('automation_rules', []);
     },
+    
     saveSimpleAutomationRule: async (status: LeadStatus, steps: any[]) => {
+        // 1. Resolve Templates to actual text body if custom_body is empty
+        const templates = getStorage<MessageTemplate[]>('templates', FULL_TEMPLATES);
+        const resolvedSteps = steps.map(s => {
+            let body = s.custom_body;
+            if (!body && s.template_id) {
+                const t = templates.find(temp => temp.id === s.template_id);
+                if (t) body = t.body;
+            }
+            return { ...s, custom_body: body };
+        });
+
+        // 2. Save to Database
+        try {
+            await fetch(`${API_BASE}/automation.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    action: 'save_rules',
+                    status,
+                    steps: resolvedSteps 
+                })
+            });
+        } catch(e) { 
+            console.error("API Error saving rules", e); 
+            throw new Error("Failed to save rules to server");
+        }
+
+        // 3. Local Cache Update
         let rules = getStorage<SimpleAutomationRule[]>('automation_rules', []);
         const idx = rules.findIndex(r => r.status === status);
         if (idx !== -1) {
@@ -304,6 +340,21 @@ export const mockService = {
             });
         }
         setStorage('automation_rules', rules);
+    },
+
+    // --- TRIGGER AUTOMATION CHECK (Heartbeat) ---
+    triggerAutomationCheck: async () => {
+        try {
+            const res = await fetch(`${API_BASE}/automation.php?action=run`);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.processed > 0) {
+                    console.log(`[Automation] Sent ${data.processed} messages automatically.`);
+                }
+            }
+        } catch(e) {
+            // Silent fail is fine here
+        }
     },
 
     // --- MESSAGING ---
