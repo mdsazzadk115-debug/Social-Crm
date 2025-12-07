@@ -324,7 +324,17 @@ export const mockService = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ numbers: phoneNumbers, message: body })
             });
-            const result = await res.json();
+            
+            // Read response as text first to handle non-JSON errors (PHP warnings/fatals)
+            const text = await res.text();
+            let result;
+            
+            try {
+                result = JSON.parse(text);
+            } catch (e) {
+                console.error("SMS Gateway Error: Invalid JSON response", text);
+                throw new Error("Server Error: " + (text.length > 200 ? text.substring(0, 200) + '...' : text));
+            }
             
             if (!result.success) {
                 throw new Error(result.message || "Failed to send SMS via Gateway.");
