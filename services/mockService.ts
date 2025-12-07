@@ -35,6 +35,42 @@ const setStorage = (key: string, val: any) => {
     localStorage.setItem(key, JSON.stringify(val));
 };
 
+// --- SYNC HELPER ---
+const getSettings = (): SystemSettings => {
+    return getStorage<SystemSettings>('system_settings', {
+        facebook_page_token: '',
+        facebook_verify_token: '',
+        sms_api_key: '',
+        sms_sender_id: '',
+        sms_base_url: '',
+        timezone: 'Asia/Dhaka',
+        system_api_key: 'lg_demo_key',
+        server_url: '',
+        sync_enabled: false
+    });
+};
+
+const syncToServer = async (action: string, data: any) => {
+    const settings = getSettings();
+    if (settings.sync_enabled && settings.server_url) {
+        try {
+            console.log(`[Server Sync] ${action} -> ${settings.server_url}`);
+            // Attempt to send data to PHP backend
+            // Using 'no-cors' mode just in case of simple testing, but real API needs CORS enabled on PHP
+            await fetch(settings.server_url, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Action': action
+                },
+                body: JSON.stringify({ action, data })
+            });
+        } catch (e) {
+            console.error("[Server Sync Failed] Check your PHP URL or CORS settings", e);
+        }
+    }
+};
+
 export const mockService = {
     // --- DATABASE MANAGEMENT ---
     clearAllData: async () => {
@@ -62,9 +98,28 @@ export const mockService = {
         localStorage.removeItem('daily_tasks');
     },
 
-    // --- LEADS (CONNECTED TO LOCAL STORAGE) ---
+    // --- LEADS (CONNECTED TO LOCAL STORAGE + SERVER SYNC) ---
     getLeads: async (): Promise<Lead[]> => {
-        // Default to EMPTY array instead of DEMO leads for production feel
+        const settings = getSettings();
+        
+        // If Sync is enabled, try to fetch from server first
+        if (settings.sync_enabled && settings.server_url) {
+            try {
+                const response = await fetch(`${settings.server_url}?action=get_leads`);
+                if (response.ok) {
+                    const data = await response.json();
+                    if (Array.isArray(data)) {
+                        // Update local cache
+                        setStorage('leads', data);
+                        return data;
+                    }
+                }
+            } catch (e) {
+                console.warn("Could not fetch from server, falling back to local storage.", e);
+            }
+        }
+
+        // Fallback to Local Storage
         return getStorage<Lead[]>('leads', []);
     },
     getLeadById: async (id: string): Promise<Lead | undefined> => {
@@ -90,21 +145,28 @@ export const mockService = {
             ...lead
         } as Lead;
 
-        // Force read from storage to ensure we have the latest state
-        // Default to [] to ensure we don't accidentally load demo data if empty
+        // Local Save
         const leads = getStorage<Lead[]>('leads', []);
         leads.unshift(newLead);
         setStorage('leads', leads);
         
+        // Server Sync
+        await syncToServer('create_lead', newLead);
+
         return newLead;
     },
     deleteLead: async (id: string) => {
         let leads = getStorage<Lead[]>('leads', []);
         leads = leads.filter(l => l.id !== id);
         setStorage('leads', leads);
+        
+        // Server Sync
+        await syncToServer('delete_lead', { id });
     },
     deleteAllLeads: async () => {
         setStorage('leads', []);
+        // Server Sync
+        await syncToServer('delete_all_leads', {});
     },
     updateLeadStatus: async (id: string, status: LeadStatus) => {
         const leads = getStorage<Lead[]>('leads', []);
@@ -113,6 +175,8 @@ export const mockService = {
             leads[index].status = status;
             leads[index].last_activity_at = new Date().toISOString();
             setStorage('leads', leads);
+            // Server Sync
+            await syncToServer('update_lead', leads[index]);
         }
     },
     updateLeadIndustry: async (id: string, industry: string) => {
@@ -121,6 +185,7 @@ export const mockService = {
         if (index !== -1) {
             leads[index].industry = industry;
             setStorage('leads', leads);
+            await syncToServer('update_lead', leads[index]);
         }
     },
     toggleLeadStar: async (id: string) => {
@@ -129,6 +194,7 @@ export const mockService = {
         if (index !== -1) {
             leads[index].is_starred = !leads[index].is_starred;
             setStorage('leads', leads);
+            await syncToServer('update_lead', leads[index]);
         }
     },
     updateLeadNote: async (id: string, note: string) => {
@@ -137,6 +203,7 @@ export const mockService = {
         if (index !== -1) {
             leads[index].quick_note = note;
             setStorage('leads', leads);
+            await syncToServer('update_lead', leads[index]);
         }
     },
     incrementDownloadCount: async (ids: string[]) => {
@@ -195,15 +262,19 @@ export const mockService = {
     },
     addLeadInteraction: async (leadId: string, data: Partial<ClientInteraction>) => {
         const interactions = getStorage<Interaction[]>('interactions', []);
-        interactions.push({
+        const newInt = {
             id: uuid(),
             lead_id: leadId,
             channel: 'other',
             direction: 'incoming',
             content: `${data.type}: ${data.notes}`,
             created_at: data.date || new Date().toISOString()
-        } as any);
+        } as any;
+        
+        interactions.push(newInt);
         setStorage('interactions', interactions);
+        
+        await syncToServer('add_interaction', newInt);
     },
     deleteLeadInteraction: async (leadId: string, interactionId: string) => {
         let interactions = getStorage<Interaction[]>('interactions', []);
@@ -842,15 +913,7 @@ export const mockService = {
 
     // --- SYSTEM SETTINGS ---
     getSystemSettings: async (): Promise<SystemSettings> => {
-        return getStorage<SystemSettings>('system_settings', {
-            facebook_page_token: '',
-            facebook_verify_token: '',
-            sms_api_key: '',
-            sms_sender_id: '',
-            sms_base_url: '',
-            timezone: 'Asia/Dhaka',
-            system_api_key: 'lg_demo_key'
-        });
+        return getSettings();
     },
     saveSystemSettings: async (settings: SystemSettings) => {
         setStorage('system_settings', settings);

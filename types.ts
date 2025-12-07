@@ -375,6 +375,10 @@ export interface SystemSettings {
 
     // n8n & External API
     system_api_key?: string; // For incoming webhooks security
+
+    // DATABASE SYNC (PHP/MySQL)
+    server_url?: string; // The URL of your PHP script (e.g., https://site.com/api.php)
+    sync_enabled?: boolean; // Whether to try connecting to the server
 }
 
 // 10. SALES GOALS & TRACKING (NEW)
