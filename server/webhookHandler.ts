@@ -5,6 +5,7 @@ import { LeadSource, LeadStatus } from '../types';
 class PrismaClient {
   lead = {
     findUnique: async (args: any) => null as any,
+    findFirst: async (args: any) => null as any, // Added findFirst support
     update: async (args: any) => null as any,
     create: async (args: any) => ({ id: 'mock-id' }) as any
   };
@@ -38,75 +39,112 @@ export const normalizePhoneNumber = (raw: string): string => {
 // --- FACEBOOK HANDLER ---
 export const handleFacebookMessage = async (senderId: string, text: string) => {
   try {
+    // 1. Extract Phone Number
     const phoneMatches = text.match(BD_PHONE_REGEX);
-    
-    if (!phoneMatches || phoneMatches.length === 0) {
-      console.log(`[Webhook] No phone number found in message from ${senderId}, skipping lead creation.`);
-      return;
+    let normalizedPhone: string | null = null;
+    if (phoneMatches && phoneMatches.length > 0) {
+        normalizedPhone = normalizePhoneNumber(phoneMatches[0]);
     }
 
-    const rawPhone = phoneMatches[0];
-    const normalizedPhone = normalizePhoneNumber(rawPhone);
-
+    // 2. Extract URLs
     const urlRegex = /(https?:\/\/[^\s]+)/g;
     const allUrls = text.match(urlRegex) || [];
     
     let websiteUrl: string | undefined = undefined;
-    let facebookProfileLink: string | undefined = undefined;
+    let facebookProfileLinkFromText: string | undefined = undefined;
 
     for (const url of allUrls) {
       if (url.includes('facebook.com') || url.includes('fb.com')) {
-        facebookProfileLink = url;
+        facebookProfileLinkFromText = url;
       } else if (!websiteUrl) {
         websiteUrl = url;
       }
     }
 
-    if (!facebookProfileLink) {
-        facebookProfileLink = `https://facebook.com/${senderId}`;
-    }
+    // This is the identifier for the conversation based on Sender ID
+    const senderProfileLink = `https://facebook.com/${senderId}`;
 
-    let lead = await prisma.lead.findUnique({
-      where: { primary_phone: normalizedPhone }
-    });
+    // 3. Find Existing Lead
+    let lead = null;
+
+    if (normalizedPhone) {
+        // Priority 1: Search by Phone Number
+        lead = await prisma.lead.findUnique({
+            where: { primary_phone: normalizedPhone }
+        });
+    } 
+    
+    if (!lead) {
+        // Priority 2: Search by Sender ID (Profile Link) to find existing conversation
+        // This handles the case where user sends a link later without a phone number
+        lead = await prisma.lead.findFirst({
+            where: { facebook_profile_link: senderProfileLink }
+        });
+    }
 
     const now = new Date();
 
+    // 4. Logic: Create or Update
     if (lead) {
       console.log(`[Webhook] Updating existing lead: ${lead.id}`);
+      
+      // Prepare update data
+      const updateData: any = {
+          last_activity_at: now,
+      };
+
+      // Only update fields if new data is present in the message
+      if (websiteUrl) updateData.website_url = websiteUrl;
+      
+      // If the text contains a specific FB profile link, we might want to save it, 
+      // but usually we keep the senderID link as the primary source identifier.
+      // However, if the user explicitly sends a profile link, we can store it.
+      if (facebookProfileLinkFromText) updateData.facebook_profile_link = facebookProfileLinkFromText;
+
       lead = await prisma.lead.update({
         where: { id: lead.id },
-        data: {
-          last_activity_at: now,
-          website_url: lead.website_url ? undefined : websiteUrl,
-          facebook_profile_link: lead.facebook_profile_link ? undefined : facebookProfileLink
-        }
+        data: updateData
       });
+
     } else {
-      console.log(`[Webhook] Creating new lead for phone: ${normalizedPhone}`);
-      lead = await prisma.lead.create({
-        data: {
-          primary_phone: normalizedPhone,
-          full_name: 'Messenger User',
-          source: LeadSource.FACEBOOK_MESSENGER,
-          status: LeadStatus.NEW,
-          first_contact_at: now,
-          last_activity_at: now,
-          facebook_profile_link: facebookProfileLink,
-          website_url: websiteUrl
-        }
-      });
+      // Lead does NOT exist.
+      if (normalizedPhone) {
+          // ONLY create a new lead if a Phone Number is present.
+          console.log(`[Webhook] Creating new lead for phone: ${normalizedPhone}`);
+          
+          lead = await prisma.lead.create({
+            data: {
+              primary_phone: normalizedPhone,
+              full_name: 'Messenger User',
+              source: LeadSource.FACEBOOK_MESSENGER,
+              status: LeadStatus.NEW,
+              first_contact_at: now,
+              last_activity_at: now,
+              // Use the sender ID based link as the primary profile link
+              facebook_profile_link: senderProfileLink, 
+              website_url: websiteUrl
+            }
+          });
+      } else {
+          console.log(`[Webhook] Message from ${senderId} ignored. No phone number provided and no existing lead found.`);
+          // STOP HERE. Do not create interaction log for non-lead messages to keep DB clean?
+          // Or return here to ensure no lead is created.
+          return; 
+      }
     }
 
-    await prisma.interaction.create({
-      data: {
-        lead_id: lead.id,
-        channel: 'facebook_messenger',
-        direction: 'incoming',
-        content: text,
-        raw_payload: { senderId, text, extractedPhone: normalizedPhone }
-      }
-    });
+    // 5. Log Interaction (Only if a lead exists or was just created)
+    if (lead) {
+        await prisma.interaction.create({
+          data: {
+            lead_id: lead.id,
+            channel: 'facebook_messenger',
+            direction: 'incoming',
+            content: text,
+            raw_payload: { senderId, text, extractedPhone: normalizedPhone, extractedUrls: allUrls }
+          }
+        });
+    }
 
   } catch (error) {
     console.error('[Webhook] Error handling FB webhook:', error);
