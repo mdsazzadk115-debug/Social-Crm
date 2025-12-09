@@ -20,6 +20,9 @@ const prisma = new PrismaClient();
 // Matches 013-019 followed by 8 digits.
 const BD_PHONE_REGEX = /(?:\+88|88)?(01[3-9]\d{8})/g;
 
+// Improved Regex to capture http, https, and www. links
+const URL_REGEX = /(https?:\/\/[^\s]+|www\.[^\s]+)/g;
+
 export const normalizePhoneNumber = (raw: string): string => {
   if (!raw) return '';
   // Remove all non-digit characters
@@ -47,19 +50,23 @@ export const handleFacebookMessage = async (senderId: string, text: string) => {
     }
 
     // 2. Extract URLs
-    const urlRegex = /(https?:\/\/[^\s]+)/g;
-    const allUrls = text.match(urlRegex) || [];
+    const allUrls = text.match(URL_REGEX) || [];
     
     let websiteUrl: string | undefined = undefined;
-    let facebookProfileLinkFromText: string | undefined = undefined;
 
+    // Prioritize finding a website URL (ignore facebook links for the website field if possible, or take first)
     for (const url of allUrls) {
-      if (url.includes('facebook.com') || url.includes('fb.com')) {
-        facebookProfileLinkFromText = url;
-      } else if (!websiteUrl) {
-        websiteUrl = url;
+      // Normalize www. links to https://
+      const cleanUrl = url.startsWith('www.') ? `https://${url}` : url;
+      
+      if (!cleanUrl.includes('facebook.com') && !cleanUrl.includes('fb.com')) {
+        websiteUrl = cleanUrl;
+        break; // Found a likely website link
       }
     }
+    // Fallback: If only FB links exist and we haven't found a website, use the first link as websiteUrl? 
+    // Usually we prefer not to set FB link as website_url, but if user wants "any link", we can uncomment below:
+    // if (!websiteUrl && allUrls.length > 0) websiteUrl = allUrls[0].startsWith('www.') ? `https://${allUrls[0]}` : allUrls[0];
 
     // This is the identifier for the conversation based on Sender ID
     const senderProfileLink = `https://facebook.com/${senderId}`;
@@ -93,13 +100,19 @@ export const handleFacebookMessage = async (senderId: string, text: string) => {
           last_activity_at: now,
       };
 
-      // Only update fields if new data is present in the message
+      // CRITICAL: Ensure the lead is bound to this Sender ID.
+      // If we found the lead by Phone Number, we must update/set the facebook_profile_link
+      // to the current senderProfileLink. This ensures that future messages (without phone)
+      // from this sender will correctly find this lead.
+      if (lead.facebook_profile_link !== senderProfileLink) {
+          updateData.facebook_profile_link = senderProfileLink;
+      }
+
+      // Only update website_url if a new one is found in this message
       if (websiteUrl) updateData.website_url = websiteUrl;
       
-      // If the text contains a specific FB profile link, we might want to save it, 
-      // but usually we keep the senderID link as the primary source identifier.
-      // However, if the user explicitly sends a profile link, we can store it.
-      if (facebookProfileLinkFromText) updateData.facebook_profile_link = facebookProfileLinkFromText;
+      // Note: We deliberately do NOT overwrite facebook_profile_link with links found in text.
+      // We strictly use the senderProfileLink (ID based) to maintain the session/connection.
 
       lead = await prisma.lead.update({
         where: { id: lead.id },
@@ -120,15 +133,14 @@ export const handleFacebookMessage = async (senderId: string, text: string) => {
               status: LeadStatus.NEW,
               first_contact_at: now,
               last_activity_at: now,
-              // Use the sender ID based link as the primary profile link
+              // Use the sender ID based link as the primary profile link to enable future lookups
               facebook_profile_link: senderProfileLink, 
               website_url: websiteUrl
             }
           });
       } else {
           console.log(`[Webhook] Message from ${senderId} ignored. No phone number provided and no existing lead found.`);
-          // STOP HERE. Do not create interaction log for non-lead messages to keep DB clean?
-          // Or return here to ensure no lead is created.
+          // STOP HERE. Do not create interaction log for non-lead messages to keep DB clean.
           return; 
       }
     }
