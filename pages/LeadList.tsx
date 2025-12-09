@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 // @ts-ignore
 import { Link } from 'react-router-dom';
-import { Search, ChevronRight, ChevronLeft, Download, Phone, Briefcase, User, AlertCircle, Globe, MessageCircle, PenTool, Calendar, FileText, Plus, X, Save, ArrowUpDown, Star, Facebook, Edit2 } from 'lucide-react';
+import { Search, ChevronRight, ChevronLeft, Download, Phone, Briefcase, User, AlertCircle, Globe, MessageCircle, PenTool, Calendar, FileText, Plus, X, Save, ArrowUpDown, Star, Facebook, Edit2, Filter, Check } from 'lucide-react';
 import { mockService } from '../services/mockService';
 import { Lead, LeadStatus, LeadSource } from '../types';
 import { STATUS_LABELS, STATUS_COLORS, INDUSTRIES } from '../constants';
@@ -19,6 +20,12 @@ const LeadList: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState('all');
   const [showFavoritesOnly, setShowFavoritesOnly] = useState(false);
   const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc'>('date_desc');
+  
+  // Advanced Boolean Filters (Has Data?)
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [filterHasPhone, setFilterHasPhone] = useState(false);
+  const [filterHasFacebook, setFilterHasFacebook] = useState(false);
+  const [filterHasWebsite, setFilterHasWebsite] = useState(false);
   
   // Date Filters
   const [startDate, setStartDate] = useState('');
@@ -61,7 +68,7 @@ const LeadList: React.FC = () => {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, filterIndustry, filterSource, filterStatus, showFavoritesOnly, startDate, endDate]);
+  }, [searchTerm, filterIndustry, filterSource, filterStatus, showFavoritesOnly, startDate, endDate, filterHasPhone, filterHasFacebook, filterHasWebsite]);
 
   const loadLeads = async () => {
     setLoading(true);
@@ -189,6 +196,20 @@ const LeadList: React.FC = () => {
       return diffInHours < 24;
   };
 
+  // Reset all filters helper
+  const resetFilters = () => {
+      setFilterStatus('all');
+      setFilterSource('all');
+      setFilterIndustry('all');
+      setSearchTerm('');
+      setShowFavoritesOnly(false);
+      setStartDate('');
+      setEndDate('');
+      setFilterHasPhone(false);
+      setFilterHasFacebook(false);
+      setFilterHasWebsite(false);
+  };
+
   // Stats Logic
   const stats = {
       total: leads.length,
@@ -215,9 +236,13 @@ const LeadList: React.FC = () => {
     const matchesSource = filterSource === 'all' || lead.source === filterSource;
     const matchesFavorites = !showFavoritesOnly || lead.is_starred;
     
+    // Advanced Boolean Filters
+    const matchesPhone = !filterHasPhone || (lead.primary_phone && lead.primary_phone.trim().length > 0);
+    const matchesFacebook = !filterHasFacebook || (lead.facebook_profile_link && lead.facebook_profile_link.trim().length > 0);
+    const matchesWebsite = !filterHasWebsite || (lead.website_url && lead.website_url.trim().length > 0);
+
     // Date Filtering
     const leadDate = new Date(lead.created_at);
-    // Reset time part for accurate date comparison
     leadDate.setHours(0, 0, 0, 0);
     
     let matchesDate = true;
@@ -232,11 +257,11 @@ const LeadList: React.FC = () => {
         matchesDate = matchesDate && leadDate <= end;
     }
 
-    if (showFavoritesOnly) return matchesFavorites && matchesSearch && matchesIndustry && matchesSource && matchesDate;
+    if (showFavoritesOnly) return matchesFavorites && matchesSearch && matchesIndustry && matchesSource && matchesDate && matchesPhone && matchesFacebook && matchesWebsite;
 
-    if (filterStatus === 'all') return matchesSearch && matchesIndustry && matchesSource && matchesDate;
-    if (filterStatus === 'lost_group') return (lead.status === LeadStatus.CLOSED_LOST || lead.status === LeadStatus.COLD) && matchesSearch && matchesIndustry && matchesSource && matchesDate;
-    return lead.status === filterStatus && matchesSearch && matchesIndustry && matchesSource && matchesDate;
+    if (filterStatus === 'all') return matchesSearch && matchesIndustry && matchesSource && matchesDate && matchesPhone && matchesFacebook && matchesWebsite;
+    if (filterStatus === 'lost_group') return (lead.status === LeadStatus.CLOSED_LOST || lead.status === LeadStatus.COLD) && matchesSearch && matchesIndustry && matchesSource && matchesDate && matchesPhone && matchesFacebook && matchesWebsite;
+    return lead.status === filterStatus && matchesSearch && matchesIndustry && matchesSource && matchesDate && matchesPhone && matchesFacebook && matchesWebsite;
   }).sort((a, b) => {
       const dateA = new Date(a.created_at).getTime();
       const dateB = new Date(b.created_at).getTime();
@@ -297,7 +322,7 @@ const LeadList: React.FC = () => {
 
       {/* --- STATS ROW --- */}
       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
-          <div onClick={() => { setFilterStatus('all'); setFilterSource('all'); setFilterIndustry('all'); setSearchTerm(''); setShowFavoritesOnly(false); setStartDate(''); setEndDate(''); }} className={`cursor-pointer p-4 rounded-xl border-2 transition-all shadow-sm flex items-center justify-between group relative ${filterStatus === 'all' && !showFavoritesOnly ? 'bg-slate-50 border-slate-400 ring-1 ring-slate-400' : 'bg-white border-transparent hover:border-slate-300 hover:shadow-md'}`}>
+          <div onClick={resetFilters} className={`cursor-pointer p-4 rounded-xl border-2 transition-all shadow-sm flex items-center justify-between group relative ${filterStatus === 'all' && !showFavoritesOnly ? 'bg-slate-50 border-slate-400 ring-1 ring-slate-400' : 'bg-white border-transparent hover:border-slate-300 hover:shadow-md'}`}>
               <div><p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Leads</p><p className="text-2xl font-extrabold text-gray-800 mt-1">{stats.total}</p></div>
               <button onClick={(e) => handleDownload(e, leads, 'all_leads')} className="absolute top-2 right-2 p-1.5 rounded-full hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-colors" title="Download All"><Download className="h-4 w-4"/></button>
           </div>
@@ -335,56 +360,119 @@ const LeadList: React.FC = () => {
 
       {/* --- FILTER BOARD --- */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-          <div className="p-4 bg-gray-50/50 border-b border-gray-100 flex flex-col md:flex-row items-center gap-4">
-                <div className="relative flex-1 w-full">
-                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Search className="h-5 w-5 text-gray-400" /></div>
-                    <input type="text" className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm shadow-sm" placeholder="Search leads by name or phone number..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-                </div>
-                
-                {/* DATE FILTER */}
-                <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
-                    <div className="bg-indigo-50 p-1.5 rounded-md text-indigo-600">
-                        <Calendar className="h-4 w-4" />
+          <div className="p-4 bg-gray-50/50 border-b border-gray-100 flex flex-col gap-4">
+                <div className="flex flex-col md:flex-row items-center gap-4">
+                    <div className="relative flex-1 w-full">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><Search className="h-5 w-5 text-gray-400" /></div>
+                        <input type="text" className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm shadow-sm" placeholder="Search leads by name or phone number..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
                     </div>
-                    <div className="flex gap-2 items-center text-sm">
-                        <input 
-                            type="date" 
-                            className="border-none text-xs text-gray-600 font-medium focus:ring-0 p-0"
-                            value={startDate}
-                            onChange={(e) => setStartDate(e.target.value)}
-                            title="Start Date"
-                        />
-                        <span className="text-gray-400">-</span>
-                        <input 
-                            type="date" 
-                            className="border-none text-xs text-gray-600 font-medium focus:ring-0 p-0"
-                            value={endDate}
-                            onChange={(e) => setEndDate(e.target.value)}
-                            title="End Date"
-                        />
+                    
+                    {/* DATE FILTER */}
+                    <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-gray-200 shadow-sm">
+                        <div className="bg-indigo-50 p-1.5 rounded-md text-indigo-600">
+                            <Calendar className="h-4 w-4" />
+                        </div>
+                        <div className="flex gap-2 items-center text-sm">
+                            <input 
+                                type="date" 
+                                className="border-none text-xs text-gray-600 font-medium focus:ring-0 p-0"
+                                value={startDate}
+                                onChange={(e) => setStartDate(e.target.value)}
+                                title="Start Date"
+                            />
+                            <span className="text-gray-400">-</span>
+                            <input 
+                                type="date" 
+                                className="border-none text-xs text-gray-600 font-medium focus:ring-0 p-0"
+                                value={endDate}
+                                onChange={(e) => setEndDate(e.target.value)}
+                                title="End Date"
+                            />
+                        </div>
+                        {(startDate || endDate) && (
+                            <button onClick={() => {setStartDate(''); setEndDate('');}} className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-red-500"><X className="h-3 w-3"/></button>
+                        )}
                     </div>
-                    {(startDate || endDate) && (
-                        <button onClick={() => {setStartDate(''); setEndDate('');}} className="p-1 hover:bg-gray-100 rounded text-gray-400 hover:text-red-500"><X className="h-3 w-3"/></button>
-                    )}
+
+                    {/* SORTING */}
+                    <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-gray-200 shadow-sm min-w-[200px]">
+                        <div className="bg-indigo-50 p-1.5 rounded-md text-indigo-600">
+                            <ArrowUpDown className="h-4 w-4" />
+                        </div>
+                        <div className="flex flex-col flex-1">
+                            <span className="text-[10px] text-gray-400 font-bold uppercase leading-none">Sort By</span>
+                            <select 
+                                className="border-none text-sm focus:ring-0 text-gray-800 font-bold py-0 pl-0 pr-6 cursor-pointer bg-transparent leading-none"
+                                value={sortBy}
+                                onChange={(e) => setSortBy(e.target.value as any)}
+                            >
+                                <option value="date_desc">Newest First</option>
+                                <option value="date_asc">Oldest First</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    {/* Advanced Filters Toggle */}
+                    <button
+                        onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                        className={`p-2 rounded-lg border shadow-sm transition-colors ${showAdvancedFilters ? 'bg-indigo-100 border-indigo-200 text-indigo-700' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                        title="Data Presence Filters"
+                    >
+                        <Filter className="h-4 w-4" />
+                    </button>
                 </div>
 
-                {/* SORTING */}
-                <div className="flex items-center gap-2 bg-white p-1 rounded-lg border border-gray-200 shadow-sm min-w-[200px]">
-                    <div className="bg-indigo-50 p-1.5 rounded-md text-indigo-600">
-                        <ArrowUpDown className="h-4 w-4" />
-                    </div>
-                    <div className="flex flex-col flex-1">
-                        <span className="text-[10px] text-gray-400 font-bold uppercase leading-none">Sort By</span>
-                        <select 
-                            className="border-none text-sm focus:ring-0 text-gray-800 font-bold py-0 pl-0 pr-6 cursor-pointer bg-transparent leading-none"
-                            value={sortBy}
-                            onChange={(e) => setSortBy(e.target.value as any)}
+                {/* Advanced Boolean Filters (Has Data?) */}
+                {showAdvancedFilters && (
+                    <div className="flex gap-4 p-3 bg-indigo-50/30 rounded-lg border border-indigo-100 animate-fade-in items-center">
+                        <span className="text-xs font-bold text-gray-500 uppercase mr-2">Show only if has:</span>
+                        
+                        <button
+                            onClick={() => setFilterHasPhone(!filterHasPhone)}
+                            className={`flex items-center px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                                filterHasPhone 
+                                ? 'bg-green-100 text-green-700 border-green-200 shadow-sm' 
+                                : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                            }`}
                         >
-                            <option value="date_desc">Newest First (নতুন আগে)</option>
-                            <option value="date_asc">Oldest First (পুরাতন আগে)</option>
-                        </select>
+                            <Phone className="h-3 w-3 mr-1.5"/> Phone Number
+                            {filterHasPhone && <Check className="h-3 w-3 ml-1.5"/>}
+                        </button>
+
+                        <button
+                            onClick={() => setFilterHasFacebook(!filterHasFacebook)}
+                            className={`flex items-center px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                                filterHasFacebook 
+                                ? 'bg-blue-100 text-blue-700 border-blue-200 shadow-sm' 
+                                : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                            }`}
+                        >
+                            <Facebook className="h-3 w-3 mr-1.5"/> Facebook Link
+                            {filterHasFacebook && <Check className="h-3 w-3 ml-1.5"/>}
+                        </button>
+
+                        <button
+                            onClick={() => setFilterHasWebsite(!filterHasWebsite)}
+                            className={`flex items-center px-3 py-1.5 rounded-full text-xs font-bold border transition-all ${
+                                filterHasWebsite 
+                                ? 'bg-purple-100 text-purple-700 border-purple-200 shadow-sm' 
+                                : 'bg-white text-gray-500 border-gray-200 hover:bg-gray-50'
+                            }`}
+                        >
+                            <Globe className="h-3 w-3 mr-1.5"/> Website Link
+                            {filterHasWebsite && <Check className="h-3 w-3 ml-1.5"/>}
+                        </button>
+                        
+                        {(filterHasPhone || filterHasFacebook || filterHasWebsite) && (
+                            <button 
+                                onClick={() => { setFilterHasPhone(false); setFilterHasFacebook(false); setFilterHasWebsite(false); }}
+                                className="ml-auto text-xs text-gray-400 hover:text-red-500 underline"
+                            >
+                                Clear
+                            </button>
+                        )}
                     </div>
-                </div>
+                )}
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-gray-100 p-2">
