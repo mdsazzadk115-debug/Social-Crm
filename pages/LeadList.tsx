@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 // @ts-ignore
 import { Link } from 'react-router-dom';
-import { Search, ChevronRight, ChevronLeft, Download, Phone, Briefcase, User, AlertCircle, Globe, MessageCircle, PenTool, Calendar, FileText, Plus, X, Save, ArrowUpDown, Star } from 'lucide-react';
+import { Search, ChevronRight, ChevronLeft, Download, Phone, Briefcase, User, AlertCircle, Globe, MessageCircle, PenTool, Calendar, FileText, Plus, X, Save, ArrowUpDown, Star, Facebook, Edit2 } from 'lucide-react';
 import { mockService } from '../services/mockService';
 import { Lead, LeadStatus, LeadSource } from '../types';
 import { STATUS_LABELS, STATUS_COLORS, INDUSTRIES } from '../constants';
@@ -45,8 +45,14 @@ const LeadList: React.FC = () => {
       industry: '',
       source: LeadSource.MANUAL,
       status: LeadStatus.NEW,
-      service_category: 'Facebook Marketing'
+      service_category: 'Facebook Marketing',
+      facebook_profile_link: '',
+      website_url: ''
   });
+
+  // Edit Lead Modal
+  const [isEditLeadOpen, setIsEditLeadOpen] = useState(false);
+  const [editingLeadData, setEditingLeadData] = useState<Partial<Lead>>({});
 
   useEffect(() => {
     loadLeads();
@@ -143,9 +149,37 @@ const LeadList: React.FC = () => {
           industry: '',
           source: LeadSource.MANUAL,
           status: LeadStatus.NEW,
-          service_category: 'Facebook Marketing'
+          service_category: 'Facebook Marketing',
+          facebook_profile_link: '',
+          website_url: ''
       });
       loadLeads();
+  };
+
+  // Edit Lead Logic
+  const openEditLeadModal = (lead: Lead) => {
+      setEditingLeadData({
+          id: lead.id,
+          full_name: lead.full_name,
+          primary_phone: lead.primary_phone,
+          facebook_profile_link: lead.facebook_profile_link,
+          website_url: lead.website_url,
+          industry: lead.industry
+      });
+      setIsEditLeadOpen(true);
+  };
+
+  const handleEditLeadSave = async () => {
+      if (!editingLeadData.id) return;
+      
+      await mockService.updateLead(editingLeadData.id, editingLeadData);
+      
+      // Local Update
+      const updatedLeads = leads.map(l => l.id === editingLeadData.id ? { ...l, ...editingLeadData } : l);
+      setLeads(updatedLeads as Lead[]);
+      
+      setIsEditLeadOpen(false);
+      setEditingLeadData({});
   };
 
   const isRecent = (dateString: string) => {
@@ -223,8 +257,8 @@ const LeadList: React.FC = () => {
     setLeads(updatedLeads);
 
     const csvContent = [
-        ['Name', 'Phone', 'Note', 'Industry', 'Source', 'Status', 'Date Added', 'Export Count'],
-        ...data.map(l => [`"${l.full_name}"`, `"${l.primary_phone}"`, `"${l.quick_note || ''}"`, `"${l.industry || ''}"`, `"${l.source}"`, `"${l.status}"`, `"${new Date(l.created_at).toLocaleDateString()}"`, `"${(l.download_count || 0) + 1}"`])
+        ['Name', 'Phone', 'Facebook', 'Website', 'Note', 'Industry', 'Source', 'Status', 'Date Added'],
+        ...data.map(l => [`"${l.full_name}"`, `"${l.primary_phone}"`, `"${l.facebook_profile_link || ''}"`, `"${l.website_url || ''}"`, `"${l.quick_note || ''}"`, `"${l.industry || ''}"`, `"${l.source}"`, `"${l.status}"`, `"${new Date(l.created_at).toLocaleDateString()}"`])
     ].map(e => e.join(',')).join('\n');
     
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -398,12 +432,13 @@ const LeadList: React.FC = () => {
         <div className="hidden md:flex px-4 py-3 bg-gray-50 border-b border-gray-200 text-xs font-bold text-gray-500 uppercase tracking-wider">
             <div className="w-8 text-center">Fav</div>
             <div className="flex-1">Profile & Contact</div>
+            <div className="w-20 text-center">Links</div>
             <div className="w-32">Source</div>
             <div className="w-32">Industry</div>
             <div className="w-24">Date Added</div>
             <div className="w-32">Status</div>
             <div className="w-16 text-center">DL Count</div>
-            <div className="w-10"></div>
+            <div className="w-24 text-right">Actions</div>
         </div>
 
         <ul className="divide-y divide-gray-200">
@@ -450,6 +485,24 @@ const LeadList: React.FC = () => {
                         </div>
                     </div>
 
+                    <div className="flex items-center justify-center md:w-20 gap-2">
+                        {lead.facebook_profile_link ? (
+                            <a href={lead.facebook_profile_link} target="_blank" rel="noreferrer" className="text-blue-600 hover:text-blue-800" title="Facebook Profile">
+                                <Facebook className="h-4 w-4"/>
+                            </a>
+                        ) : (
+                            <span className="text-gray-300"><Facebook className="h-4 w-4"/></span>
+                        )}
+                        
+                        {lead.website_url ? (
+                            <a href={lead.website_url} target="_blank" rel="noreferrer" className="text-emerald-600 hover:text-emerald-800" title="Website">
+                                <Globe className="h-4 w-4"/>
+                            </a>
+                        ) : (
+                            <span className="text-gray-300"><Globe className="h-4 w-4"/></span>
+                        )}
+                    </div>
+
                     <div className="flex items-center md:w-32 text-xs text-gray-500">
                         {lead.source === LeadSource.FACEBOOK_MESSENGER ? <MessageCircle className="h-3 w-3 mr-1 text-blue-500"/> : <PenTool className="h-3 w-3 mr-1 text-gray-400"/>}
                         <span className="truncate">{lead.source === 'facebook_messenger' ? 'Messenger' : lead.source}</span>
@@ -479,9 +532,17 @@ const LeadList: React.FC = () => {
                         </span>
                     </div>
 
-                    <div className="relative group/note flex-shrink-0 md:w-10 flex justify-end">
+                    <div className="relative group/note flex-shrink-0 md:w-24 flex justify-end gap-1">
+                        <button 
+                            onClick={() => openEditLeadModal(lead)} 
+                            className="p-2 rounded-full text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors"
+                            title="Edit Info"
+                        >
+                            <Edit2 className="h-4 w-4" />
+                        </button>
+                        
                         <button onClick={() => openNoteModal(lead)} className={`p-2 rounded-full transition-colors ${lead.quick_note ? 'text-amber-500 hover:bg-amber-50' : 'text-gray-300 hover:text-gray-500 hover:bg-gray-100'}`}>
-                            {lead.quick_note ? <FileText className="h-5 w-5 fill-amber-100" /> : <Plus className="h-5 w-5" />}
+                            {lead.quick_note ? <FileText className="h-4 w-4 fill-amber-100" /> : <Plus className="h-4 w-4" />}
                         </button>
                         {lead.quick_note && (
                             <div className="absolute right-8 top-1/2 -translate-x-0 -translate-y-1/2 hidden group-hover/note:block w-64 bg-yellow-50 text-gray-800 text-xs p-3 rounded-lg shadow-xl border border-yellow-200 z-50">
@@ -597,6 +658,24 @@ const LeadList: React.FC = () => {
                           />
                       </div>
                       <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Facebook Profile Link</label>
+                          <input 
+                            className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:ring-indigo-500 focus:border-indigo-500" 
+                            placeholder="https://facebook.com/..."
+                            value={newLeadData.facebook_profile_link}
+                            onChange={e => setNewLeadData({...newLeadData, facebook_profile_link: e.target.value})}
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
+                          <input 
+                            className="w-full border border-gray-300 rounded-md p-2.5 text-sm focus:ring-indigo-500 focus:border-indigo-500" 
+                            placeholder="https://example.com"
+                            value={newLeadData.website_url}
+                            onChange={e => setNewLeadData({...newLeadData, website_url: e.target.value})}
+                          />
+                      </div>
+                      <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Industry</label>
                           <select 
                             className="w-full border border-gray-300 rounded-md p-2.5 text-sm"
@@ -610,6 +689,71 @@ const LeadList: React.FC = () => {
                       <div className="pt-2">
                           <button onClick={handleAddLead} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg shadow-sm">
                               Create Lead
+                          </button>
+                      </div>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* EDIT LEAD MODAL */}
+      {isEditLeadOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+              <div className="bg-white rounded-lg w-full max-w-md shadow-xl">
+                  <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50 rounded-t-lg">
+                      <h3 className="font-bold text-gray-800 flex items-center"><Edit2 className="h-4 w-4 mr-2"/> Edit Contact Info</h3>
+                      <button onClick={() => setIsEditLeadOpen(false)}><X className="h-5 w-5 text-gray-500 hover:text-gray-700"/></button>
+                  </div>
+                  <div className="p-6 space-y-4">
+                      <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                          <input 
+                            className="w-full border border-gray-300 rounded-md p-2.5 text-sm" 
+                            value={editingLeadData.full_name || ''}
+                            onChange={e => setEditingLeadData({...editingLeadData, full_name: e.target.value})}
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+                          <input 
+                            className="w-full border border-gray-300 rounded-md p-2.5 text-sm font-mono" 
+                            value={editingLeadData.primary_phone || ''}
+                            onChange={e => setEditingLeadData({...editingLeadData, primary_phone: e.target.value})}
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Facebook Profile</label>
+                          <input 
+                            className="w-full border border-gray-300 rounded-md p-2.5 text-sm" 
+                            value={editingLeadData.facebook_profile_link || ''}
+                            onChange={e => setEditingLeadData({...editingLeadData, facebook_profile_link: e.target.value})}
+                            placeholder="https://"
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Website URL</label>
+                          <input 
+                            className="w-full border border-gray-300 rounded-md p-2.5 text-sm" 
+                            value={editingLeadData.website_url || ''}
+                            onChange={e => setEditingLeadData({...editingLeadData, website_url: e.target.value})}
+                            placeholder="https://"
+                          />
+                      </div>
+                      <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Industry</label>
+                          <select 
+                            className="w-full border border-gray-300 rounded-md p-2.5 text-sm"
+                            value={editingLeadData.industry || ''}
+                            onChange={e => setEditingLeadData({...editingLeadData, industry: e.target.value})}
+                          >
+                              <option value="">Select Industry</option>
+                              {industriesList.map(i => <option key={i} value={i}>{i.split('(')[0]}</option>)}
+                          </select>
+                      </div>
+                      <div className="pt-2 flex gap-3">
+                          <button onClick={() => setIsEditLeadOpen(false)} className="flex-1 bg-white border border-gray-300 text-gray-700 font-bold py-2.5 rounded-lg">Cancel</button>
+                          <button onClick={handleEditLeadSave} className="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg shadow-sm">
+                              Update Lead
                           </button>
                       </div>
                   </div>

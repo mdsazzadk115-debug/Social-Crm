@@ -85,6 +85,8 @@ export const mockService = {
             status: lead.status || LeadStatus.NEW,
             industry: lead.industry,
             service_category: lead.service_category,
+            facebook_profile_link: lead.facebook_profile_link,
+            website_url: lead.website_url,
             is_starred: false,
             is_unread: true,
             total_messages_sent: 0,
@@ -112,6 +114,28 @@ export const mockService = {
         setStorage('leads', leads);
         
         return newLead;
+    },
+    updateLead: async (id: string, updates: Partial<Lead>) => {
+        // Optimistic UI Update
+        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        const index = leads.findIndex(l => l.id === id);
+        if (index !== -1) {
+            leads[index] = { ...leads[index], ...updates };
+            setStorage('leads', leads);
+        }
+
+        try {
+            // Send specific update action or full update
+            await fetch(`${API_BASE}/leads.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    action: 'update_lead_info', 
+                    id, 
+                    ...updates 
+                })
+            });
+        } catch (e) { console.error("API Error updating lead", e); }
     },
     updateLeadStatus: async (id: string, status: LeadStatus) => {
         // Optimistic UI Update
@@ -168,6 +192,7 @@ export const mockService = {
             leads[index].quick_note = note;
             setStorage('leads', leads);
         }
+        // Assuming API update logic is similar or handled by a generic update
     },
     incrementDownloadCount: async (ids: string[]) => {
         const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
