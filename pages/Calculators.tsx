@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { DollarSign, BarChart2, ShoppingBag, Copy, Check, MessageCircle, ShoppingCart } from 'lucide-react';
+import { DollarSign, BarChart2, ShoppingBag, Copy, Check, MessageCircle, ShoppingCart, Layout, Calendar, CreditCard } from 'lucide-react';
 import { mockService } from '../services/mockService';
 import { PaymentMethod } from '../types';
 
@@ -26,6 +26,14 @@ const Calculators: React.FC = () => {
     const [returnRate, setReturnRate] = useState<number>(20);
     const [returnCharge, setReturnCharge] = useState<number>(100); // Usually delivery charge + return charge
     const [profitCopied, setProfitCopied] = useState(false);
+
+    // 4. Campaign Generator
+    const [campPageName, setCampPageName] = useState('');
+    const [campBudget, setCampBudget] = useState<number>(0);
+    const [campStartDate, setCampStartDate] = useState(new Date().toISOString().slice(0, 10));
+    const [campEndDate, setCampEndDate] = useState('');
+    const [campTitleCopied, setCampTitleCopied] = useState(false);
+    const [campMsgCopied, setCampMsgCopied] = useState(false);
 
     // Load Payment Methods on Mount
     useEffect(() => {
@@ -124,6 +132,39 @@ ${methodsText}
         navigator.clipboard.writeText(generateProfitReport());
         setProfitCopied(true);
         setTimeout(() => setProfitCopied(false), 2000);
+    };
+
+    // --- CAMPAIGN GENERATOR ---
+    const generateCampaignTitle = () => {
+        const date = campEndDate ? new Date(campEndDate).toLocaleDateString('en-GB') : 'No Date';
+        return `${campPageName || 'Page'} - $${campBudget} - ${date}`;
+    };
+
+    const generateClientMessage = () => {
+        const sDate = campStartDate ? new Date(campStartDate).toLocaleDateString('en-GB') : '...';
+        const eDate = campEndDate ? new Date(campEndDate).toLocaleDateString('en-GB') : '...';
+        const totalBill = campBudget * 145;
+
+        return `সম্মানিত ক্লায়েন্ট,
+আপনার "${campPageName}" পেজের ক্যাম্পেইনটি সম্পূর্ণভাবে সফল হয়েছে ✅
+
+📅 সময়কাল: ${sDate} থেকে ${eDate}
+💵 অ্যাড বাজেট: $${campBudget}
+💰 মোট বিল: ৳ ${totalBill.toLocaleString()} (রেট: ১৪৫ টাকা)
+
+দয়া করে আমাদের পেমেন্ট ক্লিয়ার করে দিবেন। ধন্যবাদ!`;
+    };
+
+    const handleCopyCampTitle = () => {
+        navigator.clipboard.writeText(generateCampaignTitle());
+        setCampTitleCopied(true);
+        setTimeout(() => setCampTitleCopied(false), 2000);
+    };
+
+    const handleCopyClientMsg = () => {
+        navigator.clipboard.writeText(generateClientMessage());
+        setCampMsgCopied(true);
+        setTimeout(() => setCampMsgCopied(false), 2000);
     };
 
     return (
@@ -368,6 +409,101 @@ ${methodsText}
                         >
                             {profitCopied ? <><Check className="h-3 w-3 mr-1"/> Copied!</> : <><Copy className="h-3 w-3 mr-1"/> Copy Advice</>}
                         </button>
+                    </div>
+                </div>
+
+                {/* 4. CAMPAIGN GENERATOR (NEW) */}
+                <div className="bg-white rounded-xl shadow-sm border border-orange-100 p-6 flex flex-col h-full">
+                    <div className="flex items-center gap-3 mb-6">
+                        <div className="p-3 bg-orange-100 text-orange-600 rounded-lg">
+                            <Layout className="h-6 w-6"/>
+                        </div>
+                        <h3 className="font-bold text-gray-800">Facebook Campaign Tools</h3>
+                    </div>
+
+                    <div className="space-y-4 flex-1">
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Page Name</label>
+                            <input 
+                                type="text" 
+                                className="w-full border-gray-300 bg-gray-50 rounded-md p-2.5 text-gray-900 focus:ring-orange-500 focus:border-orange-500 transition-colors shadow-sm text-sm"
+                                placeholder="e.g. My Fashion Brand"
+                                value={campPageName}
+                                onChange={e => setCampPageName(e.target.value)}
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Budget ($)</label>
+                            <div className="relative">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <DollarSign className="h-4 w-4 text-gray-400" />
+                                </div>
+                                <input 
+                                    type="number" 
+                                    className="w-full pl-9 border-gray-300 bg-gray-50 rounded-md p-2.5 text-gray-900 focus:ring-orange-500 focus:border-orange-500 shadow-sm text-sm"
+                                    placeholder="50"
+                                    value={campBudget || ''}
+                                    onChange={e => setCampBudget(parseFloat(e.target.value))}
+                                />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                            <div>
+                                <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Start Date</label>
+                                <div className="relative">
+                                    <input 
+                                        type="date" 
+                                        className="w-full border-gray-300 bg-gray-50 rounded-md p-2 text-gray-900 focus:ring-orange-500 focus:border-orange-500 shadow-sm text-xs"
+                                        value={campStartDate}
+                                        onChange={e => setCampStartDate(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-bold text-gray-600 uppercase mb-1">End Date</label>
+                                <div className="relative">
+                                    <input 
+                                        type="date" 
+                                        className="w-full border-gray-300 bg-gray-50 rounded-md p-2 text-gray-900 focus:ring-orange-500 focus:border-orange-500 shadow-sm text-xs"
+                                        value={campEndDate}
+                                        onChange={e => setCampEndDate(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Title Section */}
+                        <div className="mt-4 pt-4 border-t border-gray-100">
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Campaign Title (Internal)</label>
+                            <div className="flex gap-2">
+                                <input 
+                                    readOnly
+                                    value={generateCampaignTitle()}
+                                    className="flex-1 bg-gray-100 border border-gray-300 rounded p-2 text-xs font-mono text-gray-700"
+                                />
+                                <button onClick={handleCopyCampTitle} className="p-2 border border-gray-300 rounded hover:bg-gray-50 text-gray-600">
+                                    {campTitleCopied ? <Check className="h-4 w-4"/> : <Copy className="h-4 w-4"/>}
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Message Section */}
+                        <div className="mt-2">
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Client Bill Message</label>
+                            <div className="bg-orange-50 border border-orange-200 rounded p-3 relative">
+                                <textarea 
+                                    readOnly
+                                    value={generateClientMessage()}
+                                    className="w-full text-xs text-gray-800 bg-transparent border-none p-0 h-40 resize-none font-sans focus:outline-none"
+                                />
+                                <button 
+                                    onClick={handleCopyClientMsg}
+                                    className={`absolute bottom-2 right-2 text-xs font-bold px-3 py-1.5 rounded transition-colors shadow-sm flex items-center ${campMsgCopied ? 'bg-green-600 text-white' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100'}`}
+                                >
+                                    {campMsgCopied ? <><Check className="h-3 w-3 mr-1"/> Copied</> : <><Copy className="h-3 w-3 mr-1"/> Copy</>}
+                                </button>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
