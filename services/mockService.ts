@@ -1,3 +1,4 @@
+
 import { 
   Lead, LeadStatus, LeadSource, Interaction, MessageTemplate, Campaign, 
   SimpleAutomationRule, LeadForm, Customer, Task, Invoice, Snippet, 
@@ -450,20 +451,51 @@ export const mockService = {
         console.log("Scheduling not fully implemented on server yet.");
     },
 
-    // --- FORMS ---
+    // --- FORMS (Enhanced with API) ---
     getForms: async (): Promise<LeadForm[]> => {
+        // Try Fetching from API if available
+        try {
+            const res = await fetch(`${API_BASE}/forms.php`);
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data)) return data;
+            }
+        } catch (e) {
+            // console.warn("Forms API unavailable, falling back to local storage");
+        }
         return getStorage<LeadForm[]>('lead_forms', INITIAL_LEAD_FORMS);
     },
     getFormById: async (id: string): Promise<LeadForm | undefined> => {
-        const forms = getStorage<LeadForm[]>('lead_forms', INITIAL_LEAD_FORMS);
+        const forms = await mockService.getForms();
         return forms.find(f => f.id === id);
     },
     createForm: async (form: Omit<LeadForm, 'id' | 'created_at'>) => {
+        const newForm = { ...form, id: uuid(), created_at: new Date().toISOString() };
+        
+        // Save to API
+        try {
+            await fetch(`${API_BASE}/forms.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'create', ...newForm })
+            });
+        } catch (e) { console.error("API Error creating form", e); }
+
+        // Local Fallback
         const forms = getStorage<LeadForm[]>('lead_forms', INITIAL_LEAD_FORMS);
-        forms.push({ ...form, id: uuid(), created_at: new Date().toISOString() });
+        forms.push(newForm);
         setStorage('lead_forms', forms);
     },
     updateForm: async (id: string, updates: Partial<LeadForm>) => {
+        // Save to API
+        try {
+            await fetch(`${API_BASE}/forms.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update', id, updates })
+            });
+        } catch (e) { console.error("API Error updating form", e); }
+
         const forms = getStorage<LeadForm[]>('lead_forms', INITIAL_LEAD_FORMS);
         const idx = forms.findIndex(f => f.id === id);
         if(idx !== -1) {
@@ -472,6 +504,15 @@ export const mockService = {
         }
     },
     deleteForm: async (id: string) => {
+        // Save to API
+        try {
+            await fetch(`${API_BASE}/forms.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete', id })
+            });
+        } catch (e) { console.error("API Error deleting form", e); }
+
         let forms = getStorage<LeadForm[]>('lead_forms', INITIAL_LEAD_FORMS);
         forms = forms.filter(f => f.id !== id);
         setStorage('lead_forms', forms);

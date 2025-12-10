@@ -26,7 +26,7 @@ import AdSwipeFile from './pages/AdSwipeFile';
 import { CurrencyProvider } from './context/CurrencyContext';
 
 // --- AUTH GUARD COMPONENT ---
-const RequireAuth = ({ children }: { children: JSX.Element }) => {
+const RequireAuth = ({ children }: { children: React.ReactElement }) => {
     const auth = localStorage.getItem('sae_auth');
     const location = useLocation();
 

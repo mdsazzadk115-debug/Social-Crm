@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 // @ts-ignore
 import { useParams } from 'react-router-dom';
@@ -34,10 +35,33 @@ const PublicForm: React.FC = () => {
 
     useEffect(() => {
         if(id) {
-            mockService.getFormById(id).then(f => {
-                setForm(f || null);
-                setLoading(false);
-            });
+            // Check if ID is an encoded configuration (starts with 'cfg-')
+            if (id.startsWith('cfg-')) {
+                try {
+                    const encoded = id.substring(4);
+                    const decoded = decodeURIComponent(escape(window.atob(encoded)));
+                    const payload = JSON.parse(decoded);
+                    
+                    // Reconstruct Form Object from Payload
+                    setForm({
+                        id: 'portable_form',
+                        title: payload.t,
+                        subtitle: payload.s,
+                        config: payload.c,
+                        created_at: new Date().toISOString()
+                    });
+                    setLoading(false);
+                } catch (e) {
+                    console.error("Failed to decode form", e);
+                    setLoading(false);
+                }
+            } else {
+                // Legacy / Local Database Lookup
+                mockService.getFormById(id).then(f => {
+                    setForm(f || null);
+                    setLoading(false);
+                });
+            }
         }
     }, [id]);
 
@@ -49,10 +73,10 @@ const PublicForm: React.FC = () => {
         }
 
         try {
-            if(form) {
-                await mockService.submitLeadForm(form.id, formData);
-                setSubmitted(true);
-            }
+            // Use ID if available, or 'portable' identifier
+            const formId = form?.id || 'portable';
+            await mockService.submitLeadForm(formId, formData);
+            setSubmitted(true);
         } catch(e) {
             setError('Something went wrong. Please try again.');
         }

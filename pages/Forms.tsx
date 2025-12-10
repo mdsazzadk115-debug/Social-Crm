@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { LeadForm } from '../types';
-import { Plus, Edit2, Trash2, Link as LinkIcon, Copy, Check } from 'lucide-react';
+import { Plus, Edit2, Trash2, Link as LinkIcon, Copy, Check, Globe } from 'lucide-react';
 
 const THEME_COLORS: Record<string, string> = {
     indigo: '#4f46e5',
@@ -79,15 +79,24 @@ const Forms: React.FC = () => {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const getPublicLink = (id: string) => {
-        // In a real app, this would be the actual domain.
-        // For this demo, we assume the router handles /f/:id
-        const baseUrl = window.location.origin + window.location.pathname + '#/f/' + id;
+    // --- UNIVERSAL LINK GENERATOR (Safe for Unicode/Bangla) ---
+    const getPublicLink = (form: LeadForm) => {
+        // We encode the form config into the URL so it opens anywhere without a database
+        const payload = {
+            t: form.title,
+            s: form.subtitle,
+            c: form.config
+        };
+        // Encode Unicode string to Base64
+        const jsonStr = JSON.stringify(payload);
+        const encoded = btoa(unescape(encodeURIComponent(jsonStr)));
+        
+        const baseUrl = window.location.origin + window.location.pathname + '#/f/cfg-' + encoded;
         return baseUrl;
     };
 
-    const getEmbedCode = (id: string) => {
-        const url = getPublicLink(id);
+    const getEmbedCode = (form: LeadForm) => {
+        const url = getPublicLink(form);
         return `<iframe src="${url}" width="100%" height="600px" frameborder="0" style="border:0; width:100%; max-width:600px;"></iframe>`;
     };
 
@@ -253,11 +262,11 @@ const Forms: React.FC = () => {
                                         </div>
                                     </div>
                                     <div className="flex items-center space-x-2">
-                                        <button onClick={() => {copyToClipboard(getPublicLink(form.id));}} className="p-2 text-gray-400 hover:text-indigo-600 rounded-full hover:bg-indigo-50" title="Copy Link">
+                                        <button onClick={() => {copyToClipboard(getPublicLink(form));}} className="p-2 text-gray-400 hover:text-indigo-600 rounded-full hover:bg-indigo-50" title="Copy Universal Link">
                                             {copied ? <Check className="h-4 w-4 text-green-500"/> : <LinkIcon className="h-4 w-4"/>}
                                         </button>
-                                        <button onClick={() => {setShowShareModal(getEmbedCode(form.id));}} className="p-2 text-gray-400 hover:text-indigo-600 rounded-full hover:bg-indigo-50" title="Get Embed Code">
-                                            <Copy className="h-4 w-4"/>
+                                        <button onClick={() => {setShowShareModal(getEmbedCode(form));}} className="p-2 text-gray-400 hover:text-indigo-600 rounded-full hover:bg-indigo-50" title="Get Embed Code">
+                                            <Globe className="h-4 w-4"/>
                                         </button>
                                         <button onClick={() => handleEdit(form)} className="p-2 text-gray-400 hover:text-blue-600 rounded-full hover:bg-blue-50" title="Edit">
                                             <Edit2 className="h-4 w-4"/>
@@ -277,8 +286,10 @@ const Forms: React.FC = () => {
             {showShareModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
                     <div className="bg-white rounded-lg w-full max-w-lg shadow-xl p-6">
-                        <h3 className="text-lg font-bold text-gray-900 mb-4">Embed Code</h3>
-                        <p className="text-sm text-gray-500 mb-2">Copy this code to your website:</p>
+                        <h3 className="text-lg font-bold text-gray-900 mb-4">Embed / Share Code</h3>
+                        <p className="text-xs text-green-600 mb-2 font-bold bg-green-50 p-2 rounded">
+                            ✨ Generated Universal Link! This form will now work on any device or browser without requiring a shared database.
+                        </p>
                         <textarea 
                             readOnly 
                             className="w-full h-32 p-3 border border-gray-300 rounded-md text-xs font-mono text-gray-600 focus:outline-none bg-gray-50"
