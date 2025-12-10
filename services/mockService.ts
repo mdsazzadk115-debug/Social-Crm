@@ -518,6 +518,7 @@ export const mockService = {
         setStorage('lead_forms', forms);
     },
     submitLeadForm: async (formId: string, data: any) => {
+        // Create new lead in database regardless of form ID (form ID is just for reference/analytics)
         const newLead: Partial<Lead> = {
             full_name: data.name,
             primary_phone: data.phone,
