@@ -67,7 +67,11 @@ export const mockService = {
             const res = await fetch(`${API_BASE}/leads.php?_t=${Date.now()}`);
             if (res.ok) {
                 const data = await res.json();
-                if (Array.isArray(data)) return data;
+                if (Array.isArray(data)) {
+                    // CRITICAL FIX: Sync API data to Local Storage so update functions can find it
+                    setStorage('leads', data);
+                    return data;
+                }
             }
         } catch (e) {
             // console.warn("Running in Offline/Demo Mode (API fetch failed):", e);
@@ -144,59 +148,63 @@ export const mockService = {
         } catch (e) { console.error("API Error updating lead", e); }
     },
     updateLeadStatus: async (id: string, status: LeadStatus) => {
-        // Optimistic UI Update
-        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
-        const index = leads.findIndex(l => l.id === id);
-        let fullData = {};
+        let leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        let index = leads.findIndex(l => l.id === id);
         
-        if (index !== -1) {
-            leads[index].status = status;
-            leads[index].last_activity_at = new Date().toISOString();
-            setStorage('leads', leads);
-            fullData = leads[index];
+        // Safety: If not in storage, fetch fresh
+        if (index === -1) {
+            const fresh = await mockService.getLeads();
+            leads = fresh || [];
+            index = leads.findIndex(l => l.id === id);
         }
 
-        try {
-            // We use update_status action, but if the backend is robust it handles it.
-            // If the backend relies on full data, we should ensure we don't break anything.
-            await fetch(`${API_BASE}/leads.php`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    action: 'update_status', 
-                    id, 
-                    status,
-                    ...fullData // Optional: Send full data if backend needs it contextually
-                })
-            });
-        } catch (e) { console.error("API Error", e); }
+        if (index !== -1) {
+            const updatedLead = { ...leads[index], status, last_activity_at: new Date().toISOString() };
+            leads[index] = updatedLead;
+            setStorage('leads', leads);
+
+            try {
+                await fetch(`${API_BASE}/leads.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        action: 'update_status', 
+                        // Send full data to prevent backend data loss
+                        ...updatedLead
+                    })
+                });
+            } catch (e) { console.error("API Error", e); }
+        }
     },
     updateLeadIndustry: async (id: string, industry: string) => {
-        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
-        const index = leads.findIndex(l => l.id === id);
-        let fullData: any = {};
+        let leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        let index = leads.findIndex(l => l.id === id);
 
-        if (index !== -1) {
-            leads[index].industry = industry;
-            leads[index].last_activity_at = new Date().toISOString();
-            setStorage('leads', leads);
-            fullData = leads[index];
+        // Safety: If not in storage, fetch fresh
+        if (index === -1) {
+            const fresh = await mockService.getLeads();
+            leads = fresh || [];
+            index = leads.findIndex(l => l.id === id);
         }
 
-        try {
-            // Send FULL data payload to ensure backend doesn't nullify other fields like Name/Phone
-            await fetch(`${API_BASE}/leads.php`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    action: 'update_lead_info', 
-                    id, 
-                    ...fullData, // CRITICAL: Send existing name, phone, etc.
-                    industry, // Ensure industry is set
-                    last_activity_at: new Date().toISOString()
-                })
-            });
-        } catch (e) { console.error("API Error", e); }
+        if (index !== -1) {
+            const updatedLead = { ...leads[index], industry, last_activity_at: new Date().toISOString() };
+            leads[index] = updatedLead;
+            setStorage('leads', leads);
+
+            try {
+                // Send FULL data payload to ensure backend doesn't nullify other fields like Name/Phone
+                await fetch(`${API_BASE}/leads.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        action: 'update_lead_info', 
+                        // Spread full object first, then overrides if any
+                        ...updatedLead
+                    })
+                });
+            } catch (e) { console.error("API Error", e); }
+        }
     },
     toggleLeadStar: async (id: string) => {
         const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
@@ -214,27 +222,31 @@ export const mockService = {
         } catch (e) { console.error("API Error", e); }
     },
     updateLeadNote: async (id: string, note: string) => {
-        const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
-        const index = leads.findIndex(l => l.id === id);
-        if (index !== -1) {
-            leads[index].quick_note = note;
-            setStorage('leads', leads);
+        let leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
+        let index = leads.findIndex(l => l.id === id);
+
+        if (index === -1) {
+            const fresh = await mockService.getLeads();
+            leads = fresh || [];
+            index = leads.findIndex(l => l.id === id);
         }
-        // Assuming API update logic is similar or handled by a generic update
-        try {
-            // If backend supports note update via generic info update
-            await fetch(`${API_BASE}/leads.php`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ 
-                    action: 'update_lead_info', 
-                    id, 
-                    quick_note: note,
-                    // Send full data if available to be safe
-                    ...(leads[index] || {})
-                })
-            });
-        } catch (e) { console.error("API Error updating note", e); }
+
+        if (index !== -1) {
+            const updatedLead = { ...leads[index], quick_note: note };
+            leads[index] = updatedLead;
+            setStorage('leads', leads);
+
+            try {
+                await fetch(`${API_BASE}/leads.php`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        action: 'update_lead_info', 
+                        ...updatedLead // Send full object to preserve all fields
+                    })
+                });
+            } catch (e) { console.error("API Error updating note", e); }
+        }
     },
     incrementDownloadCount: async (ids: string[]) => {
         const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
