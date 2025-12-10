@@ -597,9 +597,17 @@ const LeadList: React.FC = () => {
                     </div>
 
                     <div className="flex items-center md:w-32">
-                        <select value={lead.industry || ''} onChange={(e) => handleIndustryChange(lead.id, e.target.value)} className="bg-transparent border-none p-0 text-xs text-gray-600 cursor-pointer focus:ring-0 truncate w-full">
+                        <select 
+                            value={lead.industry || ''} 
+                            onChange={(e) => handleIndustryChange(lead.id, e.target.value)} 
+                            className="bg-transparent border-none p-0 text-xs text-gray-600 cursor-pointer focus:ring-0 truncate w-full"
+                        >
                             <option value="">No Industry</option>
                             {industriesList.map(ind => <option key={ind} value={ind}>{ind.split('(')[0]}</option>)}
+                            {/* Fail-safe: Show saved industry if not in list */}
+                            {lead.industry && !industriesList.includes(lead.industry) && (
+                                <option value={lead.industry}>{lead.industry}</option>
+                            )}
                         </select>
                     </div>
 

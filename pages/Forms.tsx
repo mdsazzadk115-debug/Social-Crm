@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { LeadForm } from '../types';
@@ -91,8 +92,12 @@ const Forms: React.FC = () => {
         const jsonStr = JSON.stringify(payload);
         const encoded = btoa(unescape(encodeURIComponent(jsonStr)));
         
-        const baseUrl = window.location.origin + window.location.pathname + '#/f/cfg-' + encoded;
-        return baseUrl;
+        // Use current location origin and pathname, stripping any hash or query params
+        const baseUrl = window.location.href.split('#')[0];
+        // Ensure no double slash if pathname ends with /
+        const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl; 
+        
+        return `${cleanBase}/#/f/cfg-${encoded}`;
     };
 
     const getEmbedCode = (form: LeadForm) => {

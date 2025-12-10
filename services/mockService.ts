@@ -63,7 +63,8 @@ export const mockService = {
     // --- LEADS (CONNECTED TO PHP/MYSQL) ---
     getLeads: async (): Promise<Lead[]> => {
         try {
-            const res = await fetch(`${API_BASE}/leads.php`);
+            // Added cache buster (_t) to prevent browser caching of GET requests
+            const res = await fetch(`${API_BASE}/leads.php?_t=${Date.now()}`);
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data)) return data;
@@ -161,13 +162,19 @@ export const mockService = {
         const index = leads.findIndex(l => l.id === id);
         if (index !== -1) {
             leads[index].industry = industry;
+            leads[index].last_activity_at = new Date().toISOString();
             setStorage('leads', leads);
         }
         try {
             await fetch(`${API_BASE}/leads.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'update_industry', id, industry })
+                body: JSON.stringify({ 
+                    action: 'update_lead_info', 
+                    id, 
+                    industry,
+                    last_activity_at: new Date().toISOString()
+                })
             });
         } catch (e) { console.error("API Error", e); }
     },
@@ -315,7 +322,7 @@ export const mockService = {
     // --- AUTOMATION RULES (Connected to Backend) ---
     getSimpleAutomationRules: async (): Promise<SimpleAutomationRule[]> => {
         try {
-            const res = await fetch(`${API_BASE}/automation.php?action=get_rules`);
+            const res = await fetch(`${API_BASE}/automation.php?action=get_rules&_t=${Date.now()}`);
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data)) return data;
@@ -455,7 +462,7 @@ export const mockService = {
     getForms: async (): Promise<LeadForm[]> => {
         // Try Fetching from API if available
         try {
-            const res = await fetch(`${API_BASE}/forms.php`);
+            const res = await fetch(`${API_BASE}/forms.php?_t=${Date.now()}`);
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data)) return data;
@@ -534,7 +541,7 @@ export const mockService = {
     // --- CUSTOMERS (ONLINE) - API Connected ---
     getCustomers: async (): Promise<Customer[]> => {
         try {
-            const res = await fetch(`${API_BASE}/customers.php?action=get_customers`);
+            const res = await fetch(`${API_BASE}/customers.php?action=get_customers&_t=${Date.now()}`);
             if (res.ok) return await res.json();
         } catch (e) { console.warn("API Error", e); }
         return getStorage<Customer[]>('online_customers', []);
@@ -595,7 +602,7 @@ export const mockService = {
     // --- TASKS (API Connected) ---
     getTasks: async (): Promise<Task[]> => {
         try {
-            const res = await fetch(`${API_BASE}/tasks.php`);
+            const res = await fetch(`${API_BASE}/tasks.php?_t=${Date.now()}`);
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data)) return data;
@@ -666,7 +673,7 @@ export const mockService = {
     // --- INVOICES (API Connected) ---
     getInvoices: async (): Promise<Invoice[]> => {
         try {
-            const res = await fetch(`${API_BASE}/invoices.php`);
+            const res = await fetch(`${API_BASE}/invoices.php?_t=${Date.now()}`);
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data)) return data;
@@ -777,7 +784,7 @@ export const mockService = {
     // --- BIG FISH (VIP CLIENTS) - API Connected ---
     getBigFish: async (): Promise<BigFish[]> => {
         try {
-            const res = await fetch(`${API_BASE}/bigfish.php`);
+            const res = await fetch(`${API_BASE}/bigfish.php?_t=${Date.now()}`);
             if(res.ok) {
                 const rawData = await res.json();
                 if (!Array.isArray(rawData)) return [];
@@ -1291,7 +1298,7 @@ export const mockService = {
     // --- SYSTEM SETTINGS ---
     getSystemSettings: async (): Promise<SystemSettings> => {
         try {
-            const res = await fetch(`${API_BASE}/settings.php`);
+            const res = await fetch(`${API_BASE}/settings.php?_t=${Date.now()}`);
             if (res.ok) {
                 const data = await res.json();
                 if (data && !Array.isArray(data) && typeof data === 'object') return data;
@@ -1344,7 +1351,7 @@ export const mockService = {
     // --- MESSENGER BABA (Real API) ---
     getMessengerConversations: async (): Promise<MessengerConversation[]> => {
         try {
-            const res = await fetch(`${API_BASE}/messenger.php?action=get_conversations`);
+            const res = await fetch(`${API_BASE}/messenger.php?action=get_conversations&_t=${Date.now()}`);
             if (res.ok) {
                 return await res.json();
             }
@@ -1374,7 +1381,7 @@ export const mockService = {
     // --- SALES GOALS ---
     getSalesTargets: async (): Promise<MonthlyTarget[]> => {
         try {
-            const res = await fetch(`${API_BASE}/sales_goals.php?action=get_targets`);
+            const res = await fetch(`${API_BASE}/sales_goals.php?action=get_targets&_t=${Date.now()}`);
             if (res.ok) return await res.json();
         } catch (e) { console.warn("API Error", e); }
         return getStorage<MonthlyTarget[]>('sales_targets', []);
@@ -1403,7 +1410,7 @@ export const mockService = {
     },
     getSalesEntries: async (): Promise<SalesEntry[]> => {
         try {
-            const res = await fetch(`${API_BASE}/sales_goals.php?action=get_entries`);
+            const res = await fetch(`${API_BASE}/sales_goals.php?action=get_entries&_t=${Date.now()}`);
             if (res.ok) return await res.json();
         } catch (e) { console.warn("API Error", e); }
         return getStorage<SalesEntry[]>('sales_entries', []);
@@ -1494,7 +1501,7 @@ export const mockService = {
         let apiData: AdInspiration[] = [];
         let apiSuccess = false;
         try {
-            const res = await fetch(`${API_BASE}/ad_swipe.php`);
+            const res = await fetch(`${API_BASE}/ad_swipe.php?_t=${Date.now()}`);
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data)) {
