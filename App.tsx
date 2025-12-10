@@ -1,14 +1,12 @@
-
 import React, { useState, useEffect } from 'react';
 // @ts-ignore
-import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import Layout from './components/Layout';
-import LoginScreen from './components/LoginScreen'; // Import Login Screen
+import LoginScreen from './components/LoginScreen'; 
 import Dashboard from './pages/Dashboard';
 import LeadList from './pages/LeadList';
 import LeadDetail from './pages/LeadDetail';
 import Templates from './pages/Templates';
-// Campaigns import removed
 import Messaging from './pages/Messaging';
 import Forms from './pages/Forms';
 import PublicForm from './pages/PublicForm';
@@ -27,58 +25,174 @@ import WonLeads from './pages/WonLeads';
 import AdSwipeFile from './pages/AdSwipeFile';
 import { CurrencyProvider } from './context/CurrencyContext';
 
-const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-
-  useEffect(() => {
-    // Check local storage for auth token on load
+// --- AUTH GUARD COMPONENT ---
+const RequireAuth = ({ children }: { children: JSX.Element }) => {
     const auth = localStorage.getItem('sae_auth');
-    if (auth === 'true') {
-      setIsAuthenticated(true);
+    const location = useLocation();
+
+    if (auth !== 'true') {
+        // Redirect them to the /login page, but save the current location they were trying to go to
+        return <Navigate to="/login" state={{ from: location }} replace />;
     }
-    setIsLoading(false);
-  }, []);
 
-  const handleLogin = () => {
-    localStorage.setItem('sae_auth', 'true');
-    setIsAuthenticated(true);
-  };
+    return children;
+};
 
-  if (isLoading) return null; // Or a spinner
+// --- LOGIN PAGE COMPONENT ---
+const LoginPage = () => {
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  if (!isAuthenticated) {
+    useEffect(() => {
+        if(localStorage.getItem('sae_auth') === 'true') {
+            setIsAuthenticated(true);
+        }
+    }, []);
+
+    const handleLogin = () => {
+        localStorage.setItem('sae_auth', 'true');
+        // Force reload/redirect to root to ensure clean state
+        window.location.href = '#/';
+        window.location.reload(); 
+    };
+
+    if (isAuthenticated) {
+        return <Navigate to="/" replace />;
+    }
+
     return <LoginScreen onLogin={handleLogin} />;
-  }
+};
 
+const App: React.FC = () => {
   return (
     <CurrencyProvider>
       <Router>
         <Routes>
-          {/* Public Routes (No Layout, No Auth Check Needed ideally, but keeping simple) */}
+          {/* --- PUBLIC ROUTES (No Password Required) --- */}
+          <Route path="/login" element={<LoginPage />} />
           <Route path="/f/:id" element={<PublicForm />} />
           <Route path="/portal/:id" element={<ClientPortal />} /> 
 
-          {/* Admin Routes (With Layout) */}
-          <Route path="/" element={<Layout><Dashboard /></Layout>} />
-          <Route path="/big-fish" element={<Layout><BigFishPage /></Layout>} /> 
-          <Route path="/sales-goals" element={<Layout><SalesGoals /></Layout>} />
-          <Route path="/leads" element={<Layout><LeadList /></Layout>} />
-          <Route path="/leads/:id" element={<Layout><LeadDetail /></Layout>} />
-          <Route path="/won-leads" element={<Layout><WonLeads /></Layout>} />
-          <Route path="/messaging" element={<Layout><Messaging /></Layout>} />
-          <Route path="/message-baba" element={<Layout><MessageBaba /></Layout>} />
-          <Route path="/ad-swipe" element={<Layout><AdSwipeFile /></Layout>} />
-          {/* Campaigns route removed */}
-          <Route path="/customers" element={<Layout><OnlineCustomers /></Layout>} /> 
-          <Route path="/tasks" element={<Layout><DailyTasks /></Layout>} /> 
-          <Route path="/invoices" element={<Layout><Invoices /></Layout>} /> 
-          <Route path="/calculators" element={<Layout><Calculators /></Layout>} />
-          <Route path="/letterhead" element={<Layout><Letterhead /></Layout>} /> 
-          <Route path="/snippets" element={<Layout><QuickMessages /></Layout>} /> 
-          <Route path="/forms" element={<Layout><Forms /></Layout>} />
-          <Route path="/templates" element={<Layout><Templates /></Layout>} />
-          <Route path="/settings" element={<Layout><Settings /></Layout>} />
+          {/* --- PROTECTED ADMIN ROUTES (Password Required) --- */}
+          <Route path="/" element={<RequireAuth><Layout><Dashboard /></Layout></RequireAuth>} />
+          <Route path="/big-fish" element={<RequireAuth><Layout><BigFishPage /></Layout></RequireAuth>} /> 
+          <Route path="/sales-goals" element={<RequireAuth><Layout><SalesGoals /></Layout></RequireAuth>} />
+          <Route path="/leads" element={<RequireAuth><Layout><LeadList /></Layout></RequireAuth>} />
+          <Route path="/leads/:id" element={<RequireAuth><Layout><LeadDetail /></Layout></RequireAuth>} />
+          <Route path="/won-leads" element={<RequireAuth><Layout><WonLeads /></Layout></RequireAuth>} />
+          <Route path="/messaging" element={<RequireAuth><Layout><Messaging /></Layout></RequireAuth>} />
+          <Route path="/message-baba" element={<RequireAuth><Layout><MessageBaba /></Layout></RequireAuth>} />
+          <Route path="/ad-swipe" element={<RequireAuth><Layout><AdSwipeFile /></Layout></RequireAuth>} />
+          <Route path="/customers" element={<RequireAuth><Layout><OnlineCustomers /></Layout></RequireAuth>} /> 
+          <Route path="/tasks" element={<RequireAuth><Layout><DailyTasks /></Layout></RequireAuth>} /> 
+          <Route path="/invoices" element={<RequireAuth><Layout><Invoices /></Layout></RequireAuth>} /> 
+          <Route path="/calculators" element={<RequireAuth><Layout><Calculators /></Layout></RequireAuth>} />
+          <Route path="/letterhead" element={<RequireAuth><Layout><Letterhead /></Layout></RequireAuth>} /> 
+          <Route path="/snippets" element={<RequireAuth><Layout><QuickMessages /></Layout></RequireAuth>} /> 
+          <Route path="/forms" element={<RequireAuth><Layout><Forms /></Layout></RequireAuth>} />
+          <Route path="/templates" element={<RequireAuth><Layout><Templates /></Layout></RequireAuth>} />
+          <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
+          
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </CurrencyProvider>
+  );
+};
+
+export default App;import React, { useState, useEffect } from 'react';
+// @ts-ignore
+import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import Layout from './components/Layout';
+import LoginScreen from './components/LoginScreen'; 
+import Dashboard from './pages/Dashboard';
+import LeadList from './pages/LeadList';
+import LeadDetail from './pages/LeadDetail';
+import Templates from './pages/Templates';
+import Messaging from './pages/Messaging';
+import Forms from './pages/Forms';
+import PublicForm from './pages/PublicForm';
+import OnlineCustomers from './pages/OnlineCustomers';
+import DailyTasks from './pages/DailyTasks';
+import Invoices from './pages/Invoices';
+import QuickMessages from './pages/QuickMessages';
+import Letterhead from './pages/Letterhead';
+import BigFishPage from './pages/BigFish'; 
+import ClientPortal from './pages/ClientPortal'; 
+import Calculators from './pages/Calculators'; 
+import MessageBaba from './pages/MessageBaba';
+import Settings from './pages/Settings';
+import SalesGoals from './pages/SalesGoals';
+import WonLeads from './pages/WonLeads';
+import AdSwipeFile from './pages/AdSwipeFile';
+import { CurrencyProvider } from './context/CurrencyContext';
+
+// --- AUTH GUARD COMPONENT ---
+const RequireAuth = ({ children }: { children: JSX.Element }) => {
+    const auth = localStorage.getItem('sae_auth');
+    const location = useLocation();
+
+    if (auth !== 'true') {
+        // Redirect them to the /login page, but save the current location they were trying to go to
+        return <Navigate to="/login" state={{ from: location }} replace />;
+    }
+
+    return children;
+};
+
+// --- LOGIN PAGE COMPONENT ---
+const LoginPage = () => {
+    const [isAuthenticated, setIsAuthenticated] = useState(false);
+
+    useEffect(() => {
+        if(localStorage.getItem('sae_auth') === 'true') {
+            setIsAuthenticated(true);
+        }
+    }, []);
+
+    const handleLogin = () => {
+        localStorage.setItem('sae_auth', 'true');
+        // Force reload/redirect to root to ensure clean state
+        window.location.href = '#/';
+        window.location.reload(); 
+    };
+
+    if (isAuthenticated) {
+        return <Navigate to="/" replace />;
+    }
+
+    return <LoginScreen onLogin={handleLogin} />;
+};
+
+const App: React.FC = () => {
+  return (
+    <CurrencyProvider>
+      <Router>
+        <Routes>
+          {/* --- PUBLIC ROUTES (No Password Required) --- */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/f/:id" element={<PublicForm />} />
+          <Route path="/portal/:id" element={<ClientPortal />} /> 
+
+          {/* --- PROTECTED ADMIN ROUTES (Password Required) --- */}
+          <Route path="/" element={<RequireAuth><Layout><Dashboard /></Layout></RequireAuth>} />
+          <Route path="/big-fish" element={<RequireAuth><Layout><BigFishPage /></Layout></RequireAuth>} /> 
+          <Route path="/sales-goals" element={<RequireAuth><Layout><SalesGoals /></Layout></RequireAuth>} />
+          <Route path="/leads" element={<RequireAuth><Layout><LeadList /></Layout></RequireAuth>} />
+          <Route path="/leads/:id" element={<RequireAuth><Layout><LeadDetail /></Layout></RequireAuth>} />
+          <Route path="/won-leads" element={<RequireAuth><Layout><WonLeads /></Layout></RequireAuth>} />
+          <Route path="/messaging" element={<RequireAuth><Layout><Messaging /></Layout></RequireAuth>} />
+          <Route path="/message-baba" element={<RequireAuth><Layout><MessageBaba /></Layout></RequireAuth>} />
+          <Route path="/ad-swipe" element={<RequireAuth><Layout><AdSwipeFile /></Layout></RequireAuth>} />
+          <Route path="/customers" element={<RequireAuth><Layout><OnlineCustomers /></Layout></RequireAuth>} /> 
+          <Route path="/tasks" element={<RequireAuth><Layout><DailyTasks /></Layout></RequireAuth>} /> 
+          <Route path="/invoices" element={<RequireAuth><Layout><Invoices /></Layout></RequireAuth>} /> 
+          <Route path="/calculators" element={<RequireAuth><Layout><Calculators /></Layout></RequireAuth>} />
+          <Route path="/letterhead" element={<RequireAuth><Layout><Letterhead /></Layout></RequireAuth>} /> 
+          <Route path="/snippets" element={<RequireAuth><Layout><QuickMessages /></Layout></RequireAuth>} /> 
+          <Route path="/forms" element={<RequireAuth><Layout><Forms /></Layout></RequireAuth>} />
+          <Route path="/templates" element={<RequireAuth><Layout><Templates /></Layout></RequireAuth>} />
+          <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
           
           {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
