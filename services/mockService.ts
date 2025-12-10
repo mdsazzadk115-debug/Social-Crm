@@ -121,20 +121,24 @@ export const mockService = {
         // Optimistic UI Update
         const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
         const index = leads.findIndex(l => l.id === id);
+        let fullData = { ...updates };
+        
         if (index !== -1) {
             leads[index] = { ...leads[index], ...updates };
             setStorage('leads', leads);
+            fullData = { ...leads[index], ...updates }; // Ensure we have the merged data
         }
 
         try {
             // Send specific update action or full update
+            // We send the full object to prevent the backend from wiping missing fields
             await fetch(`${API_BASE}/leads.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     action: 'update_lead_info', 
                     id, 
-                    ...updates 
+                    ...fullData 
                 })
             });
         } catch (e) { console.error("API Error updating lead", e); }
@@ -143,36 +147,52 @@ export const mockService = {
         // Optimistic UI Update
         const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
         const index = leads.findIndex(l => l.id === id);
+        let fullData = {};
+        
         if (index !== -1) {
             leads[index].status = status;
             leads[index].last_activity_at = new Date().toISOString();
             setStorage('leads', leads);
+            fullData = leads[index];
         }
 
         try {
+            // We use update_status action, but if the backend is robust it handles it.
+            // If the backend relies on full data, we should ensure we don't break anything.
             await fetch(`${API_BASE}/leads.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'update_status', id, status })
+                body: JSON.stringify({ 
+                    action: 'update_status', 
+                    id, 
+                    status,
+                    ...fullData // Optional: Send full data if backend needs it contextually
+                })
             });
         } catch (e) { console.error("API Error", e); }
     },
     updateLeadIndustry: async (id: string, industry: string) => {
         const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
         const index = leads.findIndex(l => l.id === id);
+        let fullData: any = {};
+
         if (index !== -1) {
             leads[index].industry = industry;
             leads[index].last_activity_at = new Date().toISOString();
             setStorage('leads', leads);
+            fullData = leads[index];
         }
+
         try {
+            // Send FULL data payload to ensure backend doesn't nullify other fields like Name/Phone
             await fetch(`${API_BASE}/leads.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     action: 'update_lead_info', 
                     id, 
-                    industry,
+                    ...fullData, // CRITICAL: Send existing name, phone, etc.
+                    industry, // Ensure industry is set
                     last_activity_at: new Date().toISOString()
                 })
             });
@@ -201,6 +221,20 @@ export const mockService = {
             setStorage('leads', leads);
         }
         // Assuming API update logic is similar or handled by a generic update
+        try {
+            // If backend supports note update via generic info update
+            await fetch(`${API_BASE}/leads.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    action: 'update_lead_info', 
+                    id, 
+                    quick_note: note,
+                    // Send full data if available to be safe
+                    ...(leads[index] || {})
+                })
+            });
+        } catch (e) { console.error("API Error updating note", e); }
     },
     incrementDownloadCount: async (ids: string[]) => {
         const leads = getStorage<Lead[]>('leads', FULL_DEMO_LEADS);
@@ -212,6 +246,9 @@ export const mockService = {
             }
         });
         if (updated) setStorage('leads', leads);
+        
+        // Optional: Sync download count to server
+        // This might require a specific backend action or loop
     },
     resolvePhoneNumbersToIds: async (phones: string[]): Promise<string[]> => {
         const leads = await mockService.getLeads(); // Use getLeads to ensure we have latest
