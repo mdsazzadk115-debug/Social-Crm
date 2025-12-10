@@ -1,7 +1,9 @@
-import React from 'react';
+
+import React, { useState, useEffect } from 'react';
 // @ts-ignore
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Layout from './components/Layout';
+import LoginScreen from './components/LoginScreen'; // Import Login Screen
 import Dashboard from './pages/Dashboard';
 import LeadList from './pages/LeadList';
 import LeadDetail from './pages/LeadDetail';
@@ -26,11 +28,34 @@ import AdSwipeFile from './pages/AdSwipeFile';
 import { CurrencyProvider } from './context/CurrencyContext';
 
 const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Check local storage for auth token on load
+    const auth = localStorage.getItem('sae_auth');
+    if (auth === 'true') {
+      setIsAuthenticated(true);
+    }
+    setIsLoading(false);
+  }, []);
+
+  const handleLogin = () => {
+    localStorage.setItem('sae_auth', 'true');
+    setIsAuthenticated(true);
+  };
+
+  if (isLoading) return null; // Or a spinner
+
+  if (!isAuthenticated) {
+    return <LoginScreen onLogin={handleLogin} />;
+  }
+
   return (
     <CurrencyProvider>
       <Router>
         <Routes>
-          {/* Public Routes (No Layout) */}
+          {/* Public Routes (No Layout, No Auth Check Needed ideally, but keeping simple) */}
           <Route path="/f/:id" element={<PublicForm />} />
           <Route path="/portal/:id" element={<ClientPortal />} /> 
 

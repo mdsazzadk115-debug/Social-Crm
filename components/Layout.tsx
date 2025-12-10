@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 // @ts-ignore
 import { Link, useLocation } from 'react-router-dom';
@@ -36,6 +37,13 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       }, 60000);
       return () => clearInterval(interval);
   }, [location.pathname]);
+
+  const handleLogout = () => {
+      if(confirm("Are you sure you want to sign out?")) {
+          localStorage.removeItem('sae_auth');
+          window.location.reload(); // Reload to trigger App.tsx auth check
+      }
+  };
 
   const checkTaskReminders = async () => {
       const tasks = await mockService.getTasks();
@@ -252,7 +260,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
             <div className="flex items-center w-full">
               <div className="ml-3">
                 <p className="text-sm font-medium text-gray-700">Admin User</p>
-                <button className="text-xs font-medium text-gray-400 hover:text-red-500 flex items-center mt-1 transition-colors group">
+                <button 
+                    onClick={handleLogout}
+                    className="text-xs font-medium text-gray-400 hover:text-red-500 flex items-center mt-1 transition-colors group"
+                >
                   <LogOut className="h-3 w-3 mr-1 group-hover:-translate-x-1 transition-transform" /> Sign out
                 </button>
               </div>
@@ -302,6 +313,16 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                     {item.name}
                   </Link>
                 ))}
+                
+                <div className="pt-4 mt-4 border-t border-gray-100">
+                    <button 
+                        onClick={handleLogout}
+                        className="flex items-center px-4 py-3 text-base font-medium text-red-600 hover:bg-red-50 rounded-lg w-full transition-colors"
+                    >
+                        <LogOut className="mr-4 h-5 w-5" />
+                        Sign Out
+                    </button>
+                </div>
              </nav>
           </div>
         </div>
