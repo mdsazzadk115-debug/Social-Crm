@@ -839,7 +839,7 @@ export const mockService = {
                 if (!Array.isArray(rawData)) return [];
                 
                 // Sanitize Data
-                return rawData.map((fish: any) => {
+                const sanitizedData = rawData.map((fish: any) => {
                     const config = safeJSONParse(fish.portal_config, { show_balance: true, show_history: true, is_suspended: false });
                     let transactions = fish.transactions;
                     if (!Array.isArray(transactions)) transactions = [];
@@ -864,6 +864,10 @@ export const mockService = {
                         interactions: Array.isArray(fish.interactions) ? fish.interactions : [],
                     };
                 });
+
+                // CRITICAL FIX: Sync to local storage to ensure other functions find it
+                setStorage('big_fish', sanitizedData);
+                return sanitizedData;
             }
         } catch (e) { console.warn("API Error", e); }
         return getStorage<BigFish[]>('big_fish', []);
@@ -948,8 +952,15 @@ export const mockService = {
         return true;
     },
     toggleBigFishStatus: async (id: string) => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const f = fish.find(x => x.id === id);
+        let fish = getStorage<BigFish[]>('big_fish', []);
+        let f = fish.find(x => x.id === id);
+        
+        // Safety check if local storage is stale
+        if (!f) {
+            fish = await mockService.getBigFish();
+            f = fish.find(x => x.id === id);
+        }
+
         if (f) {
             f.status = f.status === 'Active Pool' ? 'Hall of Fame' : 'Active Pool';
             if (f.status === 'Hall of Fame') f.end_date = new Date().toISOString();
@@ -976,7 +987,13 @@ export const mockService = {
     },
     updateBigFish: async (id: string, updates: Partial<BigFish>) => {
         // Optimistic UI Update
-        const fish = getStorage<BigFish[]>('big_fish', []);
+        let fish = getStorage<BigFish[]>('big_fish', []);
+        
+        // Fail-safe: if empty, try fetching first
+        if (fish.length === 0) {
+            fish = await mockService.getBigFish();
+        }
+
         const idx = fish.findIndex(f => f.id === id);
         if(idx !== -1) {
             fish[idx] = { ...fish[idx], ...updates };
@@ -993,8 +1010,15 @@ export const mockService = {
     },
     addTransaction: async (fishId: string, type: Transaction['type'], amount: number, desc: string, metadata?: any, dateOverride?: string) => {
         // 1. Prepare Local Data
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const f = fish.find(x => x.id === fishId);
+        let fish = getStorage<BigFish[]>('big_fish', []);
+        
+        // Fail-safe check
+        let f = fish.find(x => x.id === fishId);
+        if (!f) {
+            fish = await mockService.getBigFish();
+            f = fish.find(x => x.id === fishId);
+        }
+
         if (f) {
             const tx: Transaction = {
                 id: uuid(),
@@ -1050,8 +1074,12 @@ export const mockService = {
     },
     deleteTransaction: async (fishId: string, txId: string) => {
         // 1. Update Local Storage
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const f = fish.find(x => x.id === fishId);
+        let fish = getStorage<BigFish[]>('big_fish', []);
+        let f = fish.find(x => x.id === fishId);
+        if(!f) {
+            fish = await mockService.getBigFish();
+            f = fish.find(x => x.id === fishId);
+        }
         
         let updates: Partial<BigFish> = {}; // Capture changes to sync
 
@@ -1117,8 +1145,13 @@ export const mockService = {
     },
     updateTransaction: async (fishId: string, txId: string, updates: { date: string, description: string, amount: number }) => {
         // 1. Update Local Storage
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const f = fish.find(x => x.id === fishId);
+        let fish = getStorage<BigFish[]>('big_fish', []);
+        let f = fish.find(x => x.id === fishId);
+        if(!f) {
+            fish = await mockService.getBigFish();
+            f = fish.find(x => x.id === fishId);
+        }
+
         if (f) {
             const txIndex = f.transactions.findIndex(t => t.id === txId);
             if (txIndex !== -1) {
@@ -1169,8 +1202,13 @@ export const mockService = {
         return fish.transactions.filter(t => t.type === 'DEPOSIT').reduce((acc, t) => acc + t.amount, 0);
     },
     addGrowthTask: async (fishId: string, title: string, dueDate?: string) => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const f = fish.find(x => x.id === fishId);
+        let fish = getStorage<BigFish[]>('big_fish', []);
+        let f = fish.find(x => x.id === fishId);
+        if(!f) {
+            fish = await mockService.getBigFish();
+            f = fish.find(x => x.id === fishId);
+        }
+
         if (f) {
             const newTask = {
                 id: uuid(),
@@ -1247,8 +1285,13 @@ export const mockService = {
         }
     },
     addWorkLog: async (fishId: string, task: string) => {
-        const fish = getStorage<BigFish[]>('big_fish', []);
-        const f = fish.find(x => x.id === fishId);
+        let fish = getStorage<BigFish[]>('big_fish', []);
+        let f = fish.find(x => x.id === fishId);
+        if(!f) {
+            fish = await mockService.getBigFish();
+            f = fish.find(x => x.id === fishId);
+        }
+
         if (f) {
             const newLog = {
                 id: uuid(),

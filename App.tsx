@@ -27,7 +27,7 @@ import AdSwipeFile from './pages/AdSwipeFile';
 import { CurrencyProvider } from './context/CurrencyContext';
 
 // --- AUTH GUARD COMPONENT ---
-const RequireAuth = ({ children }: { children: React.ReactElement }) => {
+const RequireAuth = ({ children }: { children: React.ReactNode }) => {
     const auth = localStorage.getItem('sae_auth');
     const location = useLocation();
 
@@ -36,7 +36,7 @@ const RequireAuth = ({ children }: { children: React.ReactElement }) => {
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
-    return children;
+    return <>{children}</>;
 };
 
 // --- LOGIN PAGE COMPONENT ---
