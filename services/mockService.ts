@@ -1,10 +1,9 @@
-
 import { 
-  Lead, LeadStatus, LeadSource, Interaction, MessageTemplate, Campaign, 
+  Lead, LeadStatus, LeadSource, MessageTemplate, Campaign, 
   SimpleAutomationRule, LeadForm, Customer, Task, Invoice, Snippet, 
   Document, BigFish, PaymentMethod, MessengerConversation, SystemSettings,
   MonthlyTarget, SalesEntry, AdInspiration, ClientInteraction, Transaction,
-  CampaignRecord, TopUpRequest, Channel, MessageDirection
+  CampaignRecord, TopUpRequest
 } from '../types';
 import { 
   INITIAL_TEMPLATES, INITIAL_LEAD_FORMS, INITIAL_SNIPPETS, INDUSTRIES, DEMO_LEADS, DEMO_BIG_FISH 
@@ -311,7 +310,6 @@ export const mockService = {
 
     addCampaignRecord: async (fishId: string, record: Omit<CampaignRecord, 'id' | 'created_at'>): Promise<BigFish | undefined> => { 
         const fish = await mockService.getBigFishById(fishId);
-        /* FIXED: Changed 'f' to 'fish' on line 277 as per error report */
         if (fish) {
             const newRecord: CampaignRecord = { id: uuid(), created_at: new Date().toISOString(), ...record }; 
             const records = [newRecord, ...(fish.campaign_records || [])];
@@ -609,7 +607,7 @@ export const mockService = {
         const forms = await mockService.getForms();
         setStorage('lead_forms', forms.filter(f => f.id !== id));
     },
-    submitLeadForm: async (formId: string, data: any) => {
+    submitLeadForm: async (_formId: string, data: any) => {
         const onboarding: any = {};
         if (data.current_plan) onboarding.current_plan = data.current_plan;
         if (data.monthly_avg_budget) onboarding.monthly_avg_budget = data.monthly_avg_budget;
@@ -712,8 +710,8 @@ export const mockService = {
     
     // Automation simulation
     triggerAutomationCheck: async () => { return true; },
-    scheduleBulkMessages: async (ids: string[], msgs: any[]) => { return true; },
-    sendBulkSMS: async (ids: string[], body: string) => { return true; },
+    scheduleBulkMessages: async (_ids: string[], _msgs: any[]) => { return true; },
+    sendBulkSMS: async (_ids: string[], _body: string) => { return true; },
     resolvePhoneNumbersToIds: async (phones: string[]): Promise<string[]> => { 
         const ids = [];
         for (const p of phones) {
