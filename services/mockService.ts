@@ -358,7 +358,7 @@ export const mockService = {
                 await fetch(`${API_BASE}/bigfish.php`, { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ action: 'update', id, ...payload }) 
+                    body: JSON.stringify({ action: 'update', ...payload }) 
                 }); 
             } catch (e) { console.warn("API Error", e); } 
         }
