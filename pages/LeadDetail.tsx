@@ -29,7 +29,7 @@ const LeadDetail: React.FC = () => {
   const handleStatusChange = async (newStatus: LeadStatus) => {
     if (!lead) return;
     await mockService.updateLeadStatus(lead.id, newStatus);
-    mockService.getLeadById(lead.id).then(setLead);
+    mockService.getLeadById(lead.id).then(l => setLead(l || null));
   };
 
   const handleQuickReply = (templateBody: string) => {
@@ -46,7 +46,7 @@ const LeadDetail: React.FC = () => {
           type: 'WHATSAPP',
           date: new Date().toISOString(),
           notes: `WhatsApp Sent: "${msg.substring(0, 40)}..."`,
-      }).then(() => mockService.getLeadById(lead.id).then(setLead));
+      }).then(() => mockService.getLeadById(lead.id).then(l => setLead(l || null)));
   };
 
   const getInteractionIcon = (type: string) => {
@@ -100,7 +100,7 @@ const LeadDetail: React.FC = () => {
                 className="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm text-sm"
               >
                 {Object.keys(STATUS_LABELS).map(key => (
-                  <option key={key} value={key}>{STATUS_LABELS[key as any]}</option>
+                  <option key={key} value={key}>{STATUS_LABELS[key as LeadStatus]}</option>
                 ))}
               </select>
             </div>

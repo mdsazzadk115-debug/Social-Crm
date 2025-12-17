@@ -4,7 +4,7 @@ import {
   Task, Invoice, BigFish, ClientInteraction, Transaction,
   CampaignRecord, Channel, Customer, SalesEntry, MonthlyTarget, 
   Campaign, SimpleAutomationRule, LeadForm, Document, 
-  MessengerConversation, AdInspiration, SystemSettings
+  MessengerConversation, AdInspiration, SystemSettings, Snippet, PaymentMethod
 } from '../types';
 import { 
   INITIAL_TEMPLATES, INITIAL_LEAD_FORMS, INITIAL_SNIPPETS, INDUSTRIES, DEMO_LEADS, DEMO_BIG_FISH 
