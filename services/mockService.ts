@@ -335,36 +335,51 @@ export const mockService = {
     updateBigFish: async (id: string, updates: Partial<BigFish>) => { 
         let fishList = getStorage<BigFish[]>('big_fish', []); 
         const idx = fishList.findIndex(f => f.id === id); 
-        let currentData = idx !== -1 ? fishList[idx] : null;
+        if (idx === -1) return;
+
+        const merged = { ...fishList[idx], ...updates };
+        fishList[idx] = merged; 
+        setStorage('big_fish', fishList); 
         
-        if(currentData) { 
-            const merged = { ...currentData, ...updates };
-            fishList[idx] = merged; 
-            setStorage('big_fish', fishList); 
+        try { 
+            // Database-ready flattened payload
+            const dbData = { ...merged };
             
-            try { 
-                // Separate id and action from the data payload to avoid conflicts
-                const { id: _, ...dataPayload } = merged;
-                
-                // Stringify complex objects for database safety
-                const payload = {
-                    ...dataPayload,
-                    transactions: JSON.stringify(merged.transactions || []),
-                    campaign_records: JSON.stringify(merged.campaign_records || []),
-                    topup_requests: JSON.stringify(merged.topup_requests || []),
-                    growth_tasks: JSON.stringify(merged.growth_tasks || []),
-                    reports: JSON.stringify(merged.reports || []),
-                    interactions: JSON.stringify(merged.interactions || []),
-                    portal_config: JSON.stringify(merged.portal_config || {})
-                };
-                
-                await fetch(`${API_BASE}/bigfish.php`, { 
-                    method: 'POST', 
-                    headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ action: 'update', id, ...payload }) 
-                }); 
-            } catch (e) { console.warn("API Sync Error:", e); } 
-        }
+            // Explicitly stringify all arrays and objects for PHP compatibility
+            const payload = {
+                action: 'update',
+                id: id,
+                name: merged.name,
+                phone: merged.phone,
+                status: merged.status,
+                balance: Number(merged.balance),
+                spent_amount: Number(merged.spent_amount),
+                current_sales: Number(merged.current_sales),
+                target_sales: Number(merged.target_sales),
+                package_name: merged.package_name,
+                facebook_page: merged.facebook_page,
+                website_url: merged.website_url,
+                notes: merged.notes,
+                campaign_start_date: merged.campaign_start_date,
+                campaign_end_date: merged.campaign_end_date,
+                is_retainer: merged.is_retainer ? 1 : 0,
+                retainer_amount: merged.retainer_amount,
+                retainer_renewal_date: merged.retainer_renewal_date,
+                transactions: JSON.stringify(merged.transactions || []),
+                campaign_records: JSON.stringify(merged.campaign_records || []),
+                topup_requests: JSON.stringify(merged.topup_requests || []),
+                growth_tasks: JSON.stringify(merged.growth_tasks || []),
+                reports: JSON.stringify(merged.reports || []),
+                interactions: JSON.stringify(merged.interactions || []),
+                portal_config: JSON.stringify(merged.portal_config || {})
+            };
+            
+            await fetch(`${API_BASE}/bigfish.php`, { 
+                method: 'POST', 
+                headers: { 'Content-Type': 'application/json' }, 
+                body: JSON.stringify(payload) 
+            }); 
+        } catch (e) { console.warn("API Sync Error:", e); } 
     },
 
     createBigFish: async (data: Partial<BigFish>) => { 
