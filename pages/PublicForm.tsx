@@ -4,8 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams } from 'react-router-dom';
 import { mockService } from '../services/mockService';
 import { LeadForm } from '../types';
-import { INDUSTRIES } from '../constants';
-import { CheckCircle, AlertCircle } from 'lucide-react';
+import { CheckCircle, AlertCircle, ShieldCheck, User, Link as LinkIcon, Phone, FileText, DollarSign, Send, X } from 'lucide-react';
 
 const THEME_COLORS: Record<string, string> = {
     indigo: '#4f46e5',
@@ -15,6 +14,7 @@ const THEME_COLORS: Record<string, string> = {
     orange: '#ea580c',
     purple: '#9333ea',
     pink: '#db2777',
+    navy: '#1e3a8a', // Dark Navy for Guarantee Form
 };
 
 const PublicForm: React.FC = () => {
@@ -26,11 +26,16 @@ const PublicForm: React.FC = () => {
     
     // Form State
     const [formData, setFormData] = useState({
-        name: '',
-        phone: '',
-        website: '',
-        facebook: '',
-        industry: ''
+        name: '', // Page Name (Mapped to full_name)
+        phone: '', // Phone Number
+        website: '', 
+        facebook: '', // Page Link (Mapped to profile link)
+        industry: '',
+        // Onboarding Specific Fields
+        current_plan: '', // Business Status
+        monthly_avg_budget: '', // Previous Budget
+        product_price: '', // Product Price
+        marketing_budget_willingness: '' // Future Plan
     });
 
     useEffect(() => {
@@ -47,6 +52,7 @@ const PublicForm: React.FC = () => {
                         id: 'portable_form',
                         title: payload.t,
                         subtitle: payload.s,
+                        type: payload.type || 'SIMPLE',
                         config: payload.c,
                         created_at: new Date().toISOString()
                     });
@@ -68,21 +74,28 @@ const PublicForm: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if(!formData.name || !formData.phone) {
-            setError('Please fill in required fields.');
+            setError('Please fill in required fields (Name & Phone).');
             return;
         }
 
         try {
             // Use ID if available, or 'portable' identifier
             const formId = form?.id || 'portable';
-            await mockService.submitLeadForm(formId, formData);
+            
+            // Construct payload based on type
+            const submissionData = {
+                ...formData,
+                form_type: form?.type
+            };
+
+            await mockService.submitLeadForm(formId, submissionData);
             setSubmitted(true);
         } catch(e) {
             setError('Something went wrong. Please try again.');
         }
     };
 
-    if(loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50">Loading...</div>;
+    if(loading) return <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500">Loading form...</div>;
     
     if(!form) return (
         <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
@@ -94,29 +107,65 @@ const PublicForm: React.FC = () => {
     );
 
     if(submitted) return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4 font-inter">
             <div className="bg-white p-8 rounded-xl shadow-lg max-w-md w-full text-center">
                 <div className={`mx-auto h-16 w-16 rounded-full flex items-center justify-center bg-green-100 mb-4`}>
                     <CheckCircle className="h-8 w-8 text-green-600" />
                 </div>
                 <h2 className="text-2xl font-bold text-gray-900 mb-2">Thank You!</h2>
-                <p className="text-gray-600">Your information has been received. Our team will contact you shortly.</p>
+                <p className="text-gray-600">আপনার তথ্য সফলভাবে জমা দেওয়া হয়েছে। আমাদের টিম খুব শীঘ্রই আপনার সাথে যোগাযোগ করবে।</p>
             </div>
         </div>
     );
 
     const themeColorKey = form.config.theme_color || 'indigo';
     const primaryColor = THEME_COLORS[themeColorKey] || THEME_COLORS['indigo'];
+    const isOnboarding = form.type === 'ONBOARDING';
 
     return (
-        <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8 font-inter">
-            <div className="max-w-md mx-auto bg-white rounded-xl shadow-lg overflow-hidden">
-                <div className="py-6 px-6 text-center" style={{ backgroundColor: primaryColor }}>
-                    <h1 className="text-2xl font-bold text-white">{form.title}</h1>
-                    {form.subtitle && <p className="mt-2 text-white text-opacity-90">{form.subtitle}</p>}
-                </div>
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center py-8 px-4 sm:px-6 font-inter">
+            <div className="w-full max-w-lg bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
+                
+                {/* Custom Header for Sales Guarantee */}
+                {isOnboarding ? (
+                    <div className="bg-gradient-to-r from-[#111827] to-[#1f2937] p-6 flex justify-between items-center text-white relative overflow-hidden">
+                        <div className="relative z-10 flex items-center gap-3">
+                            <div className="p-2.5 bg-yellow-500/20 rounded-full border border-yellow-500/50 shadow-inner">
+                                <ShieldCheck className="h-6 w-6 text-yellow-400" />
+                            </div>
+                            <div>
+                                <h1 className="text-lg font-bold tracking-wide">{form.title}</h1>
+                                <div className="text-[10px] text-gray-300 flex items-center mt-1">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 mr-1.5 animate-pulse"></span>
+                                    Data Protected & Secure
+                                </div>
+                            </div>
+                        </div>
+                        <X className="h-5 w-5 text-gray-500 cursor-not-allowed opacity-50 relative z-10" />
+                        
+                        {/* Decorative background element */}
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/10 rounded-full blur-2xl -mr-10 -mt-10"></div>
+                    </div>
+                ) : (
+                    <div className="py-6 px-6 text-center" style={{ backgroundColor: primaryColor }}>
+                        <h1 className="text-2xl font-bold text-white">{form.title}</h1>
+                        {form.subtitle && <p className="mt-2 text-white text-opacity-90">{form.subtitle}</p>}
+                    </div>
+                )}
 
-                <div className="p-8">
+                <div className="p-6 sm:p-8">
+                    {/* Warning/Info Box for Sales Guarantee */}
+                    {isOnboarding && (
+                        <div className="bg-[#fffbeb] border border-[#fcd34d] rounded-lg p-4 mb-6 shadow-sm">
+                            <h3 className="text-sm font-bold text-[#b45309] flex items-center mb-1">
+                                <AlertCircle className="h-4 w-4 mr-2"/> কেন এই ফর্মটি পূরণ করবেন?
+                            </h3>
+                            <p className="text-xs text-gray-700 leading-relaxed font-medium">
+                                {form.subtitle || "সেল গ্যারান্টি পেতে আপনার ইনফরমেশন গুলো সাবমিট করুন এবং বিস্তারিত জানুন। আপনার সঠিক তথ্য আমাদের স্ট্র্যাটেজি তৈরিতে সাহায্য করবে।"}
+                            </p>
+                        </div>
+                    )}
+
                     {error && (
                         <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded relative flex items-center" role="alert">
                             <AlertCircle className="h-4 w-4 mr-2"/>
@@ -124,88 +173,129 @@ const PublicForm: React.FC = () => {
                         </div>
                     )}
 
-                    <form onSubmit={handleSubmit} className="space-y-5">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Full Name <span className="text-red-500">*</span></label>
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        
+                        {/* 1. Page Name (Maps to Full Name) */}
+                        <div className="relative group">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <User className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                            </div>
                             <input 
                                 type="text"
                                 required 
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
                                 value={formData.name}
                                 onChange={e => setFormData({...formData, name: e.target.value})}
-                                placeholder="Your Name"
+                                placeholder={isOnboarding ? "আপনার পেজের নাম" : "Full Name"}
                             />
                         </div>
 
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700">Phone Number <span className="text-red-500">*</span></label>
+                        {/* 2. Page Link (Maps to Facebook Profile Link) - Always shown for onboarding */}
+                        {(form.config.include_facebook || isOnboarding) && (
+                            <div className="relative group">
+                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                    <LinkIcon className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                                </div>
+                                <input 
+                                    type="text"
+                                    className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
+                                    value={formData.facebook}
+                                    onChange={e => setFormData({...formData, facebook: e.target.value})}
+                                    placeholder={isOnboarding ? "পেজের লিংক (URL)" : "Facebook Profile Link"}
+                                />
+                            </div>
+                        )}
+
+                        {/* 3. Phone Number */}
+                        <div className="relative group">
+                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <Phone className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                            </div>
                             <input 
                                 type="tel" 
                                 required
-                                className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
+                                className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
                                 value={formData.phone}
                                 onChange={e => setFormData({...formData, phone: e.target.value})}
-                                placeholder="017..."
+                                placeholder={isOnboarding ? "আপনার ফোন নাম্বার (WhatsApp)" : "Phone Number"}
                             />
                         </div>
 
-                        {form.config.include_website && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Website URL (Optional)</label>
-                                <input 
-                                    type="url" 
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                    value={formData.website}
-                                    onChange={e => setFormData({...formData, website: e.target.value})}
-                                    placeholder="https://example.com"
-                                />
-                            </div>
+                        {/* ONBOARDING SPECIFIC FIELDS */}
+                        {isOnboarding && (
+                            <>
+                                {/* 4. Current Status (Business Status) */}
+                                <div className="relative group">
+                                    <textarea 
+                                        className="block w-full p-3 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all min-h-[80px]"
+                                        value={formData.current_plan}
+                                        onChange={e => setFormData({...formData, current_plan: e.target.value})}
+                                        placeholder="বর্তমান ব্যবসার অবস্থা বিস্তারিত লিখুন..."
+                                    />
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {/* 5. Previous Budget */}
+                                    <div className="relative group">
+                                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                            <DollarSign className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                                        </div>
+                                        <input 
+                                            type="text" 
+                                            className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
+                                            value={formData.monthly_avg_budget}
+                                            onChange={e => setFormData({...formData, monthly_avg_budget: e.target.value})}
+                                            placeholder="আগের বাজেট?"
+                                        />
+                                    </div>
+                                    
+                                    {/* 6. Product Price */}
+                                    <div className="relative group">
+                                        <input 
+                                            type="text" 
+                                            className="block w-full px-4 py-3 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all text-center"
+                                            value={formData.product_price}
+                                            onChange={e => setFormData({...formData, product_price: e.target.value})}
+                                            placeholder="প্রোডাক্ট প্রাইস"
+                                        />
+                                    </div>
+                                </div>
+
+                                {/* 7. Future Plan */}
+                                <div className="relative group">
+                                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <FileText className="h-5 w-5 text-gray-400 group-focus-within:text-blue-500 transition-colors" />
+                                    </div>
+                                    <input 
+                                        type="text" 
+                                        className="block w-full pl-10 pr-3 py-3 border border-gray-200 rounded-lg leading-5 bg-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 sm:text-sm transition-all"
+                                        value={formData.marketing_budget_willingness}
+                                        onChange={e => setFormData({...formData, marketing_budget_willingness: e.target.value})}
+                                        placeholder="আপনার ফিউচার প্ল্যান কি?"
+                                    />
+                                </div>
+                            </>
                         )}
 
-                        {form.config.include_facebook && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700">Facebook Profile Link (Optional)</label>
-                                <input 
-                                    type="url" 
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                    value={formData.facebook}
-                                    onChange={e => setFormData({...formData, facebook: e.target.value})}
-                                    placeholder="https://facebook.com/..."
-                                />
-                            </div>
-                        )}
-
-                        {form.config.include_industry && (
-                             <div>
-                                <label className="block text-sm font-medium text-gray-700">Business Industry</label>
-                                <select 
-                                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm"
-                                    value={formData.industry}
-                                    onChange={e => setFormData({...formData, industry: e.target.value})}
-                                >
-                                    <option value="">-- Select Industry --</option>
-                                    {INDUSTRIES.map(ind => (
-                                        <option key={ind} value={ind}>{ind}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        )}
-
-                        <div>
+                        <div className="pt-2">
                             <button 
                                 type="submit" 
-                                className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors"
-                                style={{ backgroundColor: primaryColor }}
+                                className="w-full flex flex-col items-center justify-center py-3.5 px-4 border border-transparent rounded-xl shadow-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all transform active:scale-[0.98]"
                             >
-                                Submit
+                                <span className="text-lg font-bold flex items-center">
+                                    সাবমিট করুন <Send className="ml-2 h-5 w-5 rotate-45" />
+                                </span>
+                                {isOnboarding && <span className="text-xs font-normal text-blue-100 mt-0.5">সেল শুরু করার প্রথম ধাপ সম্পূর্ণ করুন</span>}
                             </button>
                         </div>
                     </form>
+                    
+                    {isOnboarding && (
+                        <p className="text-center text-[10px] text-gray-400 mt-4">
+                            * ১০০০+ সফল উদ্যোক্তা আমাদের সাথে কাজ করছেন
+                        </p>
+                    )}
                 </div>
-            </div>
-            
-            <div className="mt-8 text-center">
-                 <p className="text-xs text-gray-400">Powered by LeadGenius BD</p>
             </div>
         </div>
     );

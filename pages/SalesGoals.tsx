@@ -12,6 +12,49 @@ const SERVICES: { id: SalesServiceType; label: string; color: string }[] = [
     { id: 'CONSULTANCY', label: 'Business Consultancy', color: 'purple' },
 ];
 
+// --- HELPER COMPONENT: Auto-Save Input ---
+// This component allows smooth typing and only saves when the user clicks away (onBlur)
+const GoalInput: React.FC<{ 
+    value: number; 
+    onSave: (val: string) => void; 
+    prefix?: string;
+    icon?: any;
+    placeholder?: string;
+}> = ({ value, onSave, prefix, icon: Icon, placeholder }) => {
+    const [localValue, setLocalValue] = useState<string>(value?.toString() || '');
+
+    useEffect(() => {
+        setLocalValue(value?.toString() || '');
+    }, [value]);
+
+    const handleBlur = () => {
+        // Only save if value actually changed
+        if (parseFloat(localValue) !== value) {
+            onSave(localValue);
+        }
+    };
+
+    return (
+        <div className="flex items-center gap-1 justify-end">
+            {prefix && <span className="text-gray-400">{prefix}</span>}
+            {Icon && <Icon className="h-3 w-3 text-gray-400"/>}
+            <input 
+                type="number" 
+                className="w-20 text-right border-b border-gray-300 focus:border-indigo-500 focus:outline-none text-sm font-bold text-gray-600 bg-transparent transition-colors hover:border-indigo-300"
+                value={localValue}
+                placeholder={placeholder || "0"}
+                onChange={(e) => setLocalValue(e.target.value)}
+                onBlur={handleBlur}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                        (e.target as HTMLInputElement).blur(); // Trigger save
+                    }
+                }}
+            />
+        </div>
+    );
+};
+
 const SalesGoals: React.FC = () => {
     const { formatCurrency } = useCurrency();
     // State
@@ -70,13 +113,37 @@ const SalesGoals: React.FC = () => {
         const numValue = parseFloat(value) || 0;
         const currentTarget = targets.find(t => t.month === selectedMonth && t.service === service);
         
+        // 1. Optimistic Update (Immediate Feedback)
+        setTargets(prev => {
+            const idx = prev.findIndex(t => t.month === selectedMonth && t.service === service);
+            const newTargets = [...prev];
+            
+            if (idx > -1) {
+                newTargets[idx] = {
+                    ...newTargets[idx],
+                    [field === 'amount' ? 'target_amount' : 'target_clients']: numValue
+                };
+            } else {
+                newTargets.push({
+                    id: 'temp',
+                    month: selectedMonth,
+                    service: service,
+                    target_amount: field === 'amount' ? numValue : 0,
+                    target_clients: field === 'count' ? numValue : 0
+                });
+            }
+            return newTargets;
+        });
+
+        // 2. Persist to Backend
         await mockService.setSalesTarget({
             month: selectedMonth,
             service,
             target_amount: field === 'amount' ? numValue : (currentTarget?.target_amount || 0),
             target_clients: field === 'count' ? numValue : (currentTarget?.target_clients || 0)
         });
-        loadData();
+        
+        // No need to call loadData() immediately as we did optimistic update
     };
 
     const openAddModal = () => {
@@ -190,7 +257,7 @@ const SalesGoals: React.FC = () => {
                             const amountProgress = stats.targetAmount > 0 ? (stats.achievedAmount / stats.targetAmount) * 100 : 0;
                             const countProgress = stats.targetCount > 0 ? (stats.achievedCount / stats.targetCount) * 100 : 0;
                             
-                            // Correct Colors Map (Replaced bar- with bg-)
+                            // Correct Colors Map
                             const colors: any = {
                                 blue: { header: 'bg-blue-50 text-blue-700 border-blue-200', bar: 'bg-blue-500', subBar: 'bg-blue-300' },
                                 green: { header: 'bg-green-50 text-green-700 border-green-200', bar: 'bg-green-500', subBar: 'bg-green-300' },
@@ -216,16 +283,12 @@ const SalesGoals: React.FC = () => {
                                                 </div>
                                                 <div className="text-right">
                                                     <span className="text-xs text-gray-400">Target ($)</span>
-                                                    <div className="flex items-center gap-1 justify-end">
-                                                        <span className="text-gray-400">$</span>
-                                                        <input 
-                                                            type="number" 
-                                                            className="w-20 text-right border-b border-gray-300 focus:border-indigo-500 focus:outline-none text-sm font-bold text-gray-600 bg-transparent"
-                                                            value={stats.targetAmount || ''}
-                                                            placeholder="0"
-                                                            onChange={(e) => handleUpdateTarget(srv.id, 'amount', e.target.value)}
-                                                        />
-                                                    </div>
+                                                    {/* AUTO-SAVE INPUT FOR AMOUNT */}
+                                                    <GoalInput 
+                                                        value={stats.targetAmount}
+                                                        onSave={(val) => handleUpdateTarget(srv.id, 'amount', val)}
+                                                        prefix="$"
+                                                    />
                                                 </div>
                                             </div>
                                             <div className="w-full bg-gray-100 rounded-full h-2.5 overflow-hidden">
@@ -246,16 +309,12 @@ const SalesGoals: React.FC = () => {
                                                 </div>
                                                 <div className="text-right">
                                                     <span className="text-xs text-gray-400">Target</span>
-                                                    <div className="flex items-center gap-1 justify-end">
-                                                        <Users className="h-3 w-3 text-gray-400"/>
-                                                        <input 
-                                                            type="number" 
-                                                            className="w-12 text-right border-b border-gray-300 focus:border-indigo-500 focus:outline-none text-sm font-bold text-gray-600 bg-transparent"
-                                                            value={stats.targetCount || ''}
-                                                            placeholder="0"
-                                                            onChange={(e) => handleUpdateTarget(srv.id, 'count', e.target.value)}
-                                                        />
-                                                    </div>
+                                                    {/* AUTO-SAVE INPUT FOR COUNT */}
+                                                    <GoalInput 
+                                                        value={stats.targetCount}
+                                                        onSave={(val) => handleUpdateTarget(srv.id, 'count', val)}
+                                                        icon={Users}
+                                                    />
                                                 </div>
                                             </div>
                                             <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden">

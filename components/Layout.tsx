@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 // @ts-ignore
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Settings, MessageSquare, Menu, X, LogOut, Send, FileText, ShoppingBag, CheckSquare, FileText as FileInvoice, Zap, ScrollText, Calculator, MessageCircle, Target, Coins, Bell, AlertTriangle, CheckCircle, Sparkles } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, MessageSquare, Menu, X, LogOut, Send, FileText, ShoppingBag, CheckSquare, FileText as FileInvoice, Zap, ScrollText, Calculator, MessageCircle, Target, Coins, Bell, AlertTriangle, CheckCircle, Sparkles, Smartphone } from 'lucide-react';
 import { useCurrency } from '../context/CurrencyContext';
 import { mockService } from '../services/mockService';
 import { BigFish } from '../types';
@@ -88,9 +88,10 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Big Fish 🐟', href: '/big-fish', icon: null, special: true }, 
     { name: 'Sales Goals', href: '/sales-goals', icon: Target }, 
+    { name: 'WhatsApp Panel', href: '/whatsapp', icon: Smartphone }, // NEW
     { name: 'Leads', href: '/leads', icon: Users },
     { name: 'Won Clients', href: '/won-leads', icon: CheckCircle },
-    { name: 'Messaging', href: '/messaging', icon: Send },
+    { name: 'Messaging (SMS)', href: '/messaging', icon: Send },
     { name: 'Message Baba', href: '/message-baba', icon: MessageCircle }, 
     { name: 'Online Customers', href: '/customers', icon: ShoppingBag }, 
     { name: 'Daily Tasks', href: '/tasks', icon: CheckSquare }, 

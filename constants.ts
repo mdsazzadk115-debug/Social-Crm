@@ -1,5 +1,5 @@
 
-import { LeadStatus, Channel, LeadSource } from './types';
+import { LeadStatus, Channel, LeadSource, BigFish } from './types';
 
 export const APP_NAME = "Social Ads Expert";
 export const DEFAULT_TIMEZONE = "Asia/Dhaka";
@@ -47,8 +47,35 @@ export const INDUSTRIES = [
   "🏠 Real Estate (রিয়েল স্টেট)"
 ];
 
+// --- 10 HASAN DUMMY LEADS (SALES GUARANTEE) ---
+const HASAN_LEADS = Array.from({ length: 10 }).map((_, i) => ({
+    id: `hasan_lead_${i + 1}`,
+    full_name: `Hasan Mahmud ${i + 1}`,
+    primary_phone: `0171234567${i}`,
+    source: LeadSource.FORM,
+    status: LeadStatus.NEW,
+    industry: '📢 Facebook Marketing (ফেসবুক মার্কেটিং)',
+    service_category: 'Sales Guarantee',
+    facebook_profile_link: `https://facebook.com/hasan.fashion.${i + 1}`,
+    website_url: `https://hasan-shop-${i + 1}.com`,
+    is_starred: i < 3, // First 3 starred
+    is_unread: true,
+    total_messages_sent: 0,
+    download_count: 0,
+    first_contact_at: new Date().toISOString(),
+    last_activity_at: new Date().toISOString(),
+    created_at: new Date().toISOString(),
+    onboarding_data: {
+        current_plan: `আমি বর্তমানে বুস্টিং করছি কিন্তু ভালো রেজাল্ট পাচ্ছি না। কস্ট বেশি হচ্ছে (Lead #${i + 1})।`,
+        monthly_avg_budget: `${30000 + (i * 5000)}`,
+        product_price: `${1200 + (i * 100)}`,
+        marketing_budget_willingness: 'যদি গ্যারান্টি সেলস পাই তবে বাজেট বাড়াতে সমস্যা নেই।',
+    }
+}));
+
 // --- 10 DEMO LEADS ---
 export const DEMO_LEADS = [
+    ...HASAN_LEADS, // Inject Hasan Leads at the top
     {
         id: 'dl_1',
         full_name: 'Tanvir Hasan',
@@ -198,6 +225,121 @@ export const DEMO_LEADS = [
         first_contact_at: new Date().toISOString(),
         last_activity_at: new Date().toISOString(),
         created_at: new Date().toISOString(),
+    }
+];
+
+// --- DEMO BIG FISH (VIP CLIENTS) ---
+export const DEMO_BIG_FISH: BigFish[] = [
+    {
+        id: 'bf_1',
+        lead_id: 'dl_1',
+        name: 'Urban Vogue BD',
+        phone: '01711223344',
+        status: 'Active Pool',
+        package_name: 'Premium Growth Package',
+        balance: 155.50,
+        low_balance_alert_threshold: 20,
+        total_budget: 2000,
+        spent_amount: 1844.50,
+        target_sales: 500,
+        current_sales: 342,
+        transactions: [
+            { id: 'tx_1', date: new Date().toISOString(), type: 'DEPOSIT', amount: 200, description: 'Balance Top-up via bKash' },
+            { id: 'tx_2', date: new Date(Date.now() - 86400000).toISOString(), type: 'AD_SPEND', amount: 15.50, description: 'Daily Ad Spend (May 15)' },
+            { id: 'tx_3', date: new Date(Date.now() - 172800000).toISOString(), type: 'AD_SPEND', amount: 12.00, description: 'Daily Ad Spend (May 14)' },
+        ],
+        campaign_records: [],
+        topup_requests: [],
+        growth_tasks: [
+            { id: 'gt_1', title: 'Launch Eid Collection Ads', is_completed: true, due_date: new Date().toISOString() },
+            { id: 'gt_2', title: 'Setup Retargeting Pixel', is_completed: false }
+        ],
+        reports: [],
+        portal_config: { 
+            show_balance: true, 
+            show_history: true, 
+            is_suspended: false, 
+            feature_flags: { 
+                show_sales_report: true,
+                show_profit_analysis: true,
+                show_cpr_metrics: true,
+                allow_topup_request: true
+            } 
+        },
+        start_date: new Date(Date.now() - 7776000000).toISOString(), // 3 months ago
+        facebook_page: 'https://fb.com/urbanvoguebd'
+    },
+    {
+        id: 'bf_2',
+        lead_id: 'dl_5',
+        name: 'Dhaka Dine Restaurant',
+        phone: '01555666777',
+        status: 'Active Pool',
+        package_name: 'Local Awareness',
+        balance: 5.25, // LOW BALANCE
+        low_balance_alert_threshold: 15,
+        total_budget: 500,
+        spent_amount: 494.75,
+        target_sales: 1000,
+        current_sales: 850,
+        transactions: [],
+        growth_tasks: [],
+        reports: [],
+        portal_config: { show_balance: true, show_history: true, is_suspended: false },
+        start_date: new Date().toISOString()
+    },
+    {
+        id: 'bf_3',
+        lead_id: 'dl_9',
+        name: 'Build Master Real Estate',
+        phone: '01600000001',
+        status: 'Active Pool',
+        package_name: 'Lead Gen Pro',
+        balance: 450.00,
+        low_balance_alert_threshold: 50,
+        total_budget: 5000,
+        spent_amount: 1200,
+        target_sales: 50,
+        current_sales: 12,
+        transactions: [],
+        growth_tasks: [],
+        reports: [],
+        portal_config: { show_balance: true, show_history: true, is_suspended: false },
+        start_date: new Date().toISOString(),
+        is_retainer: true,
+        retainer_amount: 25000,
+        retainer_renewal_date: new Date(Date.now() + 259200000).toISOString() // 3 days later
+    },
+    {
+        id: 'bf_4',
+        lead_id: 'dl_7',
+        name: 'Gadget Gear',
+        phone: '01777888999',
+        status: 'Active Pool',
+        package_name: 'Standard',
+        balance: 45.00,
+        low_balance_alert_threshold: 10,
+        total_budget: 100,
+        spent_amount: 55,
+        target_sales: 100,
+        current_sales: 20,
+        transactions: [],
+        growth_tasks: [],
+        reports: [],
+        portal_config: { show_balance: true, show_history: true, is_suspended: false },
+        start_date: new Date().toISOString(),
+        topup_requests: [
+            { 
+                id: 'tr_1', 
+                client_id: 'bf_4', 
+                client_name: 'Gadget Gear', 
+                amount: 100, 
+                method_name: 'bKash', 
+                sender_number: '017XXX999', 
+                status: 'PENDING', 
+                created_at: new Date().toISOString() 
+            }
+        ]
     }
 ];
 
@@ -372,81 +514,8 @@ export const INITIAL_TEMPLATES = [
     }
 ];
 
-// --- INITIAL LEAD FORMS (PERMANENT DEMO DATA) ---
-export const INITIAL_LEAD_FORMS = [
-    {
-        id: 'demo_1',
-        title: 'দ্রুত যোগাযোগ',
-        subtitle: 'আপনার নাম্বারটি দিন, আমরা শীঘ্রই আপনাকে কল করবো।',
-        config: {
-            include_website: false,
-            include_facebook: false,
-            include_industry: false,
-            theme_color: 'blue'
-        },
-        created_at: new Date().toISOString()
-    },
-    {
-        id: 'demo_2',
-        title: 'ফ্রি কনসালটেশন বুকিং',
-        subtitle: 'আপনার ব্যবসার গ্রোথ নিয়ে আলোচনা করতে ৩০ মিনিটের ফ্রি মিটিং বুক করুন।',
-        config: {
-            include_website: true,
-            include_facebook: false,
-            include_industry: true,
-            theme_color: 'indigo'
-        },
-        created_at: new Date().toISOString()
-    },
-    {
-        id: 'demo_3',
-        title: 'ওয়েবসাইট অডিট রিকোয়েস্ট',
-        subtitle: 'আপনার ওয়েবসাইটের স্পিড এবং এসইও চেক করে ফ্রি রিপোর্ট নিন।',
-        config: {
-            include_website: true,
-            include_facebook: false,
-            include_industry: false,
-            theme_color: 'green'
-        },
-        created_at: new Date().toISOString()
-    },
-    {
-        id: 'demo_4',
-        title: 'ফেসবুক মার্কেটিং সার্ভিস',
-        subtitle: 'আপনার ব্যবসার সেলস বাড়াতে কাস্টম মার্কেটিং প্ল্যান এবং বাজেট সম্পর্কে জানুন।',
-        config: {
-            include_website: false,
-            include_facebook: true,
-            include_industry: true,
-            theme_color: 'purple'
-        },
-        created_at: new Date().toISOString()
-    },
-    {
-        id: 'demo_5',
-        title: 'অর্ডার কনফার্মেশন',
-        subtitle: 'দয়া করে আপনার শিপিং ডিটেলস এবং নাম ঠিক আছে কিনা নিশ্চিত করুন।',
-        config: {
-            include_website: false,
-            include_facebook: false,
-            include_industry: false,
-            theme_color: 'orange'
-        },
-        created_at: new Date().toISOString()
-    },
-    {
-        id: 'demo_6',
-        title: 'নতুন প্রজেক্ট অনবোর্ডিং',
-        subtitle: 'কাজ শুরু করার জন্য নিচের তথ্যগুলো পূরণ করুন।',
-        config: {
-            include_website: true,
-            include_facebook: true,
-            include_industry: true,
-            theme_color: 'pink'
-        },
-        created_at: new Date().toISOString()
-    }
-];
+// --- INITIAL LEAD FORMS (CLEARED AS REQUESTED) ---
+export const INITIAL_LEAD_FORMS = [];
 
 // --- INITIAL SNIPPETS DATA ---
 export const INITIAL_SNIPPETS = [

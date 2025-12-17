@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 // @ts-ignore
-import { Link } from 'react-router-dom';
-import { Search, ChevronRight, ChevronLeft, Download, Phone, Briefcase, User, AlertCircle, Globe, MessageCircle, PenTool, Calendar, FileText, Plus, X, Save, ArrowUpDown, Star, Facebook, Edit2, Filter, Check } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Search, ChevronRight, ChevronLeft, Download, Phone, Briefcase, User, AlertCircle, Globe, MessageCircle, PenTool, Calendar, FileText, Plus, X, Save, ArrowUpDown, Star, Facebook, Edit2, Filter, Check, Send, Smartphone } from 'lucide-react';
 import { mockService } from '../services/mockService';
 import { Lead, LeadStatus, LeadSource } from '../types';
 import { STATUS_LABELS, STATUS_COLORS, INDUSTRIES } from '../constants';
@@ -10,6 +10,7 @@ import { STATUS_LABELS, STATUS_COLORS, INDUSTRIES } from '../constants';
 const ITEMS_PER_PAGE = 50;
 
 const LeadList: React.FC = () => {
+  const navigate = useNavigate();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   
@@ -102,14 +103,36 @@ const LeadList: React.FC = () => {
       await mockService.toggleLeadStar(leadId);
   };
 
-  // WhatsApp Logic
+  // --- WHATSAPP INTEGRATION (SMART WEB OPENER) ---
   const handleWhatsApp = (lead: Lead) => {
-      let num = lead.primary_phone.replace(/\D/g, '');
-      if(num.startsWith('01')) num = '88' + num;
+      // 1. Clean Number logic
+      let num = lead.primary_phone.replace(/[^\d]/g, ''); 
+      if(num.startsWith('880')) {
+          // already has code, do nothing
+      } else if(num.startsWith('01')) {
+          num = '88' + num;
+      } else if (num.startsWith('1')) {
+          num = '880' + num;
+      }
+
+      // 2. Context Greeting
+      const timeGreeting = new Date().getHours() < 12 ? 'Good Morning' : new Date().getHours() < 18 ? 'Good Afternoon' : 'Good Evening';
+      const text = `Hi ${lead.full_name}, ${timeGreeting}! 👋\n\nRegarding ${lead.service_category || 'your query'}...`;
       
-      const text = `Hi ${lead.full_name}, welcome to Social Ads Expert! Saw your interest in ${lead.service_category || lead.industry || 'our services'}. How can we help?`;
-      const url = `https://wa.me/${num}?text=${encodeURIComponent(text)}`;
-      window.open(url, '_blank');
+      // 3. Force Web WhatsApp on Desktop
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      const baseUrl = isMobile 
+          ? `https://wa.me/${num}` 
+          : `https://web.whatsapp.com/send?phone=${num}`;
+      
+      const fullUrl = `${baseUrl}&text=${encodeURIComponent(text)}`;
+
+      // 4. Open in New Tab
+      window.open(fullUrl, '_blank');
+  };
+
+  const openWhatsAppWeb = () => {
+      window.open('https://web.whatsapp.com', '_blank');
   };
 
   // Note Handlers
@@ -305,11 +328,33 @@ const LeadList: React.FC = () => {
 
   return (
     <div className="space-y-6 font-inter">
+      {/* HEADER SECTION WITH WHATSAPP BUTTONS */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">👥 Lead Management</h1>
-          <p className="text-sm text-gray-500">Track, filter and manage your leads efficiently.</p>
+          <h1 className="text-2xl font-bold text-gray-900 flex items-center flex-wrap gap-3">
+              👥 Lead Management
+              
+              {/* BUTTON 1: DIRECT WHATSAPP WEB OPENER */}
+              <button 
+                onClick={openWhatsAppWeb}
+                className="inline-flex items-center px-3 py-1.5 border border-green-200 text-xs font-bold rounded-lg text-green-700 bg-green-50 hover:bg-green-100 transition-colors shadow-sm" 
+                title="Open web.whatsapp.com directly"
+              >
+                  <MessageCircle className="h-4 w-4 mr-1.5"/> Open WhatsApp Web
+              </button>
+
+              {/* BUTTON 2: SHORTCUT TO INTERNAL WHATSAPP PANEL */}
+              <button 
+                onClick={() => navigate('/whatsapp')}
+                className="inline-flex items-center px-3 py-1.5 border border-indigo-200 text-xs font-bold rounded-lg text-indigo-700 bg-indigo-50 hover:bg-indigo-100 transition-colors shadow-sm" 
+                title="Go to Bulk Messaging Panel"
+              >
+                  <Smartphone className="h-4 w-4 mr-1.5"/> Go to Panel
+              </button>
+          </h1>
+          <p className="text-sm text-gray-500 mt-1">Track, filter and manage your leads efficiently.</p>
         </div>
+        
         <div className="flex gap-2">
             <button onClick={() => setIsAddLeadOpen(true)} className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-bold text-white bg-indigo-600 hover:bg-indigo-700">
                 <Plus className="h-4 w-4 mr-2" /> Add New Lead
@@ -565,7 +610,7 @@ const LeadList: React.FC = () => {
                                 <button 
                                     onClick={(e) => { e.stopPropagation(); handleWhatsApp(lead); }}
                                     className="ml-2 text-green-500 hover:text-green-700 p-0.5 rounded hover:bg-green-50 transition-colors"
-                                    title="Open in WhatsApp"
+                                    title="Open WhatsApp Web for this number"
                                 >
                                     <MessageCircle className="h-4 w-4" />
                                 </button>

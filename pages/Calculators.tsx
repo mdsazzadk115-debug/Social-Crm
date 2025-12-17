@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
-import { DollarSign, BarChart2, ShoppingBag, Copy, Check, MessageCircle, ShoppingCart, Layout, Calendar, CreditCard } from 'lucide-react';
+import { DollarSign, BarChart2, ShoppingBag, Copy, Check, MessageCircle, ShoppingCart, Layout, Calendar, CreditCard, Users, Send, Smartphone } from 'lucide-react';
 import { mockService } from '../services/mockService';
-import { PaymentMethod } from '../types';
+import { PaymentMethod, Lead } from '../types';
 
 const Calculators: React.FC = () => {
     
@@ -28,16 +28,20 @@ const Calculators: React.FC = () => {
     const [profitCopied, setProfitCopied] = useState(false);
 
     // 4. Campaign Generator
+    const [leads, setLeads] = useState<Lead[]>([]);
+    const [selectedClientId, setSelectedClientId] = useState('');
     const [campPageName, setCampPageName] = useState('');
     const [campBudget, setCampBudget] = useState<number>(0);
     const [campStartDate, setCampStartDate] = useState(new Date().toISOString().slice(0, 10));
     const [campEndDate, setCampEndDate] = useState('');
     const [campTitleCopied, setCampTitleCopied] = useState(false);
     const [campMsgCopied, setCampMsgCopied] = useState(false);
+    const [isSendingSMS, setIsSendingSMS] = useState(false);
 
-    // Load Payment Methods on Mount
+    // Load Data on Mount
     useEffect(() => {
         mockService.getPaymentMethods().then(setPaymentMethods);
+        mockService.getLeads().then(setLeads);
     }, []);
 
     // --- CALCULATIONS ---
@@ -134,7 +138,17 @@ ${methodsText}
         setTimeout(() => setProfitCopied(false), 2000);
     };
 
-    // --- CAMPAIGN GENERATOR ---
+    // --- CAMPAIGN GENERATOR & ACTIONS ---
+    const handleClientSelect = (leadId: string) => {
+        setSelectedClientId(leadId);
+        const lead = leads.find(l => l.id === leadId);
+        if (lead) {
+            setCampPageName(lead.full_name); // Auto-fill page name with client name
+        } else {
+            setCampPageName('');
+        }
+    };
+
     const generateCampaignTitle = () => {
         const date = campEndDate ? new Date(campEndDate).toLocaleDateString('en-GB') : 'No Date';
         return `${campPageName || 'Page'} - $${campBudget} - ${date}`;
@@ -146,13 +160,16 @@ ${methodsText}
         const totalBill = campBudget * 145;
 
         return `সম্মানিত ক্লায়েন্ট,
-আপনার "${campPageName}" পেজের ক্যাম্পেইনটি সম্পূর্ণভাবে সফল হয়েছে ✅
+আপনার "${campPageName}" পেজের ক্যাম্পেইনটি সফলভাবে চলছে/সম্পন্ন হয়েছে ✅
 
 📅 সময়কাল: ${sDate} থেকে ${eDate}
 💵 অ্যাড বাজেট: $${campBudget}
 💰 মোট বিল: ৳ ${totalBill.toLocaleString()} (রেট: ১৪৫ টাকা)
 
-দয়া করে আমাদের পেমেন্ট ক্লিয়ার করে দিবেন। ধন্যবাদ!`;
+দয়া করে আমাদের পেমেন্ট ক্লিয়ার করে দিবেন।
+(অবশ্যই বিকাশে খরচ সহ দিবেন। ব্যাংকে খরচ দিতে হবে না)
+
+ধন্যবাদ!`;
     };
 
     const handleCopyCampTitle = () => {
@@ -167,6 +184,37 @@ ${methodsText}
         setTimeout(() => setCampMsgCopied(false), 2000);
     };
 
+    const handleSendWhatsApp = () => {
+        const lead = leads.find(l => l.id === selectedClientId);
+        if (!lead) return alert("Please select a client from the dropdown first.");
+        
+        let num = lead.primary_phone.replace(/[^\d]/g, '');
+        if(num.startsWith('01')) num = '88' + num;
+        else if(num.startsWith('1')) num = '880' + num;
+
+        const msg = generateClientMessage();
+        const url = `https://web.whatsapp.com/send?phone=${num}&text=${encodeURIComponent(msg)}`;
+        window.open(url, '_blank');
+    };
+
+    const handleSendSystemSMS = async () => {
+        const lead = leads.find(l => l.id === selectedClientId);
+        if (!lead) return alert("Please select a client from the dropdown first.");
+        
+        if(!confirm(`Send SMS to ${lead.full_name} (${lead.primary_phone})?\n\nThis will use the internal SMS gateway.`)) return;
+
+        setIsSendingSMS(true);
+        try {
+            const msg = generateClientMessage();
+            await mockService.sendBulkSMS([lead.id], msg);
+            alert("✅ SMS Sent Successfully via System!");
+        } catch (e) {
+            alert("Failed to send SMS.");
+        } finally {
+            setIsSendingSMS(false);
+        }
+    };
+
     return (
         <div className="space-y-8">
             <div>
@@ -176,7 +224,7 @@ ${methodsText}
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 
-                {/* 1. COST PER RESULT + REPORT GENERATOR */}
+                {/* 1. COST PER RESULT */}
                 <div className="bg-white rounded-xl shadow-sm border border-indigo-100 p-6 flex flex-col h-full">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="p-3 bg-blue-100 text-blue-600 rounded-lg">
@@ -250,7 +298,7 @@ ${methodsText}
                     </div>
                 </div>
 
-                {/* 2. CURRENCY CONVERTER + PAYMENT REPORT */}
+                {/* 2. CURRENCY CONVERTER */}
                 <div className="bg-white rounded-xl shadow-sm border border-green-100 p-6 flex flex-col h-full">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="p-3 bg-green-100 text-green-600 rounded-lg">
@@ -412,7 +460,7 @@ ${methodsText}
                     </div>
                 </div>
 
-                {/* 4. CAMPAIGN GENERATOR (NEW) */}
+                {/* 4. CAMPAIGN GENERATOR (UPDATED) */}
                 <div className="bg-white rounded-xl shadow-sm border border-orange-100 p-6 flex flex-col h-full">
                     <div className="flex items-center gap-3 mb-6">
                         <div className="p-3 bg-orange-100 text-orange-600 rounded-lg">
@@ -422,6 +470,25 @@ ${methodsText}
                     </div>
 
                     <div className="space-y-4 flex-1">
+                        
+                        {/* SELECT CLIENT */}
+                        <div>
+                            <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Select Client</label>
+                            <div className="relative">
+                                <Users className="h-4 w-4 absolute left-3 top-3 text-gray-400 pointer-events-none"/>
+                                <select 
+                                    className="w-full pl-9 border-gray-300 bg-gray-50 rounded-md p-2.5 text-gray-900 focus:ring-orange-500 focus:border-orange-500 shadow-sm text-sm"
+                                    value={selectedClientId}
+                                    onChange={(e) => handleClientSelect(e.target.value)}
+                                >
+                                    <option value="">-- Manual Page Name --</option>
+                                    {leads.map(l => (
+                                        <option key={l.id} value={l.id}>{l.full_name}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
+
                         <div>
                             <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Page Name</label>
                             <input 
@@ -503,6 +570,24 @@ ${methodsText}
                                     {campMsgCopied ? <><Check className="h-3 w-3 mr-1"/> Copied</> : <><Copy className="h-3 w-3 mr-1"/> Copy</>}
                                 </button>
                             </div>
+                        </div>
+
+                        {/* ACTIONS */}
+                        <div className="flex gap-2 pt-2">
+                            <button 
+                                onClick={handleSendWhatsApp}
+                                disabled={!selectedClientId}
+                                className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-xs font-bold flex items-center justify-center shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                            >
+                                <Smartphone className="h-4 w-4 mr-1.5"/> WhatsApp
+                            </button>
+                            <button 
+                                onClick={handleSendSystemSMS}
+                                disabled={!selectedClientId || isSendingSMS}
+                                className="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white py-2 rounded-lg text-xs font-bold flex items-center justify-center shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                            >
+                                <Send className="h-4 w-4 mr-1.5"/> Send SMS
+                            </button>
                         </div>
                     </div>
                 </div>

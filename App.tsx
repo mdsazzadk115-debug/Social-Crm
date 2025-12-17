@@ -24,10 +24,11 @@ import Settings from './pages/Settings';
 import SalesGoals from './pages/SalesGoals';
 import WonLeads from './pages/WonLeads';
 import AdSwipeFile from './pages/AdSwipeFile';
+import WhatsAppPanel from './pages/WhatsAppPanel'; // NEW
 import { CurrencyProvider } from './context/CurrencyContext';
 
 // --- AUTH GUARD COMPONENT ---
-const RequireAuth = ({ children }: { children: React.ReactNode }) => {
+const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const auth = localStorage.getItem('sae_auth');
     const location = useLocation();
 
@@ -80,6 +81,7 @@ const App: React.FC = () => {
           <Route path="/leads" element={<RequireAuth><Layout><LeadList /></Layout></RequireAuth>} />
           <Route path="/leads/:id" element={<RequireAuth><Layout><LeadDetail /></Layout></RequireAuth>} />
           <Route path="/won-leads" element={<RequireAuth><Layout><WonLeads /></Layout></RequireAuth>} />
+          <Route path="/whatsapp" element={<RequireAuth><Layout><WhatsAppPanel /></Layout></RequireAuth>} />
           <Route path="/messaging" element={<RequireAuth><Layout><Messaging /></Layout></RequireAuth>} />
           <Route path="/message-baba" element={<RequireAuth><Layout><MessageBaba /></Layout></RequireAuth>} />
           <Route path="/ad-swipe" element={<RequireAuth><Layout><AdSwipeFile /></Layout></RequireAuth>} />

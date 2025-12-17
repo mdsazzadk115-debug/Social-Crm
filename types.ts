@@ -47,10 +47,19 @@ export interface User {
 export interface ClientInteraction {
     id: string;
     date: string;
-    type: 'CALL' | 'MEETING' | 'EMAIL' | 'WHATSAPP' | 'OTHER';
+    // UPDATED: Added INVOICE, TASK, SALE, BALANCE
+    type: 'CALL' | 'MEETING' | 'EMAIL' | 'WHATSAPP' | 'OTHER' | 'INVOICE' | 'TASK' | 'SALE' | 'BALANCE';
     notes: string;
     next_follow_up?: string;
     created_at: string;
+}
+
+// NEW: Interface for the specific questions asked
+export interface OnboardingData {
+    current_plan?: string; // এখন সে কিভাবে কাজ করতে চাচ্ছে তার প্ল্যান কি
+    monthly_avg_budget?: string; // প্রতিমাসে এভারেজে বাজেট কত টাকা
+    product_price?: string; // তার প্রোডাক্ট প্রাইস কত
+    marketing_budget_willingness?: string; // মার্কেটিং বাজেট কত খরচ করতে সে রাজি আছে
 }
 
 export interface Lead {
@@ -77,6 +86,7 @@ export interface Lead {
   active_campaign_id?: string;
 
   interactions?: ClientInteraction[]; // CRM: Interaction History
+  onboarding_data?: OnboardingData; // NEW: Stores the specific form answers
 }
 
 export interface LeadNote {
@@ -150,6 +160,7 @@ export interface LeadForm {
     id: string;
     title: string;
     subtitle: string;
+    type?: 'SIMPLE' | 'ONBOARDING'; // NEW: To distinguish the detailed form
     config: {
         include_website: boolean;
         include_facebook: boolean;
@@ -239,6 +250,43 @@ export interface Transaction {
     };
 }
 
+// NEW: Detailed Campaign Performance Record
+export interface CampaignRecord {
+    id: string;
+    start_date: string;
+    end_date: string;
+    amount_spent: number;
+    
+    // Metrics
+    impressions: number;
+    reach: number;
+    clicks: number;
+    
+    // Results
+    result_type: 'SALES' | 'MESSAGES';
+    results_count: number;
+    
+    // Financials (For Sales Type)
+    product_price?: number;
+    product_cost?: number;
+    
+    notes?: string;
+    created_at: string;
+}
+
+// NEW: Top Up Request
+export interface TopUpRequest {
+    id: string;
+    client_id: string;
+    client_name: string;
+    amount: number;
+    method_name: string; // bKash / Bank
+    sender_number: string;
+    screenshot_url?: string; // Base64 or URL
+    status: 'PENDING' | 'APPROVED' | 'REJECTED';
+    created_at: string;
+}
+
 export interface GrowthTask {
     id: string;
     title: string;
@@ -256,6 +304,19 @@ export interface PortalConfig {
     show_balance: boolean;
     show_history: boolean;
     is_suspended: boolean;
+    
+    // Advanced Toggles
+    feature_flags?: {
+        show_profit_analysis: boolean; // Legacy flag (kept for compat)
+        show_cpr_metrics: boolean; // Legacy flag (kept for compat)
+        allow_topup_request: boolean;
+
+        // New Granular Report Toggles
+        show_message_report?: boolean;
+        show_sales_report?: boolean;
+        show_profit_loss_report?: boolean;
+    };
+
     announcement_title?: string;
     announcement_message?: string;
     shared_calculators?: {
@@ -263,7 +324,6 @@ export interface PortalConfig {
         currency: boolean;
         roi: boolean;
     };
-    // Deprecated in favor of global settings, but kept for interface compatibility if needed
     agency_support_phone?: string;
     agency_support_url?: string;
     agency_fb_group?: string;
@@ -300,6 +360,8 @@ export interface BigFish {
 
     // Advanced Data
     transactions: Transaction[];
+    campaign_records?: CampaignRecord[]; // New Detailed Logs
+    topup_requests?: TopUpRequest[]; // Request History
     growth_tasks: GrowthTask[];
     reports: WorkLog[];
     interactions?: ClientInteraction[]; // NEW: CRM History

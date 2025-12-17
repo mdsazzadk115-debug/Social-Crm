@@ -1,8 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
-import { BigFish, Lead, LeadStatus, Transaction, PaymentMethod, ClientInteraction } from '../types';
-import { Plus, TrendingUp, ExternalLink, CheckCircle, Target, Copy, ArrowLeft, Wallet, Activity, Eye, List, X, Download, Archive, RotateCcw, Trash2, Settings, Building, Smartphone, Share2, AlertTriangle, Clock, Edit2, User, Search, CheckSquare, ChevronLeft, ChevronRight, Repeat, Phone, MessageSquare, Mail, MessageCircle, PieChart } from 'lucide-react';
+import { BigFish, Lead, LeadStatus, Transaction, PaymentMethod, ClientInteraction, CampaignRecord, TopUpRequest, PortalConfig } from '../types';
+import { Plus, TrendingUp, ExternalLink, CheckCircle, Target, Copy, ArrowLeft, Wallet, Activity, Eye, List, X, Download, Archive, RotateCcw, Trash2, Settings, Building, Smartphone, Share2, AlertTriangle, Clock, Edit2, User, Search, CheckSquare, ChevronLeft, ChevronRight, Repeat, Phone, MessageSquare, Mail, MessageCircle, PieChart, Image, ToggleLeft, ToggleRight, Layout, Grid, Check, Send } from 'lucide-react';
 import { PortalView } from './ClientPortal'; 
 import { useCurrency } from '../context/CurrencyContext';
 
@@ -12,6 +12,7 @@ const BigFishPage: React.FC = () => {
     const [leads, setLeads] = useState<Lead[]>([]);
     const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
     const [viewMode, setViewMode] = useState<'active' | 'history'>('active');
+    const [displayType, setDisplayType] = useState<'grid' | 'list'>('grid'); // New State for Grid/List toggle
     const [isCatchModalOpen, setIsCatchModalOpen] = useState(false);
     const [isManualAddOpen, setIsManualAddOpen] = useState(false);
     const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
@@ -27,38 +28,61 @@ const BigFishPage: React.FC = () => {
     const [editTxDesc, setEditTxDesc] = useState('');
     const [editTxAmount, setEditTxAmount] = useState(0);
     const [selectedFish, setSelectedFish] = useState<BigFish | null>(null);
-    const [activeTab, setActiveTab] = useState<'overview' | 'wallet' | 'ad_entry' | 'growth' | 'ledger' | 'settings' | 'targets' | 'profile' | 'retainer' | 'crm'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'wallet' | 'ad_entry' | 'growth' | 'targets' | 'profile' | 'crm' | 'topups' | 'camp_tools'>('overview');
     const [manualName, setManualName] = useState('');
     const [manualPhone, setManualPhone] = useState('');
     const [amount, setAmount] = useState<number>(0);
     const [desc, setDesc] = useState('');
     const [showThankYou, setShowThankYou] = useState(false);
-    const [adSpend, setAdSpend] = useState<number>(0);
-    const [adImpr, setAdImpr] = useState<number>(0);
-    const [adReach, setAdReach] = useState<number>(0);
-    const [adLeads, setAdLeads] = useState<number>(0);
-    const [adDate, setAdDate] = useState(new Date().toISOString().slice(0, 10));
-    const [resultType, setResultType] = useState<'SALES' | 'MESSAGES'>('MESSAGES');
+    
+    // Detailed Campaign Entry State
+    const [campStartDateInput, setCampStartDateInput] = useState(new Date().toISOString().slice(0, 10));
+    const [campEndDateInput, setCampEndDateInput] = useState(new Date().toISOString().slice(0, 10));
+    const [campSpend, setCampSpend] = useState<number>(0);
+    const [campImpr, setCampImpr] = useState<number>(0);
+    const [campReach, setCampReach] = useState<number>(0);
+    const [campClicks, setCampClicks] = useState<number>(0);
+    const [campResults, setCampResults] = useState<number>(0);
+    const [campResultType, setCampResultType] = useState<'SALES' | 'MESSAGES'>('MESSAGES');
+    // E-com Metrics
+    const [campProdPrice, setCampProdPrice] = useState<number>(0);
+    const [campProdCost, setCampProdCost] = useState<number>(0);
+
+    // Campaign Tools State (Generator)
+    const [genCampPageName, setGenCampPageName] = useState('');
+    const [genCampBudget, setGenCampBudget] = useState<number>(0);
+    const [genCampStartDate, setGenCampStartDate] = useState(new Date().toISOString().slice(0, 10));
+    const [genCampEndDate, setGenCampEndDate] = useState('');
+    const [genCampTitleCopied, setGenCampTitleCopied] = useState(false);
+    const [genCampMsgCopied, setGenCampMsgCopied] = useState(false);
+    const [isSendingSMS, setIsSendingSMS] = useState(false);
+
     const [taskTitle, setTaskTitle] = useState('');
     const [taskDate, setTaskDate] = useState('');
     const [newTarget, setNewTarget] = useState(0);
     const [newCurrent, setNewCurrent] = useState(0);
     const [workLogText, setWorkLogText] = useState('');
+    
+    // Profile & Settings State
     const [profilePhone, setProfilePhone] = useState('');
     const [profileWeb, setProfileWeb] = useState('');
     const [profileFb, setProfileFb] = useState('');
     const [profileNotes, setProfileNotes] = useState('');
-    const [campStart, setCampStart] = useState('');
-    const [campEnd, setCampEnd] = useState('');
-    const [methodType, setMethodType] = useState<'BANK' | 'MOBILE'>('MOBILE');
-    const [providerName, setProviderName] = useState('');
-    const [accountNumber, setAccountNumber] = useState('');
-    const [accountName, setAccountName] = useState('');
-    const [branchName, setBranchName] = useState('');
-    const [routingNumber, setRoutingNumber] = useState('');
-    const [mobileType, setMobileType] = useState<'Personal' | 'Merchant' | 'Agent'>('Personal');
-    const [instruction, setInstruction] = useState<'Send Money' | 'Payment' | 'Cash Out'>('Send Money');
-    const [generatedLink, setGeneratedLink] = useState('');
+    
+    // Portal Config State
+    const [portalConfig, setPortalConfig] = useState<PortalConfig>({
+        show_balance: true,
+        show_history: true,
+        is_suspended: false,
+        feature_flags: {
+            show_message_report: true,
+            show_sales_report: true,
+            show_profit_loss_report: false,
+            allow_topup_request: true,
+            show_cpr_metrics: true,
+            show_profit_analysis: true
+        }
+    });
 
     // Retainer State
     const [isRetainer, setIsRetainer] = useState(false);
@@ -72,11 +96,47 @@ const BigFishPage: React.FC = () => {
     const [nextFollowUp, setNextFollowUp] = useState('');
     const [autoCreateTask, setAutoCreateTask] = useState(true);
 
+    // Top-Up Viewing
+    const [viewScreenshot, setViewScreenshot] = useState<string | null>(null);
+
     // Pagination State
     const [currentPage, setCurrentPage] = useState(1);
     const ITEMS_PER_PAGE = 50;
 
     useEffect(() => { loadData(); }, []);
+
+    // AUTO-POPULATE FIELDS WHEN CLIENT SELECTED
+    useEffect(() => {
+        if (selectedFish) {
+            // 1. Campaign Tools: Auto-fill Page Name
+            // It tries to find a Facebook Page Link or Name, otherwise defaults to Client Name
+            let pageName = selectedFish.facebook_page || selectedFish.name || '';
+            
+            // Clean URL if it is a link
+            if(pageName.includes('facebook.com/')) {
+                // Try to get handle
+                const parts = pageName.split('facebook.com/');
+                if (parts.length > 1) {
+                    pageName = parts[1].replace(/\/$/, ''); // Remove trailing slash
+                }
+            }
+            setGenCampPageName(pageName);
+
+            // 2. Sync other local states
+            setNewTarget(selectedFish.target_sales || 0);
+            setNewCurrent(selectedFish.current_sales || 0);
+            setProfilePhone(selectedFish.phone || '');
+            setProfileWeb(selectedFish.website_url || '');
+            setProfileFb(selectedFish.facebook_page || '');
+            setProfileNotes(selectedFish.notes || '');
+            
+            if(selectedFish.portal_config) setPortalConfig(selectedFish.portal_config);
+            
+            setIsRetainer(selectedFish.is_retainer || false);
+            setRetainerAmount(selectedFish.retainer_amount || 0);
+            setRetainerDate(selectedFish.retainer_renewal_date || '');
+        }
+    }, [selectedFish]);
 
     const loadData = async () => {
         const fish = await mockService.getBigFish();
@@ -87,24 +147,11 @@ const BigFishPage: React.FC = () => {
         setPaymentMethods(pm);
         const expiring = await mockService.checkExpiringCampaigns();
         if (expiring.length > 0) { setExpiringClients(expiring); setShowDeadlineAlert(true); }
+        
+        // Refresh selected fish data if it exists (for live updates after save)
         if (selectedFish) {
             const updated = fish.find(f => f.id === selectedFish.id);
-            if(updated) {
-                setSelectedFish(updated);
-                setNewTarget(updated.target_sales);
-                setNewCurrent(updated.current_sales);
-                setCampStart(updated.campaign_start_date || '');
-                setCampEnd(updated.campaign_end_date || '');
-                setProfilePhone(updated.phone || '');
-                setProfileWeb(updated.website_url || '');
-                setProfileFb(updated.facebook_page || '');
-                setProfileNotes(updated.notes || '');
-                
-                // Initialize Retainer State
-                setIsRetainer(updated.is_retainer || false);
-                setRetainerAmount(updated.retainer_amount || 0);
-                setRetainerDate(updated.retainer_renewal_date || '');
-            }
+            if(updated) setSelectedFish(updated);
         }
     };
 
@@ -118,7 +165,6 @@ const BigFishPage: React.FC = () => {
         if (!selectedFish) return; 
         if(window.confirm("Are you sure you want to delete this transaction? This will reverse the balance effect.")) { 
             await mockService.deleteTransaction(selectedFish.id, txId); 
-            // Small delay to allow API processing in case of latency
             setTimeout(loadData, 300); 
         } 
     };
@@ -139,585 +185,1053 @@ const BigFishPage: React.FC = () => {
         setTimeout(loadData, 300); 
     };
 
-    const handleAdEntry = async () => { if (!selectedFish || adSpend <= 0) return alert("Spend amount required"); if (!adDate) return alert("Date is required"); const metadata = { impressions: adImpr, reach: adReach, leads: adLeads, resultType: resultType }; await mockService.addTransaction(selectedFish.id, 'AD_SPEND', adSpend, `Daily Ad Spend`, metadata, adDate); setAdSpend(0); setAdImpr(0); setAdReach(0); setAdLeads(0); alert(`Ad Spend Recorded & ${resultType} Updated!`); loadData(); };
-    const addTask = async () => { if (!selectedFish || !taskTitle) return; await mockService.addGrowthTask(selectedFish.id, taskTitle, taskDate); setTaskTitle(''); setTaskDate(''); loadData(); };
-    const toggleTask = async (taskId: string) => { if (!selectedFish) return; await mockService.toggleGrowthTask(selectedFish.id, taskId); loadData(); };
-    const updatePortal = async (key: string, val: any) => { if (!selectedFish) return; await mockService.updatePortalConfig(selectedFish.id, { [key]: val }); loadData(); };
-    const toggleSharedCalc = async (key: string) => { if(!selectedFish) return; const current = selectedFish.portal_config?.shared_calculators || { cpr: false, currency: false, roi: false }; const newCalcs = { ...current, [key]: !current[key as keyof typeof current] }; await mockService.updatePortalConfig(selectedFish.id, { shared_calculators: newCalcs }); loadData(); }
-    const saveCampaignDates = async () => { if (!selectedFish) return; await mockService.updateBigFish(selectedFish.id, { campaign_start_date: campStart, campaign_end_date: campEnd }); alert("Campaign dates updated!"); loadData(); };
-    const saveProfile = async () => { if(!selectedFish) return; await mockService.updateBigFish(selectedFish.id, { phone: profilePhone, website_url: profileWeb, facebook_page: profileFb, notes: profileNotes }); alert("Client profile saved!"); loadData(); }
-    const saveTargets = async () => { if(!selectedFish) return; await mockService.updateTargets(selectedFish.id, newTarget, newCurrent); alert("Sales targets updated!"); loadData(); };
-    const addManualLog = async () => { if(!selectedFish || !workLogText) return; await mockService.addWorkLog(selectedFish.id, workLogText); setWorkLogText(''); loadData(); }
-    const handleAddPaymentMethod = async () => { if(!providerName || !accountNumber) return alert("Provider Name and Number are required"); await mockService.savePaymentMethod({ type: methodType, provider_name: providerName, account_number: accountNumber, account_name: methodType === 'BANK' ? accountName : undefined, branch_name: methodType === 'BANK' ? branchName : undefined, routing_number: methodType === 'BANK' ? routingNumber : undefined, mobile_type: methodType === 'MOBILE' ? mobileType : undefined, instruction: methodType === 'MOBILE' ? instruction : undefined, }); setProviderName(''); setAccountNumber(''); setAccountName(''); setBranchName(''); setRoutingNumber(''); loadData(); }
-    const handleDeletePaymentMethod = async (id: string) => { if(confirm("Delete this payment method? It will be removed from all client portals.")) { await mockService.deletePaymentMethod(id); loadData(); } }
-    const downloadClientList = (list: BigFish[], prefix: string) => { if (list.length === 0) return alert("No data to export."); const data = list.map(f => ({ Name: f.name, Phone: f.phone, Package: f.package_name || 'N/A', Balance: f.balance ? f.balance.toFixed(2) : '0.00', TotalSpend: f.spent_amount ? f.spent_amount.toFixed(2) : '0.00', Status: f.status })); const csvContent = [ Object.keys(data[0]).join(','), ...data.map(row => Object.values(row).map(val => `"${val}"`).join(',')) ].join('\n'); const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.setAttribute('download', `${prefix}_clients_${new Date().toISOString().slice(0,10)}.csv`); document.body.appendChild(link); link.click(); document.body.removeChild(link); };
-    const getPortalLink = () => { if(!selectedFish) return ''; const currentUrl = window.location.href.split('#')[0]; const cleanBase = currentUrl.endsWith('/') ? currentUrl.slice(0, -1) : currentUrl; return `${cleanBase}/#/portal/${selectedFish.id}`; };
-    const openShareModal = () => { const link = getPortalLink(); if(!link) return; setGeneratedLink(link); setIsShareModalOpen(true); };
-    const openPortalPreview = () => { setShowPreview(true); };
-    const handleOpenLinkInPreview = () => { setIsShareModalOpen(false); setShowPreview(true); };
-    const getDaysRemaining = (end?: string) => { if (!end) return null; const now = new Date(); const endDate = new Date(end); const diffTime = endDate.getTime() - now.getTime(); const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); return diffDays; };
-    
-    // Retainer Save Handler
-    const handleSaveRetainer = async () => {
-        if(!selectedFish) return;
-        await mockService.updateBigFish(selectedFish.id, {
-            is_retainer: isRetainer,
-            retainer_amount: retainerAmount,
-            retainer_renewal_date: retainerDate
-        });
-        alert("Subscription settings updated!");
-        loadData();
-    };
-
-    // CRM Handlers
-    const handleAddInteraction = async () => {
-        if(!selectedFish || !interactionNotes) return alert("Please add notes for the interaction.");
+    // UPDATED: Campaign Entry Handler (Supports Range & Detailed Metrics)
+    const handleCampaignEntry = async () => {
+        if (!selectedFish || campSpend <= 0) return alert("Spend amount required");
+        if (!campStartDateInput) return alert("Start date is required");
         
-        // 1. Add Log
-        await mockService.addClientInteraction(selectedFish.id, {
-            type: interactionType,
-            date: interactionDate,
-            notes: interactionNotes,
-            next_follow_up: nextFollowUp
-        });
+        const record: Partial<CampaignRecord> = {
+            start_date: campStartDateInput,
+            end_date: campEndDateInput || campStartDateInput,
+            amount_spent: campSpend,
+            impressions: campImpr,
+            reach: campReach,
+            clicks: campClicks,
+            result_type: campResultType,
+            results_count: campResults,
+            product_price: campResultType === 'SALES' ? campProdPrice : 0,
+            product_cost: campResultType === 'SALES' ? campProdCost : 0,
+        };
 
-        // 2. Auto Create Task if enabled and date is present
-        if (autoCreateTask && nextFollowUp) {
-            await mockService.addGrowthTask(selectedFish.id, `Follow up: ${interactionType.toLowerCase()} regarding "${interactionNotes.substring(0, 20)}..."`, nextFollowUp);
-        }
-
-        // Reset
-        setInteractionNotes('');
-        setNextFollowUp('');
-        setInteractionType('CALL');
-        alert("Interaction logged successfully.");
-        loadData();
-    };
-
-    const handleDeleteInteraction = async (interactionId: string) => {
-        if(!selectedFish) return;
-        if(confirm("Delete this history log?")) {
-            await mockService.deleteClientInteraction(selectedFish.id, interactionId);
+        const updatedFish = await mockService.addCampaignRecord(selectedFish.id, record as any);
+        
+        // Reset Fields
+        setCampSpend(0); setCampImpr(0); setCampReach(0); setCampClicks(0); setCampResults(0);
+        setCampProdPrice(0); setCampProdCost(0);
+        
+        alert("Campaign data recorded & Balance Updated!");
+        
+        // IMMEDIATE UPDATE: Force state update with returned object
+        if (updatedFish) {
+            setSelectedFish(updatedFish);
+            // Also update the list view so going back doesn't show stale data
+            setAllFish(prev => prev.map(f => f.id === updatedFish.id ? updatedFish : f));
+        } else {
+            // Fallback
             loadData();
         }
     };
 
-    // Pagination & Search Logic
-    const activePool = allFish.filter(f => 
-        f.status === 'Active Pool' && 
-        (
-            f.name.toLowerCase().includes(clientSearch.toLowerCase()) ||
-            f.phone.includes(clientSearch)
-        )
-    );
-    const hallOfFame = allFish.filter(f => f.status === 'Hall of Fame');
-    
-    const totalPages = Math.ceil(activePool.length / ITEMS_PER_PAGE);
-    const displayedFish = activePool.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
-
-    const filteredLeadsForCatch = leads.filter(l => { const isEligible = l.status === LeadStatus.CLOSED_WON || l.status === LeadStatus.HOT; const matchesSearch = l.full_name.toLowerCase().includes(catchSearch.toLowerCase()) || l.primary_phone.includes(catchSearch); return isEligible && matchesSearch; });
-
-    const getInteractionIcon = (type: string) => {
-        switch(type) {
-            case 'CALL': return <Phone className="h-4 w-4"/>;
-            case 'MEETING': return <User className="h-4 w-4"/>;
-            case 'EMAIL': return <Mail className="h-4 w-4"/>;
-            case 'WHATSAPP': return <MessageCircle className="h-4 w-4"/>;
-            default: return <MessageSquare className="h-4 w-4"/>;
+    const deleteCampaignRecord = async (recId: string) => {
+        if(!selectedFish) return;
+        if(confirm("Delete this campaign entry? This will refund the amount to wallet.")) {
+            await mockService.deleteCampaignRecord(selectedFish.id, recId);
+            loadData();
         }
     };
 
-    if (showPreview && selectedFish) { return ( <div className="fixed inset-0 z-[100] bg-gray-50 overflow-y-auto font-inter"> <div className="sticky top-0 z-50 bg-indigo-900 text-white px-6 py-3 flex justify-between items-center shadow-md"> <div className="flex items-center"> <Eye className="mr-3 h-5 w-5 text-indigo-300"/> <span className="font-bold text-lg">Client View Preview</span> <span className="ml-4 text-xs bg-indigo-800 px-2 py-1 rounded text-indigo-200 hidden sm:inline">This is exactly what {selectedFish.name} sees.</span> </div> <button onClick={() => setShowPreview(false)} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-md text-sm font-bold flex items-center transition-colors shadow-sm"> <X className="h-4 w-4 mr-2"/> Close Preview </button> </div> <PortalView client={selectedFish} paymentMethods={paymentMethods} /> </div> ); }
+    // Top-Up Request Management
+    const handleApproveTopUp = async (req: TopUpRequest) => {
+        if(!selectedFish) return;
+        if(confirm(`Approve top-up of ${formatCurrency(req.amount)}?`)) {
+            await mockService.approveTopUpRequest(selectedFish.id, req.id);
+            loadData();
+        }
+    };
 
-    // RENDER: DETAIL VIEW
-    if (selectedFish) {
-        return (
-            <div className="flex flex-col h-[calc(100vh-6rem)] font-inter">
-                {/* Header Logic */}
-                <div className="flex items-center justify-between mb-4 border-b border-gray-200 pb-4">
-                    <div className="flex items-center gap-4">
-                        <button onClick={() => setSelectedFish(null)} className="p-2 hover:bg-gray-100 rounded-full text-gray-500 transition-colors">
-                            <ArrowLeft className="h-5 w-5"/>
-                        </button>
+    const handleRejectTopUp = async (reqId: string) => {
+        if(!selectedFish) return;
+        if(confirm("Reject this top-up request?")) {
+            await mockService.rejectTopUpRequest(selectedFish.id, reqId);
+            loadData();
+        }
+    };
+
+    const handleDeleteTopUp = async (reqId: string) => {
+        if(!selectedFish) return;
+        if(confirm("Delete this request history?")) {
+            await mockService.deleteTopUpRequest(selectedFish.id, reqId);
+            loadData();
+        }
+    };
+
+    const addTask = async () => { if (!selectedFish || !taskTitle) return; await mockService.addGrowthTask(selectedFish.id, taskTitle, taskDate); setTaskTitle(''); setTaskDate(''); loadData(); };
+    const toggleTask = async (taskId: string) => { 
+        if (!selectedFish) return;
+        await mockService.toggleGrowthTask(selectedFish.id, taskId);
+        loadData();
+    };
+
+    // Profile & Settings
+    const handleUpdateProfile = async () => {
+        if(!selectedFish) return;
+        await mockService.updateBigFish(selectedFish.id, {
+            phone: profilePhone,
+            website_url: profileWeb,
+            facebook_page: profileFb,
+            notes: profileNotes,
+            portal_config: portalConfig // Save config
+        });
+        alert("Profile & Settings updated!");
+        loadData();
+    };
+
+    const handleUpdateTargets = async () => {
+        if(!selectedFish) return;
+        await mockService.updateTargets(selectedFish.id, newTarget, newCurrent);
+        alert("Targets updated!");
+        loadData();
+    };
+
+    // Toggle Helper
+    const toggleFeature = (key: string) => {
+        setPortalConfig(prev => ({
+            ...prev,
+            feature_flags: {
+                ...prev.feature_flags,
+                // @ts-ignore
+                [key]: !prev.feature_flags?.[key]
+            }
+        }));
+    };
+
+    // --- CAMPAIGN GENERATOR HELPERS ---
+    const generateCampaignTitle = () => {
+        const date = genCampEndDate ? new Date(genCampEndDate).toLocaleDateString('en-GB') : 'No Date';
+        return `${genCampPageName || 'Page'} - $${genCampBudget} - ${date}`;
+    };
+
+    const generateClientMessage = () => {
+        const sDate = genCampStartDate ? new Date(genCampStartDate).toLocaleDateString('en-GB') : '...';
+        const eDate = genCampEndDate ? new Date(genCampEndDate).toLocaleDateString('en-GB') : '...';
+        const totalBill = genCampBudget * 145;
+
+        return `সম্মানিত ক্লায়েন্ট,
+আপনার "${genCampPageName}" পেজের ক্যাম্পেইনটি সফলভাবে চলছে/সম্পন্ন হয়েছে ✅
+
+📅 সময়কাল: ${sDate} থেকে ${eDate}
+💵 অ্যাড বাজেট: $${genCampBudget}
+💰 মোট বিল: ৳ ${totalBill.toLocaleString()} (রেট: ১৪৫ টাকা)
+
+দয়া করে আমাদের পেমেন্ট ক্লিয়ার করে দিবেন।
+(অবশ্যই বিকাশে খরচ সহ দিবেন। ব্যাংকে খরচ দিতে হবে না)
+
+ধন্যবাদ!`;
+    };
+
+    const handleCopyCampTitle = () => {
+        navigator.clipboard.writeText(generateCampaignTitle());
+        setGenCampTitleCopied(true);
+        setTimeout(() => setGenCampTitleCopied(false), 2000);
+    };
+
+    const handleCopyClientMsg = () => {
+        navigator.clipboard.writeText(generateClientMessage());
+        setGenCampMsgCopied(true);
+        setTimeout(() => setGenCampMsgCopied(false), 2000);
+    };
+
+    const handleSendWhatsApp = () => {
+        if (!selectedFish) return;
+        
+        let num = selectedFish.phone.replace(/[^\d]/g, '');
+        if(num.startsWith('01')) num = '88' + num;
+        else if(num.startsWith('1')) num = '880' + num;
+
+        const msg = generateClientMessage();
+        const url = `https://web.whatsapp.com/send?phone=${num}&text=${encodeURIComponent(msg)}`;
+        window.open(url, '_blank');
+    };
+
+    const handleSendSystemSMS = async () => {
+        if (!selectedFish) return;
+        if(!confirm(`Send SMS to ${selectedFish.name} (${selectedFish.phone})?`)) return;
+
+        setIsSendingSMS(true);
+        try {
+            const msg = generateClientMessage();
+            await mockService.sendBulkSMS([selectedFish.lead_id], msg);
+            alert("✅ SMS Sent Successfully via System!");
+        } catch (e) {
+            alert("Failed to send SMS.");
+        } finally {
+            setIsSendingSMS(false);
+        }
+    };
+
+    // Filter Logic
+    const filteredFish = allFish
+        .filter(f => (viewMode === 'active' ? f.status === 'Active Pool' : f.status !== 'Active Pool'))
+        .filter(f => f.name.toLowerCase().includes(clientSearch.toLowerCase()) || f.phone.includes(clientSearch));
+
+    return (
+        <div className="space-y-6">
+            {!selectedFish ? (
+                // --- LIST/GRID VIEW ---
+                <>
+                    <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                         <div>
-                            <h1 className="text-xl font-bold text-gray-900">{selectedFish.name}</h1>
-                            <p className="text-xs text-gray-500">{selectedFish.package_name}</p>
+                            <h1 className="text-2xl font-bold text-gray-900 flex items-center">
+                                <span className="mr-2 text-3xl">🐟</span> Big Fish Clients
+                            </h1>
+                            <p className="text-sm text-gray-500">Manage your VIP clients, wallets, and campaigns.</p>
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => setIsManualAddOpen(true)} className="bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium hover:bg-gray-50 transition-colors">
+                                Manual Add
+                            </button>
+                            <button onClick={() => setIsCatchModalOpen(true)} className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold hover:bg-indigo-700 shadow-md transition-colors flex items-center">
+                                <Plus className="h-5 w-5 mr-2" /> Catch New Fish
+                            </button>
                         </div>
                     </div>
-                    {/* ... Rest of Detail Header ... */}
-                    <div className="flex items-center gap-2">
-                        <div className="flex items-center bg-gray-100 rounded-lg p-1 mr-2 border border-gray-200">
-                            <button onClick={(e) => selectedFish.status !== 'Active Pool' && toggleStatus(selectedFish.id, e)} className={`flex items-center px-3 py-1.5 rounded-md text-xs font-bold transition-all ${selectedFish.status === 'Active Pool' ? 'bg-white shadow text-green-600' : 'text-gray-500 hover:bg-gray-200 hover:text-gray-700'}`}> <div className={`w-2 h-2 rounded-full mr-2 ${selectedFish.status === 'Active Pool' ? 'bg-green-500' : 'bg-gray-300'}`}></div> Active </button>
-                            <button onClick={(e) => { if(selectedFish.status === 'Active Pool') { if(confirm('Archive this client to Completed Work?')) { toggleStatus(selectedFish.id, e); setSelectedFish(null); } } }} className={`flex items-center px-3 py-1.5 rounded-md text-xs font-bold transition-all ${selectedFish.status !== 'Active Pool' ? 'bg-white shadow text-gray-800' : 'text-gray-500 hover:bg-gray-200 hover:text-red-600'}`}> <CheckSquare className="h-3 w-3 mr-1.5"/> Completed </button>
+
+                    {showDeadlineAlert && (
+                        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-md flex items-start gap-3">
+                            <Clock className="h-5 w-5 text-amber-600 mt-0.5" />
+                            <div>
+                                <h3 className="text-sm font-bold text-amber-800">Campaigns Ending Soon</h3>
+                                <p className="text-xs text-amber-700 mt-1">
+                                    {expiringClients.map(c => c.name).join(', ')} have campaigns ending tomorrow.
+                                </p>
+                            </div>
+                            <button onClick={() => setShowDeadlineAlert(false)} className="ml-auto text-amber-500"><X className="h-4 w-4"/></button>
                         </div>
-                        <button onClick={openPortalPreview} className="flex items-center bg-gray-50 border border-gray-200 text-gray-700 px-3 py-1.5 rounded-md hover:bg-gray-100 text-xs font-medium transition-colors"> <Eye className="h-3 w-3 mr-1"/> View Portal </button>
-                        <button onClick={openShareModal} className="flex items-center bg-indigo-600 text-white px-3 py-1.5 rounded-md hover:bg-indigo-700 text-xs font-bold shadow-sm transition-colors"> <Share2 className="h-3 w-3 mr-1"/> Share Link </button>
+                    )}
+
+                    <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+                        <div className="flex gap-2 p-1 bg-gray-200 rounded-lg">
+                            <button 
+                                onClick={() => setViewMode('active')} 
+                                className={`px-4 py-2 text-sm font-bold rounded-md transition-colors ${viewMode === 'active' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                                Active Pool ({allFish.filter(f => f.status === 'Active Pool').length})
+                            </button>
+                            <button 
+                                onClick={() => setViewMode('history')} 
+                                className={`px-4 py-2 text-sm font-bold rounded-md transition-colors ${viewMode === 'history' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+                            >
+                                Hall of Fame ({allFish.filter(f => f.status !== 'Active Pool').length})
+                            </button>
+                        </div>
+
+                        <div className="flex items-center gap-3 w-full md:w-auto">
+                            <div className="relative flex-1 md:w-64">
+                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"/>
+                                <input 
+                                    className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-indigo-500 focus:border-indigo-500"
+                                    placeholder="Search clients..."
+                                    value={clientSearch}
+                                    onChange={e => setClientSearch(e.target.value)}
+                                />
+                            </div>
+                            <div className="flex bg-white border border-gray-300 rounded-lg p-1">
+                                <button onClick={() => setDisplayType('grid')} className={`p-2 rounded-md ${displayType === 'grid' ? 'bg-indigo-100 text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}>
+                                    <Grid className="h-4 w-4"/>
+                                </button>
+                                <button onClick={() => setDisplayType('list')} className={`p-2 rounded-md ${displayType === 'list' ? 'bg-indigo-100 text-indigo-600' : 'text-gray-400 hover:text-gray-600'}`}>
+                                    <List className="h-4 w-4"/>
+                                </button>
+                            </div>
+                        </div>
                     </div>
-                </div>
 
-                <div className="flex-1 flex overflow-hidden">
-                    {/* Sidebar Tabs */}
-                    <div className="w-64 bg-gray-50 border-r border-gray-200 flex flex-col p-2 space-y-1 overflow-y-auto">
-                        <button onClick={() => setActiveTab('overview')} className={`flex items-center p-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'overview' ? 'bg-white shadow-sm text-indigo-600 border border-indigo-100' : 'text-gray-600 hover:bg-gray-200'}`}> <PieChart className="h-4 w-4 mr-3"/> Overview (Portal) </button>
-                        <button onClick={() => setActiveTab('profile')} className={`flex items-center p-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'profile' ? 'bg-white shadow-sm text-indigo-600 border border-indigo-100' : 'text-gray-600 hover:bg-gray-200'}`}> <User className="h-4 w-4 mr-3"/> Client Profile </button>
-                        <button onClick={() => setActiveTab('crm')} className={`flex items-center p-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'crm' ? 'bg-white shadow-sm text-indigo-600 border border-indigo-100' : 'text-gray-600 hover:bg-gray-200'}`}> <MessageSquare className="h-4 w-4 mr-3"/> CRM & History </button>
-                        <button onClick={() => setActiveTab('retainer')} className={`flex items-center p-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'retainer' ? 'bg-white shadow-sm text-indigo-600 border border-indigo-100' : 'text-gray-600 hover:bg-gray-200'}`}> <Repeat className="h-4 w-4 mr-3"/> Subscription </button>
-                        <button onClick={() => setActiveTab('wallet')} className={`flex items-center p-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'wallet' ? 'bg-white shadow-sm text-indigo-600 border border-indigo-100' : 'text-gray-600 hover:bg-gray-200'}`}> <Wallet className="h-4 w-4 mr-3"/> Wallet & Funds </button>
-                        <button onClick={() => setActiveTab('ad_entry')} className={`flex items-center p-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'ad_entry' ? 'bg-white shadow-sm text-indigo-600 border border-indigo-100' : 'text-gray-600 hover:bg-gray-200'}`}> <Activity className="h-4 w-4 mr-3"/> Daily Ad Entry </button>
-                        <button onClick={() => setActiveTab('growth')} className={`flex items-center p-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'growth' ? 'bg-white shadow-sm text-indigo-600 border border-indigo-100' : 'text-gray-600 hover:bg-gray-200'}`}> <CheckCircle className="h-4 w-4 mr-3"/> Growth Plan </button>
-                        <button onClick={() => setActiveTab('targets')} className={`flex items-center p-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'targets' ? 'bg-white shadow-sm text-indigo-600 border border-indigo-100' : 'text-gray-600 hover:bg-gray-200'}`}> <Target className="h-4 w-4 mr-3"/> Targets & Logs </button>
-                        <button onClick={() => setActiveTab('ledger')} className={`flex items-center p-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'ledger' ? 'bg-white shadow-sm text-indigo-600 border border-indigo-100' : 'text-gray-600 hover:bg-gray-200'}`}> <List className="h-4 w-4 mr-3"/> Ledger (History) </button>
-                        <button onClick={() => setActiveTab('settings')} className={`flex items-center p-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'settings' ? 'bg-white shadow-sm text-indigo-600 border border-indigo-100' : 'text-gray-600 hover:bg-gray-200'}`}> <Settings className="h-4 w-4 mr-3"/> Portal Settings </button>
-                    </div>
-
-                    {/* CONTENT AREA */}
-                    <div className="flex-1 bg-white p-8 overflow-y-auto">
-                        {activeTab === 'overview' && ( <div className="space-y-4"> <h2 className="text-xl font-bold text-gray-800">Admin Overview (Live Data)</h2> <p className="text-gray-500 text-sm">This is exactly what the client sees in their portal.</p> <div className="border border-gray-200 rounded-xl overflow-hidden shadow-sm"> <PortalView client={selectedFish} paymentMethods={paymentMethods} /> </div> </div> )}
-                        {activeTab === 'profile' && ( <div className="max-w-3xl space-y-6"> <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm"> <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center"> <User className="h-5 w-5 mr-2 text-indigo-600"/> Client Contact Info </h3> <div className="grid grid-cols-1 md:grid-cols-2 gap-6"> <div className="col-span-2 md:col-span-1"> <label className="block text-sm font-medium text-gray-700 mb-1">Phone / WhatsApp</label> <input type="text" className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900" value={profilePhone} onChange={e => setProfilePhone(e.target.value)} /> </div> <div className="col-span-2 md:col-span-1"> <label className="block text-sm font-medium text-gray-700 mb-1">Facebook Page Link</label> <input type="text" className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900" value={profileFb} onChange={e => setProfileFb(e.target.value)} placeholder="https://facebook.com/..." /> </div> <div className="col-span-2"> <label className="block text-sm font-medium text-gray-700 mb-1">Website URL</label> <input type="text" className="w-full border border-gray-300 rounded-lg p-2.5 focus:ring-indigo-500 focus:border-indigo-500 text-gray-900" value={profileWeb} onChange={e => setProfileWeb(e.target.value)} placeholder="https://..." /> </div> </div> </div> <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6 shadow-sm"> <h3 className="text-lg font-bold text-yellow-800 mb-4 flex items-center"> 📝 Private Admin Notes </h3> <textarea className="w-full border border-yellow-300 rounded-lg p-3 h-32 focus:ring-yellow-500 focus:border-yellow-500 bg-white text-gray-900" placeholder="Write internal notes here (not visible to client)..." value={profileNotes} onChange={e => setProfileNotes(e.target.value)} /> </div> <div className="flex justify-end"> <button onClick={saveProfile} className="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2.5 rounded-lg font-bold shadow-md transition-all flex items-center"> Save Profile </button> </div> </div> )}
-                        
-                        {activeTab === 'ledger' && ( 
-                            <div className="max-w-5xl"> 
-                                <h3 className="text-lg font-bold text-gray-900 mb-4">Transaction Ledger (History)</h3>
-                                <div className="overflow-x-auto border rounded-lg border-gray-200 shadow-sm">
-                                    <table className="w-full text-sm text-left text-gray-600"> 
-                                        <thead className="bg-gray-100 text-gray-700 uppercase text-xs"> 
-                                            <tr> 
-                                                <th className="px-6 py-4">Date</th> 
-                                                <th className="px-6 py-4">Type</th> 
-                                                <th className="px-6 py-4">Description</th> 
-                                                <th className="px-6 py-4 text-right">Amount</th> 
-                                                <th className="px-6 py-4 text-right">Actions</th> 
-                                            </tr> 
-                                        </thead> 
-                                        <tbody className="divide-y divide-gray-100 bg-white"> 
-                                            {selectedFish.transactions?.length === 0 ? (
-                                                <tr><td colSpan={5} className="p-8 text-center text-gray-400">No transactions recorded.</td></tr>
-                                            ) : (
-                                                selectedFish.transactions?.map(tx => ( 
-                                                    <tr key={tx.id} className="hover:bg-gray-50 transition-colors"> 
-                                                        <td className="px-6 py-4 font-medium">{new Date(tx.date).toLocaleDateString()}</td> 
-                                                        <td className="px-6 py-4">
-                                                            <span className={`text-[10px] font-bold px-2 py-1 rounded uppercase ${tx.type === 'DEPOSIT' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                                {tx.type.replace('_', ' ')}
-                                                            </span>
-                                                        </td> 
-                                                        <td className="px-6 py-4">{tx.description}</td> 
-                                                        <td className={`px-6 py-4 text-right font-mono font-bold ${tx.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-600'}`}> 
-                                                            {tx.type === 'DEPOSIT' ? '+' : '-'}{formatCurrency(tx.amount)} 
-                                                        </td> 
-                                                        <td className="px-6 py-4 text-right"> 
-                                                            <div className="flex justify-end gap-3"> 
-                                                                <button onClick={() => openEditTxModal(tx)} className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors" title="Edit Transaction"> <Edit2 className="h-4 w-4"/> </button> 
-                                                                <button onClick={() => deleteTransaction(tx.id)} className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete Transaction"> <Trash2 className="h-4 w-4"/> </button> 
-                                                            </div> 
-                                                        </td> 
-                                                    </tr> 
-                                                ))
-                                            )}
-                                        </tbody> 
-                                    </table> 
-                                </div>
-                            </div> 
-                        )}
-
-                        {activeTab === 'crm' && (
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-full">
-                                {/* LEFT: LOG INTERACTION */}
-                                <div className="flex flex-col">
-                                    <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm mb-6">
-                                        <h3 className="text-lg font-bold text-gray-900 mb-4 flex items-center">
-                                            <Phone className="h-5 w-5 mr-2 text-indigo-600"/> Log Communication
-                                        </h3>
-                                        <div className="space-y-4">
-                                            <div className="flex gap-4">
-                                                <div className="flex-1">
-                                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Type</label>
-                                                    <select 
-                                                        className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-indigo-500"
-                                                        value={interactionType}
-                                                        onChange={e => setInteractionType(e.target.value as any)}
-                                                    >
-                                                        <option value="CALL">Call</option>
-                                                        <option value="MEETING">Meeting (Online/Offline)</option>
-                                                        <option value="WHATSAPP">WhatsApp</option>
-                                                        <option value="EMAIL">Email</option>
-                                                        <option value="OTHER">Other</option>
-                                                    </select>
-                                                </div>
-                                                <div className="flex-1">
-                                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Date</label>
-                                                    <input 
-                                                        type="date" 
-                                                        className="w-full border border-gray-300 rounded-lg p-2 text-sm focus:ring-indigo-500"
-                                                        value={interactionDate}
-                                                        onChange={e => setInteractionDate(e.target.value)}
-                                                    />
-                                                </div>
-                                            </div>
-                                            
-                                            <div>
-                                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Summary / Notes</label>
-                                                <textarea 
-                                                    className="w-full border border-gray-300 rounded-lg p-3 text-sm h-32 focus:ring-indigo-500 focus:border-indigo-500"
-                                                    placeholder="What did you discuss? What's the outcome?"
-                                                    value={interactionNotes}
-                                                    onChange={e => setInteractionNotes(e.target.value)}
-                                                />
-                                            </div>
-
-                                            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
-                                                <div className="flex items-center justify-between mb-2">
-                                                    <label className="block text-xs font-bold text-blue-800 uppercase">Next Follow-up</label>
-                                                    <div className="flex items-center">
-                                                        <input 
-                                                            type="checkbox" 
-                                                            id="autoTask" 
-                                                            className="h-4 w-4 text-blue-600 rounded mr-2"
-                                                            checked={autoCreateTask}
-                                                            onChange={e => setAutoCreateTask(e.target.checked)}
-                                                        />
-                                                        <label htmlFor="autoTask" className="text-xs text-blue-700">Add to Growth Tasks</label>
+                    {filteredFish.length === 0 ? (
+                        <div className="text-center py-12 bg-white rounded-xl border border-dashed border-gray-300">
+                            <p className="text-gray-500">No clients found in this view.</p>
+                        </div>
+                    ) : displayType === 'list' ? (
+                        /* TABLE VIEW */
+                        <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-left">
+                                    <thead className="bg-gray-100 text-gray-600 font-bold uppercase text-xs">
+                                        <tr>
+                                            <th className="px-6 py-4">Client Name</th>
+                                            <th className="px-6 py-4 text-right">Balance ($)</th>
+                                            <th className="px-6 py-4 text-right">Total Spent</th>
+                                            <th className="px-6 py-4 text-center">Sales Goal</th>
+                                            <th className="px-6 py-4 text-center">Status</th>
+                                            <th className="px-6 py-4 text-right">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {filteredFish.map(fish => (
+                                            <tr key={fish.id} className="hover:bg-indigo-50/30 transition-colors group cursor-pointer" onClick={() => setSelectedFish(fish)}>
+                                                <td className="px-6 py-4">
+                                                    <div className="font-bold text-gray-900 text-base">{fish.name}</div>
+                                                    <div className="text-xs text-gray-500 flex items-center mt-1">
+                                                        <Smartphone className="h-3 w-3 mr-1"/> {fish.phone}
                                                     </div>
-                                                </div>
-                                                <input 
-                                                    type="date" 
-                                                    className="w-full border border-blue-200 rounded-lg p-2 text-sm focus:ring-blue-500"
-                                                    value={nextFollowUp}
-                                                    onChange={e => setNextFollowUp(e.target.value)}
-                                                />
-                                                <p className="text-xs text-blue-600 mt-2">
-                                                    {nextFollowUp && autoCreateTask 
-                                                        ? "A task will be automatically created in 'Growth Plan' for this date." 
-                                                        : "Set a date to schedule a follow-up."}
-                                                </p>
-                                            </div>
-
-                                            <button 
-                                                onClick={handleAddInteraction} 
-                                                className="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 shadow-sm transition-colors flex justify-center items-center"
-                                            >
-                                                <CheckCircle className="h-4 w-4 mr-2"/> Save Interaction
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {/* RIGHT: TIMELINE */}
-                                <div className="bg-gray-50 border border-gray-200 rounded-xl p-6 overflow-hidden flex flex-col h-full">
-                                    <h3 className="text-lg font-bold text-gray-900 mb-6">Interaction History</h3>
-                                    
-                                    <div className="flex-1 overflow-y-auto pr-2 space-y-6">
-                                        {!selectedFish.interactions || selectedFish.interactions.length === 0 ? (
-                                            <div className="text-center text-gray-400 py-10">
-                                                <MessageSquare className="h-12 w-12 mx-auto mb-2 opacity-20"/>
-                                                <p>No history yet.</p>
-                                            </div>
-                                        ) : (
-                                            selectedFish.interactions.map((item, idx) => (
-                                                <div key={item.id} className="relative pl-8 group">
-                                                    {/* Vertical Line */}
-                                                    {idx !== (selectedFish.interactions!.length - 1) && (
-                                                        <div className="absolute top-8 left-[11px] bottom-[-24px] w-0.5 bg-gray-200 group-last:hidden"></div>
+                                                    {fish.topup_requests && fish.topup_requests.some(r => r.status === 'PENDING') && (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-700 mt-1 animate-pulse">
+                                                            Top-up Request
+                                                        </span>
                                                     )}
-                                                    
-                                                    {/* Icon */}
-                                                    <div className="absolute left-0 top-1 h-6 w-6 rounded-full bg-white border-2 border-indigo-200 flex items-center justify-center text-indigo-600 z-10">
-                                                        {getInteractionIcon(item.type)}
+                                                </td>
+                                                <td className="px-6 py-4 text-right">
+                                                    <span className={`font-mono font-bold text-base px-3 py-1 rounded-full ${fish.balance < (fish.low_balance_alert_threshold || 10) ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>
+                                                        {formatCurrency(fish.balance)}
+                                                    </span>
+                                                </td>
+                                                <td className="px-6 py-4 text-right text-gray-600 font-mono">
+                                                    {formatCurrency(fish.spent_amount)}
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    <div className="flex items-center justify-center gap-1 text-gray-600 font-bold">
+                                                        <span>{fish.current_sales}</span>
+                                                        <span className="text-gray-400 font-normal">/ {fish.target_sales}</span>
                                                     </div>
-
-                                                    {/* Content Card */}
-                                                    <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm hover:shadow-md transition-shadow relative">
-                                                        <button 
-                                                            onClick={() => handleDeleteInteraction(item.id)}
-                                                            className="absolute top-2 right-2 text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
-                                                        >
-                                                            <Trash2 className="h-4 w-4"/>
-                                                        </button>
-                                                        
-                                                        <div className="flex justify-between items-start mb-2">
-                                                            <span className="text-xs font-bold px-2 py-0.5 rounded bg-gray-100 text-gray-600">{item.type}</span>
-                                                            <span className="text-xs text-gray-400">{new Date(item.date).toLocaleDateString()}</span>
-                                                        </div>
-                                                        <p className="text-sm text-gray-800 whitespace-pre-wrap">{item.notes}</p>
-                                                        
-                                                        {item.next_follow_up && (
-                                                            <div className="mt-3 pt-3 border-t border-gray-50 flex items-center text-xs text-amber-600 font-medium">
-                                                                <Clock className="h-3 w-3 mr-1"/> Follow-up: {new Date(item.next_follow_up).toLocaleDateString()}
-                                                            </div>
-                                                        )}
+                                                    <div className="w-20 bg-gray-200 h-1.5 rounded-full mx-auto mt-1 overflow-hidden">
+                                                        <div className="bg-indigo-500 h-1.5 rounded-full" style={{ width: `${Math.min((fish.current_sales / (fish.target_sales || 1)) * 100, 100)}%` }}></div>
                                                     </div>
-                                                </div>
-                                            ))
+                                                </td>
+                                                <td className="px-6 py-4 text-center">
+                                                    {fish.status === 'Active Pool' ? (
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                                            Active
+                                                        </span>
+                                                    ) : (
+                                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                                            Archived
+                                                        </span>
+                                                    )}
+                                                </td>
+                                                <td className="px-6 py-4 text-right" onClick={e => e.stopPropagation()}>
+                                                    <button 
+                                                        onClick={(e) => toggleStatus(fish.id, e)} 
+                                                        className="p-2 text-gray-400 hover:text-indigo-600 transition-colors"
+                                                        title={fish.status === 'Active Pool' ? "Archive" : "Activate"}
+                                                    >
+                                                        {fish.status === 'Active Pool' ? <Archive className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    ) : (
+                        /* GRID/CARD VIEW */
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                            {filteredFish.map(fish => (
+                                <div 
+                                    key={fish.id} 
+                                    onClick={() => setSelectedFish(fish)}
+                                    className="bg-white rounded-xl shadow-sm border border-gray-200 p-5 hover:shadow-md transition-shadow cursor-pointer relative group overflow-hidden"
+                                >
+                                    <div className="absolute top-0 left-0 w-full h-1 bg-indigo-500"></div>
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div>
+                                            <h3 className="font-bold text-lg text-gray-900 truncate pr-2">{fish.name}</h3>
+                                            <p className="text-xs text-gray-500 flex items-center mt-1">
+                                                <Smartphone className="h-3 w-3 mr-1"/> {fish.phone}
+                                            </p>
+                                        </div>
+                                        {fish.status === 'Active Pool' ? (
+                                            <span className="bg-green-100 text-green-800 text-[10px] font-bold px-2 py-1 rounded-full uppercase">Active</span>
+                                        ) : (
+                                            <span className="bg-gray-100 text-gray-600 text-[10px] font-bold px-2 py-1 rounded-full uppercase">Archived</span>
                                         )}
                                     </div>
-                                </div>
-                            </div>
-                        )}
 
-                        {activeTab === 'retainer' && (
-                            <div className="max-w-2xl bg-white border border-gray-200 rounded-xl p-6 shadow-sm">
-                                <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
-                                    <Repeat className="h-5 w-5 mr-2 text-indigo-600"/> Monthly Subscription / Retainer
-                                </h3>
-                                <div className="space-y-6">
-                                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
-                                        <div>
-                                            <h4 className="font-bold text-gray-900 text-sm">Enable Monthly Tracking</h4>
-                                            <p className="text-xs text-gray-500">System will alert you when payment is due.</p>
+                                    <div className="grid grid-cols-2 gap-4 mb-4">
+                                        <div className="bg-gray-50 p-3 rounded-lg text-center">
+                                            <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Balance</span>
+                                            <span className={`block text-lg font-mono font-bold ${fish.balance < (fish.low_balance_alert_threshold || 10) ? 'text-red-500' : 'text-indigo-600'}`}>
+                                                {formatCurrency(fish.balance)}
+                                            </span>
                                         </div>
-                                        <div className="relative inline-block w-12 mr-2 align-middle select-none transition duration-200 ease-in">
-                                            <input type="checkbox" name="toggle" id="toggle" className="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer" checked={isRetainer} onChange={e => setIsRetainer(e.target.checked)}/>
-                                            <label htmlFor="toggle" className={`toggle-label block overflow-hidden h-6 rounded-full cursor-pointer ${isRetainer ? 'bg-indigo-600' : 'bg-gray-300'}`}></label>
+                                        <div className="bg-gray-50 p-3 rounded-lg text-center">
+                                            <span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Spent</span>
+                                            <span className="block text-lg font-mono font-bold text-gray-700">
+                                                {formatCurrency(fish.spent_amount)}
+                                            </span>
                                         </div>
                                     </div>
 
-                                    {isRetainer && (
-                                        <div className="grid grid-cols-2 gap-6 animate-fade-in">
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Monthly Fee ($)</label>
-                                                <input 
-                                                    type="number" 
-                                                    className="w-full border border-gray-300 rounded p-2.5 focus:ring-indigo-500" 
-                                                    value={retainerAmount}
-                                                    onChange={e => setRetainerAmount(parseFloat(e.target.value))}
-                                                />
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-medium text-gray-700 mb-1">Next Payment Date</label>
-                                                <input 
-                                                    type="date" 
-                                                    className="w-full border border-gray-300 rounded p-2.5 focus:ring-indigo-500"
-                                                    value={retainerDate}
-                                                    onChange={e => setRetainerDate(e.target.value)}
-                                                />
-                                            </div>
+                                    <div className="mb-4">
+                                        <div className="flex justify-between text-xs font-medium text-gray-600 mb-1">
+                                            <span>Sales Goal</span>
+                                            <span>{fish.current_sales} / {fish.target_sales}</span>
+                                        </div>
+                                        <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden">
+                                            <div 
+                                                className="bg-green-500 h-full rounded-full transition-all duration-500" 
+                                                style={{ width: `${Math.min((fish.current_sales / (fish.target_sales || 1)) * 100, 100)}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+
+                                    {fish.topup_requests && fish.topup_requests.some(r => r.status === 'PENDING') && (
+                                        <div className="bg-amber-50 border border-amber-200 text-amber-700 px-3 py-2 rounded-lg text-xs font-bold flex items-center animate-pulse mb-3">
+                                            <AlertTriangle className="h-3 w-3 mr-2"/>
+                                            Top-up Requested!
                                         </div>
                                     )}
 
-                                    <div className="pt-4 border-t border-gray-100 flex justify-end">
-                                        <button onClick={handleSaveRetainer} className="bg-indigo-600 text-white px-6 py-2.5 rounded-lg font-bold shadow-md hover:bg-indigo-700 transition-colors">
-                                            Save Settings
+                                    <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 opacity-60 group-hover:opacity-100 transition-opacity">
+                                        <button 
+                                            onClick={(e) => { e.stopPropagation(); setShowPreview(true); setSelectedFish(fish); }}
+                                            className="p-2 text-gray-400 hover:text-indigo-600 bg-gray-50 hover:bg-indigo-50 rounded-full"
+                                            title="View Portal"
+                                        >
+                                            <Eye className="h-4 w-4"/>
                                         </button>
-                                    </div>
-                                </div>
-                                <style>{`
-                                    .toggle-checkbox:checked { right: 0; border-color: #68D391; }
-                                    .toggle-checkbox { right: auto; left: 0; transition: all 0.3s; }
-                                    .toggle-label { width: 3rem; }
-                                `}</style>
-                            </div>
-                        )}
-                        {activeTab === 'wallet' && ( <div className="max-w-2xl space-y-6"> <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100 flex justify-between items-center"> <div> <p className="text-indigo-600 font-bold uppercase text-xs tracking-wider">Current Balance</p> <h2 className="text-4xl font-mono font-bold text-indigo-900 mt-1">{formatCurrency(selectedFish.balance || 0)}</h2> <p className="text-xs text-indigo-400 mt-2">Lifetime Deposit: {formatCurrency(mockService.getLifetimeDeposit(selectedFish))}</p> </div> <Wallet className="h-16 w-16 text-indigo-200"/> </div> <div className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm"> <h3 className="text-lg font-bold text-gray-900 mb-4">Fund Adjustment</h3> <div className="space-y-4"> <div> <label className="block text-sm font-medium text-gray-700">Amount ($)</label> <input type="number" className="w-full border border-gray-300 rounded p-2 mt-1 text-gray-900" value={amount || ''} onChange={e => setAmount(parseFloat(e.target.value))} /> <p className="text-xs text-gray-500 mt-1">Please enter amount in USD ($).</p></div> <div> <label className="block text-sm font-medium text-gray-700">Description (Optional)</label> <input type="text" className="w-full border border-gray-300 rounded p-2 mt-1 text-gray-900" placeholder="e.g. Bank Transfer Ref..." value={desc} onChange={e => setDesc(e.target.value)} /> </div> <div className="flex gap-4 pt-2"> <button onClick={() => handleTransaction('DEPOSIT')} className="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 rounded font-bold transition-colors"> <TrendingUp className="inline-block mr-2 h-4 w-4"/> Deposit Funds </button> <button onClick={() => handleTransaction('DEDUCT')} className="flex-1 bg-red-100 hover:bg-red-200 text-red-700 py-3 rounded font-bold transition-colors"> Deduct / Adjust </button> </div> {showThankYou && ( <div className="bg-green-50 text-green-800 p-3 rounded text-center font-bold animate-bounce mt-4"> 🎉 Thank you! Deposit successful. </div> )} </div> </div> </div> )}
-                        {activeTab === 'ad_entry' && ( <div className="max-w-2xl bg-white border border-gray-200 rounded-xl p-6 shadow-sm"> <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center"> <Activity className="h-5 w-5 mr-2 text-indigo-600"/> Daily Ad Performance </h3> <div className="grid grid-cols-2 gap-6"> <div> <label className="block text-sm font-medium text-gray-700 mb-1">Date</label> <input type="date" className="w-full border border-gray-300 rounded p-2 text-gray-900" value={adDate} onChange={e => setAdDate(e.target.value)} /> </div> <div> <label className="block text-sm font-medium text-gray-700 mb-1">Amount Spent ($)</label> <input type="number" className="w-full border border-gray-300 rounded p-2 focus:ring-indigo-500 text-gray-900" value={adSpend || ''} onChange={e => setAdSpend(parseFloat(e.target.value))} /> <p className="text-xs text-gray-500 mt-1">Enter in USD ($)</p></div> <div> <label className="block text-sm font-medium text-gray-700 mb-1">Result Type</label> <select className="w-full border border-gray-300 rounded p-2 text-gray-900" value={resultType} onChange={e => setResultType(e.target.value as any)}> <option value="MESSAGES">Messages</option> <option value="SALES">Sales</option> </select> </div> <div> <label className="block text-sm font-medium text-gray-700 mb-1">Count ({resultType === 'SALES' ? 'Sales' : 'Msgs'})</label> <input type="number" className="w-full border border-gray-300 rounded p-2 text-gray-900" value={adLeads || ''} onChange={e => setAdLeads(parseFloat(e.target.value))} /> </div> <div> <label className="block text-sm font-medium text-gray-700 mb-1">Impressions</label> <input type="number" className="w-full border border-gray-300 rounded p-2 text-gray-900" value={adImpr || ''} onChange={e => setAdImpr(parseFloat(e.target.value))} /> </div> <div> <label className="block text-sm font-medium text-gray-700 mb-1">Reach</label> <input type="number" className="w-full border border-gray-300 rounded p-2 text-gray-900" value={adReach || ''} onChange={e => setAdReach(parseFloat(e.target.value))} /> </div> </div> <div className="mt-8 pt-6 border-t border-gray-100"> <button onClick={handleAdEntry} className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-lg font-bold shadow-md transition-all"> Save & Auto-Deduct Balance </button> <p className="text-xs text-gray-500 mt-2 text-center">This will deduct ${adSpend || 0} from wallet and add a work log entry.</p> </div> </div> )}
-                        {activeTab === 'growth' && ( <div className="max-w-3xl"> <div className="flex gap-4 mb-6"> <input className="flex-1 border border-gray-300 rounded p-2 text-gray-900" placeholder="New Task (e.g. Upload 4 Videos)" value={taskTitle} onChange={e => setTaskTitle(e.target.value)} /> <input type="date" className="border border-gray-300 rounded p-2 text-gray-900" value={taskDate} onChange={e => setTaskDate(e.target.value)} /> <button onClick={addTask} className="bg-indigo-600 text-white px-6 rounded font-bold">Add</button> </div> <div className="space-y-2"> {selectedFish.growth_tasks?.map(task => ( <div key={task.id} className="flex items-center justify-between p-4 bg-gray-50 rounded border hover:bg-white transition-colors"> <div className="flex items-center gap-3"> <button onClick={() => toggleTask(task.id)} className={`h-6 w-6 rounded-full border flex items-center justify-center ${task.is_completed ? 'bg-green-500 border-green-500' : 'border-gray-300'}`}> {task.is_completed && <CheckCircle className="text-white h-4 w-4"/>} </button> <span className={task.is_completed ? 'line-through text-gray-400' : 'text-gray-800'}>{task.title}</span> </div> <span className="text-xs text-gray-400">{task.due_date}</span> </div> ))} </div> </div> )}
-                        {activeTab === 'targets' && ( <div className="max-w-3xl space-y-8"> <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"> <h3 className="font-bold text-gray-900 mb-4">Sales Targets</h3> <div className="grid grid-cols-2 gap-4"> <div> <label className="block text-sm font-medium text-gray-700">Target Sales</label> <input type="number" className="w-full border border-gray-300 rounded p-2 text-gray-900" value={newTarget} onChange={e => setNewTarget(parseFloat(e.target.value))} /> </div> <div> <label className="block text-sm font-medium text-gray-700">Current Sales</label> <input type="number" className="w-full border border-gray-300 rounded p-2 text-gray-900" value={newCurrent} onChange={e => setNewCurrent(parseFloat(e.target.value))} /> </div> </div> <button onClick={saveTargets} className="mt-4 bg-indigo-600 text-white px-4 py-2 rounded font-medium">Update Progress Bar</button> </div> <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"> <h3 className="font-bold text-gray-900 mb-4">Manual Work Log Entry</h3> <div className="flex gap-4"> <input className="flex-1 border border-gray-300 rounded p-2 text-gray-900" placeholder="e.g. Fixed website bug, Posted new creative..." value={workLogText} onChange={e => setWorkLogText(e.target.value)} /> <button onClick={addManualLog} className="bg-green-600 text-white px-6 rounded font-bold">Add Log</button> </div> <p className="text-xs text-gray-500 mt-2">Daily Ad Spend automatically creates logs. Use this for other activities.</p> </div> </div> )}
-                        {activeTab === 'settings' && ( <div className="max-w-2xl space-y-6"> <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"> <h3 className="font-bold text-gray-900 mb-4 flex items-center"> <Clock className="h-5 w-5 mr-2 text-indigo-600"/> Campaign Duration </h3> <div className="grid grid-cols-2 gap-4"> <div> <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label> <input type="date" className="w-full border border-gray-300 rounded p-2 text-gray-900" value={campStart} onChange={e => setCampStart(e.target.value)} /> </div> <div> <label className="block text-sm font-medium text-gray-700 mb-1">End Date (Deadline)</label> <input type="date" className="w-full border border-gray-300 rounded p-2 text-gray-900" value={campEnd} onChange={e => setCampEnd(e.target.value)} /> </div> </div> <button onClick={saveCampaignDates} className="mt-4 bg-indigo-600 text-white px-4 py-2 rounded font-medium text-sm">Save Dates</button> <p className="text-xs text-gray-500 mt-2">Setting an End Date will trigger alerts 24 hours before expiration.</p> </div> <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"> <h3 className="font-bold text-gray-900 mb-4">Portal Visibility</h3> <div className="space-y-3"> <label className="flex items-center justify-between p-3 border rounded hover:bg-gray-50 cursor-pointer"> <span className="text-sm font-medium text-gray-900">Show Wallet Balance</span> <input type="checkbox" checked={selectedFish.portal_config?.show_balance ?? true} onChange={e => updatePortal('show_balance', e.target.checked)} className="h-5 w-5 text-indigo-600"/> </label> <label className="flex items-center justify-between p-3 border rounded hover:bg-gray-50 cursor-pointer"> <span className="text-sm font-medium text-gray-900">Show Transaction History</span> <input type="checkbox" checked={selectedFish.portal_config?.show_history ?? true} onChange={e => updatePortal('show_history', e.target.checked)} className="h-5 w-5 text-indigo-600"/> </label> <label className="flex items-center justify-between p-3 border border-red-200 bg-red-50 rounded cursor-pointer"> <span className="text-sm font-bold text-red-700">Suspend Access (Lock Portal)</span> <input type="checkbox" checked={selectedFish.portal_config?.is_suspended ?? false} onChange={e => updatePortal('is_suspended', e.target.checked)} className="h-5 w-5 text-red-600"/> </label> </div> </div> <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"> <h3 className="font-bold text-gray-900 mb-4">Shared Calculators</h3> <p className="text-xs text-gray-500 mb-4">Enable tools for the client to use in their portal.</p> <div className="space-y-3"> <label className="flex items-center justify-between p-3 border rounded hover:bg-gray-50 cursor-pointer"> <span className="text-sm font-medium text-gray-900">Cost Per Result (CPR)</span> <input type="checkbox" checked={selectedFish.portal_config?.shared_calculators?.cpr ?? false} onChange={() => toggleSharedCalc('cpr')} className="h-5 w-5 text-indigo-600"/> </label> <label className="flex items-center justify-between p-3 border rounded hover:bg-gray-50 cursor-pointer"> <span className="text-sm font-medium text-gray-900">USD to BDT Converter</span> <input type="checkbox" checked={selectedFish.portal_config?.shared_calculators?.currency ?? false} onChange={() => toggleSharedCalc('currency')} className="h-5 w-5 text-indigo-600"/> </label> <label className="flex items-center justify-between p-3 border rounded hover:bg-gray-50 cursor-pointer"> <span className="text-sm font-medium text-gray-900">Profit/ROI Calculator</span> <input type="checkbox" checked={selectedFish.portal_config?.shared_calculators?.roi ?? false} onChange={() => toggleSharedCalc('roi')} className="h-5 w-5 text-indigo-600"/> </label> </div> </div> <div className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm"> <h3 className="font-bold text-gray-900 mb-4">Announcement Banner</h3> <div className="space-y-3"> <input className="w-full border border-gray-300 rounded p-2 text-sm text-gray-900" placeholder="Title (e.g. Payment Due)" value={selectedFish.portal_config?.announcement_title || ''} onChange={e => updatePortal('announcement_title', e.target.value)} /> <textarea className="w-full border border-gray-300 rounded p-2 text-sm text-gray-900" placeholder="Message body..." value={selectedFish.portal_config?.announcement_message || ''} onChange={e => updatePortal('announcement_message', e.target.value)} /> </div> </div> <div className="bg-red-50 p-6 rounded-xl border border-red-100 shadow-sm mt-6"> <h3 className="font-bold text-red-800 mb-2">Danger Zone</h3> <p className="text-xs text-red-600 mb-4">Once archived, the client will be moved to the 'Hall of Fame' history list. You can restore them later.</p> <button onClick={(e) => { if(confirm('Are you sure you want to archive this client?')) { toggleStatus(selectedFish.id, e); setSelectedFish(null); } }} className="bg-white border border-red-200 text-red-600 px-4 py-2 rounded text-sm font-bold hover:bg-red-50 transition-colors"> <Archive className="h-4 w-4 inline-block mr-2" /> Archive / Move to Hall of Fame </button> </div> </div> )}
-                    </div>
-                </div>
-                {/* Modals */}
-                {isShareModalOpen && ( <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"> <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl"> <div className="flex justify-between items-center mb-4"> <h3 className="text-lg font-bold text-gray-900 flex items-center"> <Share2 className="h-5 w-5 mr-2 text-indigo-600"/> Share Client Portal </h3> <button onClick={() => setIsShareModalOpen(false)} className="text-gray-400 hover:text-gray-600"> <X className="h-5 w-5"/> </button> </div> <div className="mb-6"> <label className="block text-sm font-medium text-gray-700 mb-2">Unique Access Link</label> <div className="flex shadow-sm rounded-md"> <input type="text" readOnly value={generatedLink} className="flex-1 min-w-0 block w-full px-3 py-2 rounded-l-md border border-gray-300 bg-gray-50 text-sm text-gray-600 focus:outline-none" /> <button onClick={() => {navigator.clipboard.writeText(generatedLink); alert("Link Copied!");}} className="inline-flex items-center px-4 py-2 border border-l-0 border-gray-300 rounded-r-md bg-gray-100 text-gray-700 hover:bg-gray-200 text-sm font-medium"> <Copy className="h-4 w-4"/> </button> </div> <p className="text-xs text-gray-500 mt-2"> Send this link to your client. They can view their wallet, reports, and progress in real-time. </p> </div> <div className="flex gap-3"> <button onClick={handleOpenLinkInPreview} className="flex-1 bg-indigo-600 text-white text-center py-2 rounded-md font-bold text-sm hover:bg-indigo-700 flex items-center justify-center transition-colors"> <ExternalLink className="h-4 w-4 mr-2"/> Open / Preview </button> <button onClick={() => setIsShareModalOpen(false)} className="flex-1 bg-white border border-gray-300 text-gray-700 py-2 rounded-md font-bold text-sm hover:bg-gray-50"> Close </button> </div> </div> </div> )}
-                
-                {/* EDIT TRANSACTION MODAL */}
-                {isEditTxModalOpen && ( 
-                    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm"> 
-                        <div className="bg-white rounded-lg p-6 w-full max-w-md shadow-xl animate-scale-up"> 
-                            <div className="flex justify-between items-center mb-4 border-b border-gray-100 pb-3"> 
-                                <h3 className="text-lg font-bold text-gray-900">Edit Transaction</h3> 
-                                <button onClick={() => setIsEditTxModalOpen(false)}><X className="h-5 w-5 text-gray-500 hover:text-gray-700"/></button> 
-                            </div> 
-                            <div className="space-y-4"> 
-                                <div> 
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Date</label> 
-                                    <input type="date" className="w-full border border-gray-300 rounded p-2 text-gray-900 focus:ring-indigo-500" value={editTxDate} onChange={e => setEditTxDate(e.target.value)} /> 
-                                </div> 
-                                <div> 
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Description</label> 
-                                    <input type="text" className="w-full border border-gray-300 rounded p-2 text-gray-900 focus:ring-indigo-500" value={editTxDesc} onChange={e => setEditTxDesc(e.target.value)} /> 
-                                </div> 
-                                <div> 
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Amount ($)</label> 
-                                    <input type="number" className="w-full border border-gray-300 rounded p-2 text-gray-900 focus:ring-indigo-500" value={editTxAmount} onChange={e => setEditTxAmount(parseFloat(e.target.value))} /> 
-                                </div> 
-                                <p className="text-xs text-orange-600 bg-orange-50 p-3 rounded border border-orange-100 font-medium"> 
-                                    ⚠️ Warning: Changing the amount will automatically recalculate the client's Balance and Total Spend immediately. 
-                                </p> 
-                                <div className="flex gap-3 pt-2"> 
-                                    <button onClick={() => setIsEditTxModalOpen(false)} className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-lg font-medium hover:bg-gray-200 transition-colors">Cancel</button> 
-                                    <button onClick={handleUpdateTransaction} className="flex-1 py-2.5 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 shadow-sm transition-colors">Save Changes</button> 
-                                </div> 
-                            </div> 
-                        </div> 
-                    </div> 
-                )}
-            </div>
-        );
-    }
-
-    // RENDER: LIST VIEW (MAIN DASHBOARD)
-    return (
-        <div className="space-y-8 relative font-inter">
-            {/* ALERT COMPONENT */}
-            {showDeadlineAlert && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-70 p-4">
-                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-lg overflow-hidden animate-bounce-slow">
-                        <div className="bg-red-600 p-4 flex justify-between items-center text-white">
-                            <h3 className="font-bold text-lg flex items-center"><AlertTriangle className="mr-2 h-6 w-6"/> Critical Campaign Alerts</h3>
-                            <button onClick={() => setShowDeadlineAlert(false)} className="text-white hover:bg-red-700 rounded p-1"><X className="h-5 w-5"/></button>
-                        </div>
-                        <div className="p-6">
-                            <p className="text-gray-700 font-medium mb-4">The following campaigns are ending within 24 hours. Contact clients immediately to renew or extend budget.</p>
-                            <div className="space-y-3 max-h-60 overflow-y-auto">
-                                {expiringClients.map(c => (
-                                    <div key={c.id} className="flex justify-between items-center bg-red-50 border border-red-200 p-3 rounded-lg">
-                                        <div>
-                                            <p className="font-bold text-red-900">{c.name}</p>
-                                            <p className="text-xs text-red-700">Ends: {new Date(c.campaign_end_date!).toLocaleDateString()}</p>
-                                        </div>
-                                        <button onClick={() => { setSelectedFish(c); setShowDeadlineAlert(false); }} className="px-3 py-1 bg-red-600 text-white text-xs font-bold rounded hover:bg-red-700"> View </button>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                        <div className="bg-gray-50 p-4 border-t border-gray-200 flex justify-end">
-                            <button onClick={() => setShowDeadlineAlert(false)} className="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded text-sm font-bold">Dismiss</button>
-                        </div>
-                    </div>
-                </div>
-            )}
-
-            {/* NEW HEADER DESIGN */}
-            <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold text-gray-800 flex items-center group cursor-default">
-                        <span className="text-3xl mr-2 inline-block animate-swim">🐋</span>
-                        <span className="bg-gradient-to-r from-gray-800 to-gray-600 bg-clip-text text-transparent transition-all duration-300 group-hover:from-indigo-600 group-hover:to-blue-600">
-                            Big Fish Agency
-                        </span>
-                    </h1>
-                    <p className="text-gray-500 text-sm mt-1">Manage VIP clients, balances, and reports.</p>
-                </div>
-                <div className="flex gap-3">
-                     <button onClick={() => setIsPaymentModalOpen(true)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors flex items-center text-sm"> <Settings className="h-4 w-4 mr-2" /> Methods </button>
-                    <button onClick={() => setIsManualAddOpen(true)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors flex items-center text-sm"> <Plus className="h-4 w-4 mr-2" /> Manual Add </button>
-                    <button onClick={() => setIsCatchModalOpen(true)} className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg font-bold shadow-md hover:shadow-lg transition-all flex items-center text-sm"> <Target className="h-4 w-4 mr-2" /> Catch Lead </button>
-                </div>
-            </div>
-
-            {/* TAB SELECTOR (ACTIVE VS HISTORY) */}
-            <div className="flex space-x-1 bg-gray-100 p-1 rounded-xl w-fit">
-                <button onClick={() => setViewMode('active')} className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${viewMode === 'active' ? 'bg-white shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}> Active Clients ({activePool.length}) </button>
-                <button onClick={() => setViewMode('history')} className={`px-4 py-2 text-sm font-bold rounded-lg transition-all ${viewMode === 'history' ? 'bg-white shadow text-indigo-600' : 'text-gray-500 hover:text-gray-700'}`}> Completed Work ({hallOfFame.length}) </button>
-            </div>
-
-            {/* ACTIVE CLIENTS GRID */}
-            {viewMode === 'active' && (
-                <div>
-                    <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-                        <div className="relative w-full sm:w-72">
-                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
-                            <input 
-                                type="text" 
-                                className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-lg text-sm focus:ring-indigo-500 focus:border-indigo-500"
-                                placeholder="Search Active Clients..."
-                                value={clientSearch}
-                                onChange={(e) => { setClientSearch(e.target.value); setCurrentPage(1); }}
-                            />
-                        </div>
-                        <button onClick={() => downloadClientList(activePool, 'active')} className="text-gray-400 hover:text-indigo-600 transition-colors flex items-center text-xs font-bold"> 
-                            <Download className="h-4 w-4 mr-1"/> Export List 
-                        </button>
-                    </div>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                        {displayedFish.map(fish => {
-                            const daysLeft = getDaysRemaining(fish.campaign_end_date);
-                            const isCritical = daysLeft !== null && daysLeft <= 1;
-                            const isLowBalance = (fish.balance || 0) < (fish.low_balance_alert_threshold || 10);
-
-                            return (
-                                <div onClick={() => setSelectedFish(fish)} key={fish.id} className={`group bg-white rounded-xl border-2 p-5 cursor-pointer transition-all hover:-translate-y-1 hover:shadow-lg relative overflow-hidden ${isCritical ? 'border-red-300 shadow-red-100' : 'border-gray-100 hover:border-indigo-300'}`}>
-                                    <div className={`absolute top-0 left-0 right-0 h-1 ${isLowBalance ? 'bg-red-500' : 'bg-green-500'}`}></div>
-                                    <div className="absolute top-3 right-3 z-30">
-                                        <button onClick={(e) => { e.stopPropagation(); if(window.confirm(`Mark ${fish.name} as Completed/Inactive?`)) { toggleStatus(fish.id, e); } }} className="px-2 py-1 bg-white border border-gray-200 text-gray-500 text-xs font-bold rounded-md shadow-sm hover:bg-green-50 hover:text-green-600 hover:border-green-200 transition-colors flex items-center" title="Move to Completed"> <CheckCircle className="h-3 w-3 mr-1" /> Mark Complete </button>
-                                    </div>
-                                    <div className="flex justify-between items-start mb-4">
-                                        <div>
-                                            <h3 className="font-bold text-gray-900 text-lg group-hover:text-indigo-600 transition-colors">{fish.name}</h3>
-                                            <span className="text-xs text-gray-500 bg-gray-100 px-2 py-0.5 rounded mt-1 inline-block">{fish.package_name || 'Standard'}</span>
-                                        </div>
-                                        <div className="text-right">
-                                            <p className="text-[10px] text-gray-400 uppercase font-bold">Wallet</p>
-                                            <p className={`text-xl font-mono font-bold ${isLowBalance ? 'text-red-600' : 'text-gray-800'}`}> {formatCurrency(fish.balance || 0)} </p>
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4 border-t border-gray-100 pt-4 mt-2">
-                                        <div> <p className="text-[10px] text-gray-400 uppercase">Total Spent</p> <p className="text-sm font-bold text-gray-700">{formatCurrency(fish.spent_amount || 0)}</p> </div>
-                                        <div className="text-right"> <p className="text-[10px] text-gray-400 uppercase">Campaign</p> {daysLeft !== null ? ( <p className={`text-sm font-bold ${daysLeft <= 3 ? 'text-red-500' : 'text-green-600'}`}> {daysLeft <= 0 ? 'Ended' : `${daysLeft} Days Left`} </p> ) : ( <p className="text-sm text-gray-400">Ongoing</p> )} </div>
-                                    </div>
-                                    <div className="absolute inset-0 bg-white/90 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity backdrop-blur-sm z-10 pointer-events-none"> <span className="bg-indigo-600 text-white px-4 py-2 rounded-full text-sm font-bold shadow-md">Manage Dashboard</span> </div>
-                                </div>
-                            );
-                        })}
-                        
-                        {/* Only show 'Add New Client' button on last page if pagination is used, or always if less than 1 page */}
-                        {(currentPage === totalPages || totalPages === 0) && (
-                            <button onClick={() => setIsCatchModalOpen(true)} className="border-2 border-dashed border-gray-300 rounded-xl p-6 flex flex-col items-center justify-center text-gray-400 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 transition-all min-h-[180px]"> <Plus className="h-8 w-8 mb-2" /> <span className="font-bold text-sm">Add New Client</span> </button>
-                        )}
-                    </div>
-
-                    {/* PAGINATION CONTROLS */}
-                    {activePool.length > ITEMS_PER_PAGE && (
-                        <div className="flex justify-center items-center mt-8 space-x-4">
-                            <button 
-                                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                                disabled={currentPage === 1}
-                                className="px-4 py-2 border border-gray-300 rounded-md bg-white text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 flex items-center font-medium"
-                            >
-                                <ChevronLeft className="h-4 w-4 mr-2"/> Previous
-                            </button>
-                            <span className="text-sm font-bold text-gray-700 bg-gray-100 px-3 py-2 rounded">
-                                Page {currentPage} of {totalPages}
-                            </span>
-                            <button 
-                                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                                disabled={currentPage === totalPages}
-                                className="px-4 py-2 border border-gray-300 rounded-md bg-white text-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 flex items-center font-medium"
-                            >
-                                Next <ChevronRight className="h-4 w-4 ml-2"/>
-                            </button>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* INACTIVE HISTORY */}
-            {viewMode === 'history' && (
-                <div className="bg-white rounded-lg border border-gray-200 overflow-hidden shadow-sm">
-                    {hallOfFame.length === 0 ? (
-                        <div className="p-12 text-center text-gray-400"> <CheckCircle className="h-12 w-12 mx-auto mb-3 opacity-20"/> <p>No completed/inactive clients yet.</p> </div>
-                    ) : (
-                        <div className="divide-y divide-gray-100">
-                            {hallOfFame.map(fish => (
-                                <div key={fish.id} onClick={() => setSelectedFish(fish)} className="flex items-center justify-between p-4 hover:bg-gray-50 cursor-pointer group">
-                                    <div className="flex items-center gap-4">
-                                        <div className="h-10 w-10 bg-gray-100 rounded-full flex items-center justify-center text-gray-500 font-bold group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors"> {fish.name.charAt(0)} </div>
-                                        <div> <p className="font-bold text-gray-700 group-hover:text-indigo-600">{fish.name}</p> <p className="text-xs text-gray-400">Completed: {new Date(fish.end_date || new Date().toISOString()).toLocaleDateString()}</p> </div>
-                                    </div>
-                                    <div className="flex items-center gap-6">
-                                        <div className="text-right hidden sm:block"> <p className="text-xs text-gray-400 uppercase">Lifetime Spend</p> <p className="font-bold text-sm text-gray-600">{formatCurrency(fish.spent_amount || 0)}</p> </div>
-                                        <button onClick={(e) => toggleStatus(fish.id, e)} className="px-3 py-1.5 bg-white border border-gray-200 text-gray-500 hover:text-indigo-600 hover:border-indigo-300 rounded-md transition-colors shadow-sm text-xs font-bold flex items-center" title="Restore to Active"> <RotateCcw className="h-3 w-3 mr-1.5"/> Restore </button>
+                                        <button 
+                                            onClick={(e) => toggleStatus(fish.id, e)} 
+                                            className="p-2 text-gray-400 hover:text-red-600 bg-gray-50 hover:bg-red-50 rounded-full"
+                                            title={fish.status === 'Active Pool' ? "Archive" : "Activate"}
+                                        >
+                                            {fish.status === 'Active Pool' ? <Archive className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}
+                                        </button>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     )}
+                </>
+            ) : (
+                // --- DETAIL VIEW ---
+                <div className="flex flex-col h-[calc(100vh-100px)]">
+                    {/* Detail Header */}
+                    <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4 flex flex-col md:flex-row justify-between items-center shadow-sm">
+                        <div className="flex items-center gap-4 w-full md:w-auto">
+                            <button onClick={() => setSelectedFish(null)} className="p-2 hover:bg-gray-100 rounded-full text-gray-500">
+                                <ArrowLeft className="h-5 w-5"/>
+                            </button>
+                            <div>
+                                <h1 className="text-xl font-bold text-gray-900">{selectedFish.name}</h1>
+                                <div className="flex items-center gap-3 text-sm text-gray-500">
+                                    <span className="flex items-center"><Smartphone className="h-3 w-3 mr-1"/> {selectedFish.phone}</span>
+                                    <span className="hidden md:inline text-gray-300">|</span>
+                                    <span className={`font-mono font-bold ${selectedFish.balance < 20 ? 'text-red-500' : 'text-green-600'}`}>
+                                        Wallet: {formatCurrency(selectedFish.balance)}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex gap-2 mt-3 md:mt-0 w-full md:w-auto">
+                            <button 
+                                onClick={() => setShowPreview(!showPreview)} 
+                                className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-bold flex items-center justify-center border transition-colors ${showPreview ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}
+                            >
+                                <Eye className="h-4 w-4 mr-2"/> {showPreview ? 'Exit Preview' : 'Client View'}
+                            </button>
+                            <button 
+                                onClick={() => setIsShareModalOpen(true)}
+                                className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
+                                title="Share Portal Link"
+                            >
+                                <Share2 className="h-4 w-4"/>
+                            </button>
+                        </div>
+                    </div>
+
+                    {showPreview ? (
+                        <div className="flex-1 overflow-y-auto bg-gray-100 rounded-xl border border-gray-300 shadow-inner">
+                            <PortalView client={selectedFish} paymentMethods={paymentMethods} />
+                        </div>
+                    ) : (
+                        <div className="flex flex-col md:flex-row gap-6 flex-1 overflow-hidden">
+                            {/* SIDEBAR TABS (Left) */}
+                            <div className="w-full md:w-64 bg-white border border-gray-200 rounded-xl overflow-y-auto shrink-0 flex flex-row md:flex-col overflow-x-auto md:overflow-x-visible">
+                                {[
+                                    { id: 'overview', label: 'Overview', icon: Activity },
+                                    { id: 'wallet', label: 'Wallet & Funds', icon: Wallet },
+                                    { id: 'camp_tools', label: 'Campaign Tools', icon: Layout },
+                                    { id: 'ad_entry', label: 'Ad Performance', icon: TrendingUp },
+                                    { id: 'crm', label: 'CRM & Notes', icon: MessageSquare },
+                                    { id: 'growth', label: 'Tasks & Growth', icon: CheckCircle },
+                                    { id: 'targets', label: 'Sales Targets', icon: Target },
+                                    { id: 'topups', label: 'Top-up Requests', icon: Plus },
+                                    { id: 'profile', label: 'Profile & Settings', icon: Settings },
+                                ].map(tab => (
+                                    <button 
+                                        key={tab.id}
+                                        onClick={() => setActiveTab(tab.id as any)}
+                                        className={`p-4 text-sm font-medium flex items-center transition-colors whitespace-nowrap md:whitespace-normal ${activeTab === tab.id ? 'bg-indigo-50 text-indigo-600 border-b-2 md:border-b-0 md:border-l-4 border-indigo-600' : 'text-gray-600 hover:bg-gray-50'}`}
+                                    >
+                                        <tab.icon className="h-4 w-4 mr-3"/> {tab.label}
+                                        {tab.id === 'topups' && selectedFish.topup_requests && selectedFish.topup_requests.some(r => r.status === 'PENDING') && (
+                                            <span className="ml-auto w-2 h-2 bg-red-500 rounded-full"></span>
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
+
+                            {/* TAB CONTENT AREA (Right) */}
+                            <div className="flex-1 bg-white border border-gray-200 rounded-xl p-6 overflow-y-auto shadow-sm">
+                                
+                                {activeTab === 'overview' && (
+                                    <div className="space-y-6">
+                                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                            <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100">
+                                                <h3 className="text-indigo-800 font-bold text-sm uppercase">Balance</h3>
+                                                <p className="text-3xl font-mono font-bold text-indigo-600 mt-2">{formatCurrency(selectedFish.balance)}</p>
+                                            </div>
+                                            <div className="bg-purple-50 p-6 rounded-xl border border-purple-100">
+                                                <h3 className="text-purple-800 font-bold text-sm uppercase">Total Spent</h3>
+                                                <p className="text-3xl font-mono font-bold text-purple-600 mt-2">{formatCurrency(selectedFish.spent_amount)}</p>
+                                            </div>
+                                            <div className="bg-green-50 p-6 rounded-xl border border-green-100">
+                                                <h3 className="text-green-800 font-bold text-sm uppercase">Total Sales</h3>
+                                                <p className="text-3xl font-mono font-bold text-green-600 mt-2">{selectedFish.current_sales}</p>
+                                            </div>
+                                        </div>
+                                        {/* Recent Activity Feed */}
+                                        <div className="mt-8">
+                                            <h3 className="font-bold text-gray-800 mb-4">Recent Activity</h3>
+                                            <div className="space-y-4">
+                                                {selectedFish.reports?.slice(0, 5).map(log => (
+                                                    <div key={log.id} className="flex items-start gap-3 p-3 bg-gray-50 rounded-lg">
+                                                        <div className="mt-1 h-2 w-2 rounded-full bg-indigo-400"></div>
+                                                        <div>
+                                                            <p className="text-sm text-gray-700">{log.task}</p>
+                                                            <p className="text-xs text-gray-400 mt-1">{new Date(log.date).toLocaleDateString()}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                                {(!selectedFish.reports || selectedFish.reports.length === 0) && (
+                                                    <p className="text-gray-400 italic text-sm">No recent logs.</p>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === 'wallet' && (
+                                    <div className="space-y-8">
+                                        <div className="bg-gray-50 p-6 rounded-xl border border-gray-200">
+                                            <h3 className="font-bold text-gray-800 mb-4">Manual Transaction</h3>
+                                            <div className="flex flex-col md:flex-row gap-4">
+                                                <input type="number" className="flex-1 border border-gray-300 rounded p-2 text-sm" placeholder="Amount ($)" value={amount || ''} onChange={e => setAmount(parseFloat(e.target.value))} />
+                                                <input type="text" className="flex-[2] border border-gray-300 rounded p-2 text-sm" placeholder="Description" value={desc} onChange={e => setDesc(e.target.value)} />
+                                                <div className="flex gap-2">
+                                                    <button onClick={() => handleTransaction('DEPOSIT')} className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded text-sm font-bold flex items-center"><Plus className="h-4 w-4 mr-2"/> Add</button>
+                                                    <button onClick={() => handleTransaction('AD_SPEND')} className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded text-sm font-bold flex items-center"><TrendingUp className="h-4 w-4 mr-2"/> Deduct</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div className="overflow-x-auto">
+                                            <table className="w-full text-sm text-left">
+                                                <thead className="bg-gray-100 text-gray-600 uppercase text-xs">
+                                                    <tr>
+                                                        <th className="px-4 py-3">Date</th>
+                                                        <th className="px-4 py-3">Description</th>
+                                                        <th className="px-4 py-3 text-right">Amount</th>
+                                                        <th className="px-4 py-3 text-right">Action</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-gray-100">
+                                                    {selectedFish.transactions?.map(tx => (
+                                                        <tr key={tx.id} className="hover:bg-gray-50">
+                                                            <td className="px-4 py-3">{new Date(tx.date).toLocaleDateString()}</td>
+                                                            <td className="px-4 py-3">{tx.description}</td>
+                                                            <td className={`px-4 py-3 text-right font-mono ${tx.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-500'}`}>{tx.type === 'DEPOSIT' ? '+' : '-'}{formatCurrency(tx.amount)}</td>
+                                                            <td className="px-4 py-3 text-right"><button onClick={() => deleteTransaction(tx.id)}><Trash2 className="h-4 w-4 text-gray-400 hover:text-red-600"/></button></td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* --- NEW CAMPAIGN TOOLS TAB --- */}
+                                {activeTab === 'camp_tools' && (
+                                    <div className="space-y-6">
+                                        <div className="bg-orange-50 border border-orange-100 p-6 rounded-xl">
+                                            <h3 className="font-bold text-orange-800 mb-4 flex items-center">
+                                                <Layout className="h-5 w-5 mr-2"/> Campaign Generator
+                                            </h3>
+                                            
+                                            <div className="space-y-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Page Name</label>
+                                                    <input 
+                                                        type="text" 
+                                                        className="w-full border-gray-300 rounded-md p-2 text-sm"
+                                                        value={genCampPageName}
+                                                        onChange={e => setGenCampPageName(e.target.value)}
+                                                    />
+                                                </div>
+                                                <div className="grid grid-cols-2 gap-4">
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Budget ($)</label>
+                                                        <input 
+                                                            type="number" 
+                                                            className="w-full border-gray-300 rounded-md p-2 text-sm"
+                                                            value={genCampBudget || ''}
+                                                            onChange={e => setGenCampBudget(parseFloat(e.target.value))}
+                                                        />
+                                                    </div>
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-gray-600 uppercase mb-1">Start Date</label>
+                                                        <input 
+                                                            type="date" 
+                                                            className="w-full border-gray-300 rounded-md p-2 text-sm"
+                                                            value={genCampStartDate}
+                                                            onChange={e => setGenCampStartDate(e.target.value)}
+                                                        />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-600 uppercase mb-1">End Date</label>
+                                                    <input 
+                                                        type="date" 
+                                                        className="w-full border-gray-300 rounded-md p-2 text-sm"
+                                                        value={genCampEndDate}
+                                                        onChange={e => setGenCampEndDate(e.target.value)}
+                                                    />
+                                                </div>
+
+                                                {/* Generated Output */}
+                                                <div className="space-y-4 pt-4 border-t border-orange-200">
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Campaign Title (Internal)</label>
+                                                        <div className="flex gap-2">
+                                                            <input 
+                                                                readOnly
+                                                                value={generateCampaignTitle()}
+                                                                className="flex-1 bg-white border border-gray-300 rounded p-2 text-xs font-mono text-gray-700"
+                                                            />
+                                                            <button onClick={handleCopyCampTitle} className="p-2 border border-gray-300 rounded hover:bg-white text-gray-600 bg-gray-50">
+                                                                {genCampTitleCopied ? <Check className="h-4 w-4"/> : <Copy className="h-4 w-4"/>}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div>
+                                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Client Bill Message</label>
+                                                        <div className="relative">
+                                                            <textarea 
+                                                                readOnly
+                                                                value={generateClientMessage()}
+                                                                className="w-full text-xs text-gray-800 bg-white border border-gray-300 rounded p-3 h-40 resize-none font-sans"
+                                                            />
+                                                            <button 
+                                                                onClick={handleCopyClientMsg}
+                                                                className={`absolute bottom-2 right-2 text-xs font-bold px-3 py-1.5 rounded transition-colors shadow-sm flex items-center ${genCampMsgCopied ? 'bg-green-600 text-white' : 'bg-gray-100 border border-gray-300 text-gray-700 hover:bg-white'}`}
+                                                            >
+                                                                {genCampMsgCopied ? <><Check className="h-3 w-3 mr-1"/> Copied</> : <><Copy className="h-3 w-3 mr-1"/> Copy</>}
+                                                            </button>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="flex gap-3">
+                                                        <button 
+                                                            onClick={handleSendWhatsApp}
+                                                            className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center shadow-sm transition-colors"
+                                                        >
+                                                            <Smartphone className="h-4 w-4 mr-1.5"/> WhatsApp
+                                                        </button>
+                                                        <button 
+                                                            onClick={handleSendSystemSMS}
+                                                            disabled={isSendingSMS}
+                                                            className="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+                                                        >
+                                                            <Send className="h-4 w-4 mr-1.5"/> Send SMS
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === 'ad_entry' && (
+                                    <div className="space-y-8">
+                                        <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-100">
+                                            <h3 className="font-bold text-indigo-900 mb-4 flex items-center">
+                                                <Activity className="h-5 w-5 mr-2 text-indigo-600"/> Log Campaign Performance
+                                            </h3>
+                                            
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Date Range</label>
+                                                    <div className="flex gap-2">
+                                                        <input type="date" className="w-full border-gray-300 rounded p-2 text-sm" value={campStartDateInput} onChange={e => setCampStartDateInput(e.target.value)} />
+                                                        <span className="self-center text-gray-400">-</span>
+                                                        <input type="date" className="w-full border-gray-300 rounded p-2 text-sm" value={campEndDateInput} onChange={e => setCampEndDateInput(e.target.value)} />
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Ad Spend ($)</label>
+                                                    <input type="number" className="w-full border-gray-300 rounded p-2 text-sm font-bold text-red-600" value={campSpend || ''} onChange={e => setCampSpend(parseFloat(e.target.value))} placeholder="Amount Spent"/>
+                                                </div>
+                                            </div>
+
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                                                <div>
+                                                    <label className="block text-xs text-gray-500 mb-1">Result Type</label>
+                                                    <select className="w-full border-gray-300 rounded p-2 text-sm" value={campResultType} onChange={e => setCampResultType(e.target.value as any)}>
+                                                        <option value="MESSAGES">Messages</option>
+                                                        <option value="SALES">Website Sales</option>
+                                                    </select>
+                                                </div>
+                                                <div>
+                                                    <label className="block text-xs text-gray-500 mb-1">Result Count</label>
+                                                    <input type="number" className="w-full border-gray-300 rounded p-2 text-sm" value={campResults || ''} onChange={e => setCampResults(parseFloat(e.target.value))} placeholder="0"/>
+                                                </div>
+                                                {campResultType === 'SALES' && (
+                                                    <>
+                                                        <div>
+                                                            <label className="block text-xs text-gray-500 mb-1">Product Price (৳)</label>
+                                                            <input type="number" className="w-full border-gray-300 rounded p-2 text-sm" value={campProdPrice || ''} onChange={e => setCampProdPrice(parseFloat(e.target.value))} placeholder="Selling Price"/>
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-xs text-gray-500 mb-1">Product Cost (৳)</label>
+                                                            <input type="number" className="w-full border-gray-300 rounded p-2 text-sm" value={campProdCost || ''} onChange={e => setCampProdCost(parseFloat(e.target.value))} placeholder="Buying Cost"/>
+                                                        </div>
+                                                    </>
+                                                )}
+                                            </div>
+
+                                            <button onClick={handleCampaignEntry} className="w-full bg-indigo-600 text-white font-bold py-3 rounded hover:bg-indigo-700 transition-colors shadow-sm">
+                                                Save Record & Update Balance
+                                            </button>
+                                        </div>
+                                        {/* Records Table */}
+                                        <div className="overflow-hidden border border-gray-200 rounded-lg">
+                                            <table className="w-full text-sm text-left">
+                                                <thead className="bg-gray-100 text-gray-600 uppercase text-xs"><tr><th className="px-4 py-3">Date</th><th className="px-4 py-3">Type</th><th className="px-4 py-3 text-right">Spend</th><th className="px-4 py-3 text-center">Results</th><th className="px-4 py-3 text-right">CPR</th><th className="px-4 py-3 text-right">Action</th></tr></thead>
+                                                <tbody className="divide-y divide-gray-100">
+                                                    {selectedFish.campaign_records?.map(rec => (
+                                                        <tr key={rec.id} className="hover:bg-gray-50">
+                                                            <td className="px-4 py-3">{new Date(rec.start_date).toLocaleDateString()}</td>
+                                                            <td className="px-4 py-3"><span className={`px-2 py-0.5 rounded text-xs font-bold ${rec.result_type === 'SALES' ? 'bg-green-100 text-green-700' : 'bg-blue-100 text-blue-700'}`}>{rec.result_type}</span></td>
+                                                            <td className="px-4 py-3 text-right font-mono text-red-500">{formatCurrency(rec.amount_spent)}</td>
+                                                            <td className="px-4 py-3 text-center font-bold">{rec.results_count}</td>
+                                                            <td className="px-4 py-3 text-right text-gray-500 text-xs">{rec.results_count > 0 ? formatCurrency(rec.amount_spent/rec.results_count) : '-'}</td>
+                                                            <td className="px-4 py-3 text-right"><button onClick={() => deleteCampaignRecord(rec.id)}><Trash2 className="h-4 w-4 text-gray-400 hover:text-red-600"/></button></td>
+                                                        </tr>
+                                                    ))}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === 'crm' && (
+                                    <div className="space-y-6">
+                                        {/* New Interaction Input */}
+                                        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                            <h3 className="font-bold text-gray-700 mb-3 text-sm uppercase">Log New Interaction</h3>
+                                            <div className="flex gap-2 mb-3">
+                                                <select className="border border-gray-300 rounded p-2 text-sm" value={interactionType} onChange={e => setInteractionType(e.target.value as any)}>
+                                                    <option value="CALL">Call</option>
+                                                    <option value="MEETING">Meeting</option>
+                                                    <option value="WHATSAPP">WhatsApp</option>
+                                                    <option value="EMAIL">Email</option>
+                                                </select>
+                                                <input type="date" className="border border-gray-300 rounded p-2 text-sm" value={interactionDate} onChange={e => setInteractionDate(e.target.value)} />
+                                            </div>
+                                            <textarea 
+                                                className="w-full border border-gray-300 rounded p-2 text-sm mb-3 focus:ring-indigo-500" 
+                                                rows={3} 
+                                                placeholder="Notes..."
+                                                value={interactionNotes}
+                                                onChange={e => setInteractionNotes(e.target.value)}
+                                            />
+                                            <div className="flex justify-between items-center">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-xs text-gray-500">Next Follow-up:</span>
+                                                    <input type="date" className="border border-gray-300 rounded p-1 text-sm" value={nextFollowUp} onChange={e => setNextFollowUp(e.target.value)} />
+                                                </div>
+                                                <button onClick={async () => {
+                                                    if(!interactionNotes) return alert("Notes required");
+                                                    await mockService.addClientInteraction(selectedFish.id, {
+                                                        type: interactionType,
+                                                        date: interactionDate,
+                                                        notes: interactionNotes,
+                                                        next_follow_up: nextFollowUp
+                                                    });
+                                                    setInteractionNotes(''); setNextFollowUp('');
+                                                    loadData();
+                                                }} className="bg-indigo-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-indigo-700">Save Log</button>
+                                            </div>
+                                        </div>
+
+                                        {/* Timeline */}
+                                        <div className="space-y-4 pl-4 border-l-2 border-gray-200">
+                                            {selectedFish.interactions?.map(item => (
+                                                <div key={item.id} className="relative group">
+                                                    <div className="absolute -left-[21px] top-1 h-3 w-3 rounded-full bg-indigo-400 border-2 border-white"></div>
+                                                    <div className="bg-white p-3 rounded border border-gray-200 hover:shadow-sm transition-shadow">
+                                                        <div className="flex justify-between items-start mb-1">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="text-xs font-bold uppercase bg-gray-100 px-2 py-0.5 rounded text-gray-600">{item.type}</span>
+                                                                <span className="text-xs text-gray-400">{new Date(item.date).toLocaleDateString()}</span>
+                                                            </div>
+                                                            <button onClick={async () => {
+                                                                if(confirm("Delete log?")) {
+                                                                    await mockService.deleteClientInteraction(selectedFish.id, item.id);
+                                                                    loadData();
+                                                                }
+                                                            }} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100"><Trash2 className="h-3 w-3"/></button>
+                                                        </div>
+                                                        <p className="text-sm text-gray-700">{item.notes}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {(!selectedFish.interactions || selectedFish.interactions.length === 0) && (
+                                                <p className="text-gray-400 italic text-sm">No interactions recorded.</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === 'growth' && (
+                                    <div className="space-y-6">
+                                        <div className="flex gap-2">
+                                            <input 
+                                                className="flex-1 border border-gray-300 rounded p-2 text-sm" 
+                                                placeholder="Add new task..." 
+                                                value={taskTitle}
+                                                onChange={e => setTaskTitle(e.target.value)}
+                                            />
+                                            <input 
+                                                type="date"
+                                                className="border border-gray-300 rounded p-2 text-sm"
+                                                value={taskDate}
+                                                onChange={e => setTaskDate(e.target.value)}
+                                            />
+                                            <button onClick={addTask} className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700">
+                                                <Plus className="h-5 w-5"/>
+                                            </button>
+                                        </div>
+                                        <div className="space-y-2">
+                                            {selectedFish.growth_tasks?.map(task => (
+                                                <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200">
+                                                    <div className="flex items-center gap-3">
+                                                        <button onClick={() => toggleTask(task.id)} className={`h-5 w-5 rounded border flex items-center justify-center ${task.is_completed ? 'bg-green-500 border-green-500' : 'bg-white border-gray-300'}`}>
+                                                            {task.is_completed && <CheckSquare className="h-3 w-3 text-white"/>}
+                                                        </button>
+                                                        <div>
+                                                            <p className={`text-sm ${task.is_completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>{task.title}</p>
+                                                            {task.due_date && <p className="text-xs text-gray-400">Due: {task.due_date}</p>}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === 'topups' && (
+                                    <div className="space-y-6">
+                                        <h3 className="font-bold text-gray-800">Pending Requests</h3>
+                                        <div className="space-y-4">
+                                            {selectedFish.topup_requests?.filter(r => r.status === 'PENDING').map(req => (
+                                                <div key={req.id} className="bg-amber-50 p-4 rounded-lg border border-amber-200 flex flex-col md:flex-row justify-between items-center gap-4">
+                                                    <div>
+                                                        <div className="font-bold text-amber-900 text-lg">{formatCurrency(req.amount)}</div>
+                                                        <div className="text-sm text-amber-800">Via: {req.method_name} ({req.sender_number})</div>
+                                                        <div className="text-xs text-amber-600 mt-1">{new Date(req.created_at).toLocaleString()}</div>
+                                                    </div>
+                                                    {req.screenshot_url && (
+                                                        <button 
+                                                            onClick={() => window.open(req.screenshot_url, '_blank')}
+                                                            className="text-xs flex items-center text-blue-600 hover:underline"
+                                                        >
+                                                            <Image className="h-3 w-3 mr-1"/> View Screenshot
+                                                        </button>
+                                                    )}
+                                                    <div className="flex gap-2">
+                                                        <button onClick={() => handleApproveTopUp(req)} className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-green-700">Approve</button>
+                                                        <button onClick={() => handleRejectTopUp(req.id)} className="bg-red-500 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-red-600">Reject</button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {(!selectedFish.topup_requests || !selectedFish.topup_requests.some(r => r.status === 'PENDING')) && (
+                                                <p className="text-gray-400 text-sm">No pending requests.</p>
+                                            )}
+                                        </div>
+
+                                        <h3 className="font-bold text-gray-800 pt-4 border-t border-gray-200">History</h3>
+                                        <div className="opacity-70">
+                                            {selectedFish.topup_requests?.filter(r => r.status !== 'PENDING').map(req => (
+                                                <div key={req.id} className="flex justify-between items-center py-2 border-b border-gray-100 text-sm">
+                                                    <div>
+                                                        <span className={`font-bold ${req.status === 'APPROVED' ? 'text-green-600' : 'text-red-500'}`}>{req.status}</span>
+                                                        <span className="mx-2 text-gray-400">|</span>
+                                                        <span>{formatCurrency(req.amount)}</span>
+                                                    </div>
+                                                    <button onClick={() => handleDeleteTopUp(req.id)} className="text-gray-300 hover:text-red-500"><Trash2 className="h-3 w-3"/></button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {activeTab === 'targets' && (
+                                    <div className="max-w-md space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Target Sales</label>
+                                            <input type="number" className="w-full border border-gray-300 rounded p-2" value={newTarget} onChange={e => setNewTarget(parseInt(e.target.value))} />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 mb-1">Current Sales</label>
+                                            <input type="number" className="w-full border border-gray-300 rounded p-2" value={newCurrent} onChange={e => setNewCurrent(parseInt(e.target.value))} />
+                                        </div>
+                                        <button onClick={handleUpdateTargets} className="bg-indigo-600 text-white px-4 py-2 rounded font-bold hover:bg-indigo-700">Update Targets</button>
+                                    </div>
+                                )}
+
+                                {/* PROFILE & SETTINGS TAB */}
+                                {activeTab === 'profile' && (
+                                    <div className="space-y-8">
+                                        {/* Contact Profile */}
+                                        <div className="max-w-lg space-y-4">
+                                            <h3 className="font-bold text-gray-900 border-b pb-2">Client Profile</h3>
+                                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Phone</label><input className="w-full border border-gray-300 rounded p-2" value={profilePhone} onChange={e => setProfilePhone(e.target.value)} /></div>
+                                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Website URL</label><input className="w-full border border-gray-300 rounded p-2" value={profileWeb} onChange={e => setProfileWeb(e.target.value)} /></div>
+                                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Facebook Page</label><input className="w-full border border-gray-300 rounded p-2" value={profileFb} onChange={e => setProfileFb(e.target.value)} /></div>
+                                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Admin Notes</label><textarea className="w-full border border-gray-300 rounded p-2 h-24" value={profileNotes} onChange={e => setProfileNotes(e.target.value)} /></div>
+                                        </div>
+
+                                        {/* Portal Config Toggles */}
+                                        <div className="max-w-lg pt-4">
+                                            <h3 className="font-bold text-gray-900 border-b pb-2 mb-4">Portal Visibility Settings</h3>
+                                            <div className="space-y-3">
+                                                <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer">
+                                                    <span className="text-sm font-medium text-gray-700">Show Wallet Balance</span>
+                                                    <div onClick={() => setPortalConfig(prev => ({ ...prev, show_balance: !prev.show_balance }))} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.show_balance ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                                                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.show_balance ? 'translate-x-5' : ''}`}></div>
+                                                    </div>
+                                                </label>
+                                                
+                                                <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer">
+                                                    <span className="text-sm font-medium text-gray-700">Show Transaction History</span>
+                                                    <div onClick={() => setPortalConfig(prev => ({ ...prev, show_history: !prev.show_history }))} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.show_history ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                                                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.show_history ? 'translate-x-5' : ''}`}></div>
+                                                    </div>
+                                                </label>
+
+                                                <label className="flex items-center justify-between p-3 bg-blue-50 rounded-lg cursor-pointer border border-blue-100">
+                                                    <span className="text-sm font-medium text-blue-900">Show Message Report (মেসেজ রিপোর্ট)</span>
+                                                    <div onClick={() => toggleFeature('show_message_report')} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.feature_flags?.show_message_report ? 'bg-blue-600' : 'bg-gray-300'}`}>
+                                                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.feature_flags?.show_message_report ? 'translate-x-5' : ''}`}></div>
+                                                    </div>
+                                                </label>
+
+                                                <label className="flex items-center justify-between p-3 bg-green-50 rounded-lg cursor-pointer border border-green-100">
+                                                    <span className="text-sm font-medium text-green-900">Show Sales Report (সেলস রিপোর্ট)</span>
+                                                    <div onClick={() => toggleFeature('show_sales_report')} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.feature_flags?.show_sales_report ? 'bg-green-600' : 'bg-gray-300'}`}>
+                                                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.feature_flags?.show_sales_report ? 'translate-x-5' : ''}`}></div>
+                                                    </div>
+                                                </label>
+
+                                                <label className="flex items-center justify-between p-3 bg-purple-50 rounded-lg cursor-pointer border border-purple-100">
+                                                    <span className="text-sm font-medium text-purple-900">Show Profit/Loss Ledger (লাভ/ক্ষতি)</span>
+                                                    <div onClick={() => toggleFeature('show_profit_loss_report')} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.feature_flags?.show_profit_loss_report ? 'bg-purple-600' : 'bg-gray-300'}`}>
+                                                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.feature_flags?.show_profit_loss_report ? 'translate-x-5' : ''}`}></div>
+                                                    </div>
+                                                </label>
+
+                                                <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer">
+                                                    <span className="text-sm font-medium text-gray-700">Allow Top-up Requests</span>
+                                                    <div onClick={() => toggleFeature('allow_topup_request')} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.feature_flags?.allow_topup_request ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                                                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.feature_flags?.allow_topup_request ? 'translate-x-5' : ''}`}></div>
+                                                    </div>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <button onClick={handleUpdateProfile} className="bg-indigo-600 text-white px-6 py-3 rounded font-bold hover:bg-indigo-700 w-full md:w-auto shadow-sm">
+                                            Save All Settings
+                                        </button>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
                 </div>
             )}
 
-            {/* MODALS */}
-            {isCatchModalOpen && ( <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"> <div className="bg-white rounded-lg p-6 w-full max-w-md"> <h3 className="text-lg font-bold mb-4 text-gray-900">Select Lead to Convert</h3> <div className="relative mb-4"> <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400"/> <input className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md text-sm focus:ring-indigo-500 focus:border-indigo-500" placeholder="Search by Name or Phone..." value={catchSearch} onChange={e => setCatchSearch(e.target.value)} autoFocus /> </div> <div className="max-h-60 overflow-y-auto space-y-2 mb-4"> {filteredLeadsForCatch.length === 0 && ( <p className="text-center text-xs text-gray-400 py-4">No matching leads found (Must be HOT or WON)</p> )} {filteredLeadsForCatch.map(lead => ( <button key={lead.id} onClick={() => handleCatchFish(lead.id)} className="w-full text-left p-3 rounded bg-gray-50 hover:bg-blue-50 border border-gray-100 flex justify-between items-center group transition-colors"> <div> <div className="font-bold text-gray-900 group-hover:text-blue-700">{lead.full_name}</div> <div className="text-xs text-gray-600 font-mono">{lead.primary_phone}</div> </div> <Plus className="h-4 w-4 text-gray-400 group-hover:text-blue-600"/> </button> ))} </div> <button onClick={() => setIsCatchModalOpen(false)} className="w-full py-2 bg-gray-200 text-gray-800 rounded font-medium hover:bg-gray-300">Cancel</button> </div> </div> )}
-             {isManualAddOpen && ( <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"> <div className="bg-white rounded-lg p-6 w-full max-w-md"> <h3 className="text-lg font-bold mb-4 text-gray-900">Add VIP Client Manually</h3> <div className="space-y-4 mb-4"> <input className="w-full border border-gray-300 rounded p-2 text-gray-900 placeholder-gray-500" placeholder="Client Name" value={manualName} onChange={e => setManualName(e.target.value)} /> <input className="w-full border border-gray-300 rounded p-2 text-gray-900 placeholder-gray-500" placeholder="Phone Number" value={manualPhone} onChange={e => setManualPhone(e.target.value)} /> </div> <div className="flex gap-2"> <button onClick={() => setIsManualAddOpen(false)} className="flex-1 py-2 bg-gray-200 text-gray-800 rounded font-medium">Cancel</button> <button onClick={handleManualAdd} className="flex-1 py-2 bg-indigo-600 text-white rounded font-bold">Create Client</button> </div> </div> </div> )}
-            {isPaymentModalOpen && ( <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50"> <div className="bg-white rounded-lg p-6 w-full max-w-lg"> <div className="flex justify-between items-center mb-4"> <h3 className="text-lg font-bold text-gray-900">Manage Payment Methods</h3> <button onClick={() => setIsPaymentModalOpen(false)}><X className="h-5 w-5 text-gray-500"/></button> </div> <div className="bg-gray-50 p-4 rounded mb-4 border border-gray-200 space-y-3"> <h4 className="text-xs font-bold text-gray-500 uppercase">Add New Method</h4> <div className="flex rounded-md shadow-sm" role="group"> <button type="button" onClick={() => setMethodType('MOBILE')} className={`flex-1 px-4 py-2 text-xs font-medium border rounded-l-lg ${methodType === 'MOBILE' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700'}`}> Mobile Banking </button> <button type="button" onClick={() => setMethodType('BANK')} className={`flex-1 px-4 py-2 text-xs font-medium border rounded-r-lg ${methodType === 'BANK' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700'}`}> Bank Transfer </button> </div> <div className="grid grid-cols-2 gap-3"> <div className="col-span-2"> <label className="block text-xs font-medium text-gray-500 mb-1">Provider Name</label> <input className="w-full border border-gray-300 rounded p-2 text-sm text-gray-900" placeholder={methodType === 'BANK' ? "e.g. City Bank" : "e.g. bKash"} value={providerName} onChange={e => setProviderName(e.target.value)} /> </div> <div className="col-span-2"> <label className="block text-xs font-medium text-gray-500 mb-1">Account Number</label> <input className="w-full border border-gray-300 rounded p-2 text-sm font-mono text-gray-900" placeholder={methodType === 'BANK' ? "110-220..." : "017..."} value={accountNumber} onChange={e => setAccountNumber(e.target.value)} /> </div> {methodType === 'MOBILE' ? ( <> <div> <label className="block text-xs font-medium text-gray-500 mb-1">Account Type</label> <select className="w-full border border-gray-300 rounded p-2 text-sm text-gray-900" value={mobileType} onChange={e => setMobileType(e.target.value as any)}> <option value="Personal">Personal</option> <option value="Merchant">Merchant</option> <option value="Agent">Agent</option> </select> </div> <div> <label className="block text-xs font-medium text-gray-500 mb-1">Instruction</label> <select className="w-full border border-gray-300 rounded p-2 text-sm text-gray-900" value={instruction} onChange={e => setInstruction(e.target.value as any)}> <option value="Send Money">Send Money</option> <option value="Payment">Payment</option> <option value="Cash Out">Cash Out</option> </select> </div> </> ) : ( <> <div className="col-span-2"> <label className="block text-xs font-medium text-gray-500 mb-1">Account Name</label> <input className="w-full border border-gray-300 rounded p-2 text-sm text-gray-900" placeholder="Account Holder Name" value={accountName} onChange={e => setAccountName(e.target.value)} /> </div> <div> <label className="block text-xs font-medium text-gray-500 mb-1">Branch Name</label> <input className="w-full border border-gray-300 rounded p-2 text-sm text-gray-900" placeholder="Branch Name" value={branchName} onChange={e => setBranchName(e.target.value)} /> </div> <div> <label className="block text-xs font-medium text-gray-500 mb-1">Routing Number</label> <input className="w-full border border-gray-300 rounded p-2 text-sm text-gray-900" placeholder="Optional" value={routingNumber} onChange={e => setRoutingNumber(e.target.value)} /> </div> </> )} </div> <button onClick={handleAddPaymentMethod} className="w-full bg-green-600 text-white py-2 rounded text-sm font-bold hover:bg-green-700 mt-2">Add Payment Method</button> </div> <div className="max-h-60 overflow-y-auto space-y-2"> {paymentMethods.map(pm => ( <div key={pm.id} className="flex justify-between items-center p-3 border rounded hover:bg-gray-50"> <div className="flex items-center gap-3"> <div className="p-2 bg-indigo-50 rounded text-indigo-600"> {pm.type === 'BANK' ? <Building className="h-4 w-4"/> : <Smartphone className="h-4 w-4"/>} </div> <div> <p className="font-bold text-sm text-gray-900">{pm.provider_name}</p> <p className="text-xs text-gray-500 font-mono">{pm.account_number}</p> </div> </div> <button onClick={() => handleDeletePaymentMethod(pm.id)} className="text-gray-400 hover:text-red-500"><Trash2 className="h-4 w-4"/></button> </div> ))} </div> </div> </div> )}
+            {/* ... (Other Modals: Catch Fish, Manual Add, etc. are preserved) ... */}
+            {/* CATCH FISH MODAL */}
+            {isCatchModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md h-[500px] flex flex-col">
+                        <div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
+                            <h3 className="font-bold text-gray-800">Select Client from Leads</h3>
+                            <button onClick={() => setIsCatchModalOpen(false)}><X className="h-5 w-5 text-gray-500"/></button>
+                        </div>
+                        <div className="p-2 border-b border-gray-100">
+                            <input className="w-full border border-gray-300 rounded-md p-2 text-sm" placeholder="Search name..." value={catchSearch} onChange={e => setCatchSearch(e.target.value)} autoFocus />
+                        </div>
+                        <div className="flex-1 overflow-y-auto">
+                            {leads.filter(l => l.full_name.toLowerCase().includes(catchSearch.toLowerCase())).map(lead => (
+                                <div key={lead.id} onClick={() => handleCatchFish(lead.id)} className="p-3 border-b border-gray-100 hover:bg-indigo-50 cursor-pointer flex justify-between items-center">
+                                    <div>
+                                        <p className="font-bold text-gray-900">{lead.full_name}</p>
+                                        <p className="text-xs text-gray-500">{lead.primary_phone}</p>
+                                    </div>
+                                    <Plus className="h-4 w-4 text-indigo-600"/>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* MANUAL ADD MODAL */}
+            {isManualAddOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6">
+                        <h3 className="font-bold text-lg mb-4">Add Manual Client</h3>
+                        <div className="space-y-3">
+                            <input className="w-full border border-gray-300 rounded p-2" placeholder="Client Name" value={manualName} onChange={e => setManualName(e.target.value)} />
+                            <input className="w-full border border-gray-300 rounded p-2" placeholder="Phone Number" value={manualPhone} onChange={e => setManualPhone(e.target.value)} />
+                            <button onClick={handleManualAdd} className="w-full bg-indigo-600 text-white font-bold py-2 rounded hover:bg-indigo-700">Create Client</button>
+                            <button onClick={() => setIsManualAddOpen(false)} className="w-full border border-gray-300 text-gray-700 font-bold py-2 rounded hover:bg-gray-50">Cancel</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* SHARE MODAL */}
+            {isShareModalOpen && selectedFish && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
+                        <h3 className="font-bold text-lg mb-4 text-center">Share Portal Access</h3>
+                        <div className="bg-gray-100 p-3 rounded-lg border border-gray-200 mb-4 break-all text-sm font-mono text-center">
+                            {window.location.origin}/#/portal/{selectedFish.id}
+                        </div>
+                        <div className="flex gap-2">
+                            <button onClick={() => {
+                                navigator.clipboard.writeText(`${window.location.origin}/#/portal/${selectedFish.id}`);
+                                setIsShareModalOpen(false);
+                                alert("Link Copied!");
+                            }} className="flex-1 bg-indigo-600 text-white font-bold py-2 rounded hover:bg-indigo-700 flex items-center justify-center">
+                                <Copy className="h-4 w-4 mr-2"/> Copy Link
+                            </button>
+                            <button onClick={() => setIsShareModalOpen(false)} className="flex-1 border border-gray-300 font-bold py-2 rounded hover:bg-gray-50">Close</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* EDIT TRANSACTION MODAL */}
+            {isEditTxModalOpen && editingTx && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+                    <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6">
+                        <h3 className="font-bold text-lg mb-4">Edit Transaction</h3>
+                        <div className="space-y-3">
+                            <input type="date" className="w-full border border-gray-300 rounded p-2" value={editTxDate} onChange={e => setEditTxDate(e.target.value)} />
+                            <input type="number" className="w-full border border-gray-300 rounded p-2" value={editTxAmount} onChange={e => setEditTxAmount(parseFloat(e.target.value))} />
+                            <input type="text" className="w-full border border-gray-300 rounded p-2" value={editTxDesc} onChange={e => setEditTxDesc(e.target.value)} />
+                            <div className="flex gap-2 pt-2">
+                                <button onClick={handleUpdateTransaction} className="flex-1 bg-indigo-600 text-white font-bold py-2 rounded hover:bg-indigo-700">Update</button>
+                                <button onClick={() => setIsEditTxModalOpen(false)} className="flex-1 border border-gray-300 text-gray-700 font-bold py-2 rounded hover:bg-gray-50">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
