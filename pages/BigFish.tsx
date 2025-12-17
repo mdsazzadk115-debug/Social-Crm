@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { BigFish, Lead, LeadStatus, Transaction, PaymentMethod, ClientInteraction, CampaignRecord, TopUpRequest, PortalConfig } from '../types';
@@ -284,23 +285,14 @@ const BigFishPage: React.FC = () => {
 
     // Toggle Helper
     const toggleFeature = (key: string) => {
-        setPortalConfig(prev => {
-            const currentFlags = prev.feature_flags || {
-                show_profit_analysis: true,
-                show_cpr_metrics: true,
-                allow_topup_request: true
-            };
-            
-            const updatedFlags = {
-                ...currentFlags,
-                [key]: !((currentFlags as any)[key])
-            };
-
-            return {
-                ...prev,
-                feature_flags: updatedFlags as any
-            };
-        });
+        setPortalConfig(prev => ({
+            ...prev,
+            feature_flags: {
+                ...prev.feature_flags,
+                // @ts-ignore
+                [key]: !prev.feature_flags?.[key]
+            }
+        }));
     };
 
     // --- CAMPAIGN GENERATOR HELPERS ---
@@ -1067,7 +1059,6 @@ const BigFishPage: React.FC = () => {
                                                         <span className="mx-2 text-gray-400">|</span>
                                                         <span>{formatCurrency(req.amount)}</span>
                                                     </div>
-                                                    {/* Fixed error where 'reqId' was used instead of 'req.id' */}
                                                     <button onClick={() => handleDeleteTopUp(req.id)} className="text-gray-300 hover:text-red-500"><Trash2 className="h-3 w-3"/></button>
                                                 </div>
                                             ))}
@@ -1226,7 +1217,7 @@ const BigFishPage: React.FC = () => {
 
             {/* EDIT TRANSACTION MODAL */}
             {isEditTxModalOpen && editingTx && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 p-4">
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
                     <div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6">
                         <h3 className="font-bold text-lg mb-4">Edit Transaction</h3>
                         <div className="space-y-3">

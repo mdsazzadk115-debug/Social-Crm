@@ -3,12 +3,12 @@ import React, { useEffect, useState, useRef } from 'react';
 // @ts-ignore
 import { useParams } from 'react-router-dom';
 import { mockService } from '../services/mockService';
-import { BigFish, PaymentMethod, SystemSettings, CampaignRecord, PortalConfig } from '../types';
+import { BigFish, PaymentMethod, SystemSettings, CampaignRecord } from '../types';
 import { DollarSign, Calendar, CheckCircle, ShieldCheck, Target, AlertTriangle, CreditCard, Lock, List, BarChart2, Download, Building, Smartphone, Copy, Check, Calculator, ChevronLeft, ChevronRight, Phone, Globe, Users, PlusCircle, UploadCloud, X, MessageCircle, ShoppingBag, TrendingUp, TrendingDown, Table, Filter, Clock } from 'lucide-react';
 
 // --- HELPER: CSS BAR CHART COMPONENT ---
 const SimpleChart = ({ data, colorClass, labelKey, valueKey, valuePrefix = '', valueSuffix = '' }: any) => {
-    if (!data || data.length === 0) return <div className="h-56 flex items-center justify-center text-gray-400 text-xs">No data for graph</div>;
+    if (!data || data.length === 0) return <div className="h-48 flex items-center justify-center text-gray-400 text-xs">No data for graph</div>;
 
     const maxValue = Math.max(...data.map((d: any) => d[valueKey]), 1);
 
@@ -256,15 +256,11 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
     const showCalculators = showCPR || showCurrency || showROI;
     const showTopUp = client.portal_config?.feature_flags?.allow_topup_request;
 
-    // Report Visibility Flags (Default to TRUE if configuration is missing)
-    const flags = client.portal_config?.feature_flags || {
-        show_message_report: true,
-        show_sales_report: true,
-        show_profit_loss_report: false,
-    };
+    // Report Visibility Flags (Default to TRUE if undefined, except Profit Loss)
+    const flags = client.portal_config?.feature_flags || {};
     const showMessageReport = flags.show_message_report !== false; 
     const showSalesReport = flags.show_sales_report !== false;
-    const showProfitLossReport = flags.show_profit_loss_report === true; 
+    const showProfitLossReport = flags.show_profit_loss_report === true; // Opt-in default false
 
     return (
         <div className="min-h-screen bg-gray-50 text-gray-900 font-inter">
