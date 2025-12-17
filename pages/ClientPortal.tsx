@@ -1,10 +1,9 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 // @ts-ignore
 import { useParams } from 'react-router-dom';
 import { mockService } from '../services/mockService';
-import { BigFish, PaymentMethod, SystemSettings, CampaignRecord } from '../types';
-import { DollarSign, Calendar, CheckCircle, ShieldCheck, Target, AlertTriangle, CreditCard, Lock, List, BarChart2, Download, Building, Smartphone, Copy, Check, Calculator, ChevronLeft, ChevronRight, Phone, Globe, Users, PlusCircle, UploadCloud, X, MessageCircle, ShoppingBag, TrendingUp, TrendingDown, Table, Filter, Clock } from 'lucide-react';
+import { BigFish, PaymentMethod, SystemSettings } from '../types';
+import { DollarSign, Calendar, CheckCircle, ShieldCheck, Target, AlertTriangle, CreditCard, Lock, List, BarChart2, Download, Building, Smartphone, Copy, Check, Calculator, ChevronLeft, ChevronRight, Phone, Globe, Users, PlusCircle, UploadCloud, X, MessageCircle, ShoppingBag, TrendingUp, Table, Filter, Clock } from 'lucide-react';
 
 // --- HELPER: CSS BAR CHART COMPONENT ---
 const SimpleChart = ({ data, colorClass, labelKey, valueKey, valuePrefix = '', valueSuffix = '' }: any) => {
@@ -256,11 +255,11 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
     const showCalculators = showCPR || showCurrency || showROI;
     const showTopUp = client.portal_config?.feature_flags?.allow_topup_request;
 
-    // Report Visibility Flags (Default to TRUE if undefined, except Profit Loss)
-    const flags = client.portal_config?.feature_flags || {};
+    // Report Visibility Flags
+    const flags: any = client.portal_config?.feature_flags || {};
     const showMessageReport = flags.show_message_report !== false; 
     const showSalesReport = flags.show_sales_report !== false;
-    const showProfitLossReport = flags.show_profit_loss_report === true; // Opt-in default false
+    const showProfitLossReport = flags.show_profit_loss_report === true; 
 
     return (
         <div className="min-h-screen bg-gray-50 text-gray-900 font-inter">
@@ -592,18 +591,12 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
                                     </thead>
                                     <tbody className="divide-y divide-gray-100">
                                         {salesCampaigns.map(rec => {
-                                            // Calculation Logic
                                             const totalRevenue = rec.results_count * (rec.product_price || 0);
                                             const totalCOGS = rec.results_count * (rec.product_cost || 0);
-                                            const grossProfit = totalRevenue - totalCOGS; // Profit from Product only
-                                            
-                                            // Ad Spend is in USD usually, need conversion or assume uniform unit.
-                                            // Based on context, spend is entered in USD.
-                                            const adSpendBDT = rec.amount_spent * 120; // Approx Rate for quick view, or use stored rate
+                                            const grossProfit = totalRevenue - totalCOGS; 
+                                            const adSpendBDT = rec.amount_spent * 120; 
                                             const realNetProfit = grossProfit - adSpendBDT;
-
                                             const isProfit = realNetProfit >= 0;
-
                                             return (
                                                 <tr key={rec.id} className={`hover:bg-gray-50 ${isProfit ? 'bg-green-50/10' : 'bg-red-50/10'}`}>
                                                     <td className="px-6 py-4 font-medium text-gray-700">
@@ -629,7 +622,6 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
                             <div className="p-4">
                                 <SimpleChart 
                                     data={salesCampaigns.map(r => {
-                                        // Calc net profit for graph
                                         const totalRevenue = r.results_count * (r.product_price || 0);
                                         const totalCOGS = r.results_count * (r.product_cost || 0);
                                         const adSpendBDT = r.amount_spent * 120;
@@ -704,11 +696,7 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
                 )}
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                    
-                    {/* LEFT COL: GROWTH & LEDGER */}
                     <div className="lg:col-span-2 space-y-8">
-                        
-                        {/* GROWTH CHECKLIST */}
                         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                             <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
                                 <h3 className="font-bold text-gray-900 text-lg flex items-center"><CheckCircle className="mr-2 text-indigo-600"/> Project Tasks & Milestones</h3>
@@ -735,13 +723,10 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
                             </div>
                         </div>
 
-                        {/* RECENT TRANSACTIONS (Conditional) - WITH PAGINATION */}
                         {client.portal_config?.show_history && (
                             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                                 <div className="p-6 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50/50">
                                     <h3 className="font-bold text-gray-900 text-lg flex items-center"><List className="mr-2 text-indigo-600"/> Transaction History ({filteredTx.length})</h3>
-                                    
-                                    {/* FILTERS */}
                                     <div className="flex flex-wrap gap-2 items-center">
                                         <div className="relative">
                                             <Calendar className="h-4 w-4 absolute left-2 top-2 text-gray-400"/>
@@ -799,7 +784,6 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
                                         </tbody>
                                     </table>
                                 </div>
-                                {/* Pagination Controls */}
                                 {filteredTx.length > 0 && (
                                     <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-between items-center">
                                         <button 
@@ -822,47 +806,33 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
                             </div>
                         )}
                     </div>
-
-                    {/* RIGHT COL: WORK LOG & BANK INFO */}
                     <div className="lg:col-span-1 space-y-6">
-                         
-                         {/* DYNAMIC SUPPORT SECTION */}
                          <div className="bg-indigo-50 rounded-xl border border-indigo-100 p-6 text-center">
                             <h4 className="text-indigo-800 font-bold mb-2 flex justify-center items-center">
                                 <Users className="h-5 w-5 mr-2"/> Need Support?
                             </h4>
                             <p className="text-sm text-indigo-600 mb-4">Contact your account manager directly.</p>
-                            
                             <div className="space-y-2">
-                                {/* Support Phone */}
                                 {globalSettings?.portal_support_phone && (
                                     <a href={`tel:${globalSettings.portal_support_phone}`} className="flex items-center justify-center p-2 bg-white rounded border border-indigo-100 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-indigo-600 transition-colors">
                                         <Phone className="h-4 w-4 mr-2"/> {globalSettings.portal_support_phone}
                                     </a>
                                 )}
-                                
-                                {/* Support Website */}
                                 {globalSettings?.portal_support_url && (
                                     <a href={globalSettings.portal_support_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center p-2 bg-white rounded border border-indigo-100 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-indigo-600 transition-colors">
                                         <Globe className="h-4 w-4 mr-2"/> Visit Website
                                     </a>
                                 )}
-
-                                {/* FB Group */}
                                 {globalSettings?.portal_fb_group && (
                                     <a href={globalSettings.portal_fb_group} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center p-2 bg-white rounded border border-indigo-100 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-indigo-600 transition-colors">
                                         <Users className="h-4 w-4 mr-2"/> Join FB Group
                                     </a>
                                 )}
-
-                                {/* Fallback if no details set */}
                                 {(!globalSettings?.portal_support_phone && !globalSettings?.portal_support_url && !globalSettings?.portal_fb_group) && (
                                     <p className="text-xs text-indigo-400 italic">No contact details configured.</p>
                                 )}
                             </div>
                          </div>
-
-                         {/* Daily Work Log (WITH PAGINATION) */}
                         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
                             <div className="p-4 bg-gray-50/80 sticky top-0 backdrop-blur-md border-b border-gray-200 flex justify-between items-center">
                                 <h3 className="font-bold text-gray-500 text-sm uppercase tracking-wider">Daily Work Log</h3>
@@ -877,8 +847,6 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
                                     </div>
                                 ))}
                             </div>
-                            
-                            {/* Pagination Controls */}
                             {allLogs.length > LOGS_PER_PAGE && (
                                 <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-between items-center">
                                     <button 
@@ -899,12 +867,8 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
                                 </div>
                             )}
                         </div>
-
-                        {/* Payment Info & TOP-UP REQUEST */}
                         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
                             <h3 className="font-bold text-gray-900 text-lg mb-4 flex items-center"><ShieldCheck className="mr-2 text-indigo-600"/> Make a Payment</h3>
-                            
-                            {/* Top-Up Request Action */}
                             {showTopUp && (
                                 <button 
                                     onClick={() => setIsTopUpOpen(true)}
@@ -914,8 +878,6 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
                                     Submit Payment / Top-up Request
                                 </button>
                             )}
-
-                            {/* Pending Requests History */}
                             {pendingTopUps.length > 0 && (
                                 <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-3">
                                     <h4 className="text-xs font-bold text-amber-800 uppercase mb-2 flex items-center">
@@ -931,7 +893,6 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
                                     </div>
                                 </div>
                             )}
-
                             <div className="space-y-4">
                                 {paymentMethods.map(pm => {
                                     if (pm.type === 'BANK') {
@@ -1005,11 +966,8 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
                             </div>
                         </div>
                     </div>
-
                 </div>
             </div>
-
-            {/* TOP UP MODAL */}
             {isTopUpOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-scale-up">
@@ -1018,73 +976,19 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
                             <button onClick={() => setIsTopUpOpen(false)} className="hover:bg-indigo-700 rounded p-1"><X className="h-5 w-5"/></button>
                         </div>
                         <div className="p-6 space-y-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Amount Sent ($)</label>
-                                <input type="number" className="w-full border border-gray-300 rounded p-2.5 focus:ring-indigo-500" placeholder="e.g. 50" value={topUpAmount || ''} onChange={e => setTopUpAmount(parseFloat(e.target.value))} />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Method Used</label>
-                                <select className="w-full border border-gray-300 rounded p-2.5 focus:ring-indigo-500" value={topUpMethod} onChange={e => setTopUpMethod(e.target.value)}>
-                                    <option value="">-- Select Method --</option>
-                                    
-                                    {/* Agency Accounts */}
-                                    <optgroup label="Agency Accounts">
-                                        {paymentMethods.map(pm => (
-                                            <option key={pm.id} value={`${pm.provider_name} (${pm.account_number})`}>
-                                                {pm.provider_name} - {pm.account_number}
-                                            </option>
-                                        ))}
-                                    </optgroup>
-
-                                    {/* General Methods */}
-                                    <optgroup label="Mobile Banking">
-                                        <option value="bKash">bKash</option>
-                                        <option value="Nagad">Nagad</option>
-                                        <option value="Rocket">Rocket</option>
-                                        <option value="Upay">Upay</option>
-                                        <option value="Cellfin">Cellfin</option>
-                                        <option value="Tap">Tap</option>
-                                        <option value="OK Wallet">OK Wallet</option>
-                                    </optgroup>
-                                    <optgroup label="Banking & Others">
-                                        <option value="Bank Transfer">Bank Transfer</option>
-                                        <option value="City Bank">City Bank</option>
-                                        <option value="Brac Bank">Brac Bank</option>
-                                        <option value="Dutch Bangla Bank">Dutch Bangla Bank</option>
-                                        <option value="Islami Bank">Islami Bank</option>
-                                        <option value="Cash">Cash / Hand Cash</option>
-                                        <option value="Other">Other</option>
-                                    </optgroup>
-                                </select>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Sender Number / Trx ID</label>
-                                <input type="text" className="w-full border border-gray-300 rounded p-2.5 focus:ring-indigo-500" placeholder="Last 4 digits or Trx ID" value={topUpSender} onChange={e => setTopUpSender(e.target.value)} />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Upload Screenshot</label>
-                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center text-gray-500 hover:bg-gray-50 hover:border-indigo-300 transition-colors cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                                    {topUpImage ? (
-                                        <div className="text-center">
-                                            <img src={topUpImage} alt="Preview" className="h-20 mx-auto mb-2 object-contain" />
-                                            <span className="text-xs text-green-600 font-bold">Image Selected (Compressed)</span>
-                                        </div>
-                                    ) : (
-                                        <>
-                                            <UploadCloud className="h-8 w-8 mb-2"/>
-                                            <span className="text-xs">Click to upload image</span>
-                                        </>
-                                    )}
-                                    <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
-                                </div>
-                            </div>
-                            <button 
-                                onClick={submitTopUp}
-                                disabled={isSubmittingTopUp}
-                                className="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 shadow-md transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                                {isSubmittingTopUp ? 'Sending Request...' : 'Submit Request'}
-                            </button>
+                            <div><label className="block text-sm font-medium text-gray-700 mb-1">Amount Sent ($)</label><input type="number" className="w-full border border-gray-300 rounded p-2.5 focus:ring-indigo-500" placeholder="e.g. 50" value={topUpAmount || ''} onChange={e => setTopUpAmount(parseFloat(e.target.value))} /></div>
+                            <div><label className="block text-sm font-medium text-gray-700 mb-1">Method Used</label><select className="w-full border border-gray-300 rounded p-2.5 focus:ring-indigo-500" value={topUpMethod} onChange={e => setTopUpMethod(e.target.value)}>
+                                <option value="">-- Select Method --</option>
+                                <optgroup label="Agency Accounts">{paymentMethods.map(pm => (<option key={pm.id} value={`${pm.provider_name} (${pm.account_number})`}>{pm.provider_name} - {pm.account_number}</option>))}</optgroup>
+                                <optgroup label="Mobile Banking"><option value="bKash">bKash</option><option value="Nagad">Nagad</option><option value="Rocket">Rocket</option><option value="Upay">Upay</option><option value="Cellfin">Cellfin</option><option value="Tap">Tap</option><option value="OK Wallet">OK Wallet</option></optgroup>
+                                <optgroup label="Banking & Others"><option value="Bank Transfer">Bank Transfer</option><option value="City Bank">City Bank</option><option value="Brac Bank">Brac Bank</option><option value="Dutch Bangla Bank">Dutch Bangla Bank</option><option value="Islami Bank">Islami Bank</option><option value="Cash">Cash / Hand Cash</option><option value="Other">Other</option></optgroup>
+                            </select></div>
+                            <div><label className="block text-sm font-medium text-gray-700 mb-1">Sender Number / Trx ID</label><input type="text" className="w-full border border-gray-300 rounded p-2.5 focus:ring-indigo-500" placeholder="Last 4 digits or Trx ID" value={topUpSender} onChange={e => setTopUpSender(e.target.value)} /></div>
+                            <div><label className="block text-sm font-medium text-gray-700 mb-1">Upload Screenshot</label><div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center text-gray-500 hover:bg-gray-50 hover:border-indigo-300 transition-colors cursor-pointer" onClick={() => fileInputRef.current?.click()}>
+                                {topUpImage ? (<div className="text-center"><img src={topUpImage} alt="Preview" className="h-20 mx-auto mb-2 object-contain" /><span className="text-xs text-green-600 font-bold">Image Selected (Compressed)</span></div>) : (<><UploadCloud className="h-8 w-8 mb-2"/><span className="text-xs">Click to upload image</span></>)}
+                                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
+                            </div></div>
+                            <button onClick={submitTopUp} disabled={isSubmittingTopUp} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 shadow-md transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">{isSubmittingTopUp ? 'Sending Request...' : 'Submit Request'}</button>
                         </div>
                     </div>
                 </div>
@@ -1093,42 +997,22 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
     );
 };
 
-// --- DEFAULT PAGE COMPONENT (Fetches Data) ---
 const ClientPortal: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const [client, setClient] = useState<BigFish | null>(null);
     const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
     const [loading, setLoading] = useState(true);
-
     useEffect(() => {
         if(id) {
-            Promise.all([
-                mockService.getBigFishById(id),
-                mockService.getPaymentMethods()
-            ]).then(([c, pm]) => {
+            Promise.all([mockService.getBigFishById(id), mockService.getPaymentMethods()]).then(([c, pm]) => {
                 setClient(c || null);
                 setPaymentMethods(pm);
                 setLoading(false);
             });
         }
     }, [id]);
-
-    if(loading) return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center text-gray-900 font-inter">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div>
-            <p className="text-gray-500 text-sm">Loading secure portal...</p>
-        </div>
-    );
-    
-    if(!client) return (
-        <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center text-gray-900 p-4 text-center">
-            <AlertTriangle className="h-16 w-16 text-red-500 mb-4" />
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Invalid Portal Link</h1>
-            <p className="text-gray-500">The link you followed may be incorrect, expired, or the client record was removed.</p>
-        </div>
-    );
-
+    if(loading) return (<div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center text-gray-900 font-inter"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div><p className="text-gray-500 text-sm">Loading secure portal...</p></div>);
+    if(!client) return (<div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center text-gray-900 p-4 text-center"><AlertTriangle className="h-16 w-16 text-red-500 mb-4" /><h1 className="text-2xl font-bold text-gray-900 mb-2">Invalid Portal Link</h1><p className="text-gray-500">The link you followed may be incorrect, expired, or the client record was removed.</p></div>);
     return <PortalView client={client} paymentMethods={paymentMethods} />;
 };
-
 export default ClientPortal;

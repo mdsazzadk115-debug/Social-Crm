@@ -1,4 +1,3 @@
-
 import { 
   Lead, LeadStatus, LeadSource, Interaction, MessageTemplate, Campaign, 
   SimpleAutomationRule, LeadForm, Customer, Task, Invoice, Snippet, 
@@ -26,14 +25,6 @@ const getStorage = <T>(key: string, defaultVal: T): T => {
 
 const setStorage = (key: string, val: any) => {
     localStorage.setItem(key, JSON.stringify(val));
-};
-
-const formatDateForMySQL = (dateString: string) => {
-    if (!dateString) return null;
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return null;
-    const pad = (num: number) => num.toString().padStart(2, '0');
-    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 };
 
 const safeJSONParse = (data: any, fallback: any = {}) => {
@@ -110,7 +101,6 @@ export const mockService = {
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ 
                         action: 'update_lead_info', 
-                        id: updatedLead.id, 
                         ...updatedLead,
                         onboarding_data: updatedLead.onboarding_data ? JSON.stringify(updatedLead.onboarding_data) : undefined
                     })
@@ -211,11 +201,11 @@ export const mockService = {
         setStorage('leads', updatedLeads);
     },
 
-    getInteractions: async (leadId: string): Promise<Interaction[]> => {
+    getInteractions: async (_leadId: string): Promise<Interaction[]> => {
         return [
             {
                 id: uuid(),
-                lead_id: leadId,
+                lead_id: _leadId,
                 channel: Channel.MESSENGER,
                 direction: MessageDirection.INCOMING,
                 content: "Is this service still available?",
@@ -223,7 +213,7 @@ export const mockService = {
             },
             {
                 id: uuid(),
-                lead_id: leadId,
+                lead_id: _leadId,
                 channel: Channel.SMS,
                 direction: MessageDirection.OUTGOING,
                 content: "Yes, we are open. How can I help?",
@@ -700,7 +690,7 @@ export const mockService = {
     createForm: async (form: Omit<LeadForm, 'id' | 'created_at'>) => { const newForm = { ...form, id: uuid(), created_at: new Date().toISOString() }; const forms = await mockService.getForms(); forms.push(newForm); setStorage('lead_forms', forms); },
     updateForm: async (id: string, updates: Partial<LeadForm>) => { const forms = await mockService.getForms(); const idx = forms.findIndex(f => f.id === id); if(idx !== -1) { forms[idx] = { ...forms[idx], ...updates }; setStorage('lead_forms', forms); } },
     deleteForm: async (id: string) => { let forms = await mockService.getForms(); forms = forms.filter(f => f.id !== id); setStorage('lead_forms', forms); },
-    submitLeadForm: async (formId: string, data: any) => { 
+    submitLeadForm: async (_formId: string, data: any) => { 
         const newLead: Partial<Lead> = { 
             full_name: data.name, 
             primary_phone: data.phone, 
@@ -828,7 +818,7 @@ export const mockService = {
         }
         return ids;
     },
-    scheduleBulkMessages: async (leadIds: string[], messages: any[]) => { console.log(`Scheduled for ${leadIds.length} leads.`); return true; },
+    scheduleBulkMessages: async (leadIds: string[], _messages: any[]) => { console.log(`Scheduled for ${leadIds.length} leads.`); return true; },
     sendBulkSMS: async (leadIds: string[], messageBody: string) => { 
         for (const id of leadIds) {
             await mockService.addLeadInteraction(id, { type: 'OTHER', date: new Date().toISOString(), notes: `SMS Sent: ${messageBody.substring(0, 50)}...`, });

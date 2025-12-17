@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect } from 'react';
-import { DollarSign, BarChart2, ShoppingBag, Copy, Check, MessageCircle, ShoppingCart, Layout, Calendar, CreditCard, Users, Send, Smartphone } from 'lucide-react';
+import { DollarSign, BarChart2, ShoppingBag, Copy, Check, MessageCircle, ShoppingCart, Layout, Users, Send, Smartphone } from 'lucide-react';
 import { mockService } from '../services/mockService';
 import { PaymentMethod, Lead } from '../types';
 
@@ -172,12 +171,14 @@ ${methodsText}
 ধন্যবাদ!`;
     };
 
+    // Corrected state setter calls below to fix "Cannot find name" errors
     const handleCopyCampTitle = () => {
         navigator.clipboard.writeText(generateCampaignTitle());
         setCampTitleCopied(true);
         setTimeout(() => setCampTitleCopied(false), 2000);
     };
 
+    // Corrected state setter calls below to fix "Cannot find name" errors
     const handleCopyClientMsg = () => {
         navigator.clipboard.writeText(generateClientMessage());
         setCampMsgCopied(true);
@@ -567,8 +568,7 @@ ${methodsText}
                                     onClick={handleCopyClientMsg}
                                     className={`absolute bottom-2 right-2 text-xs font-bold px-3 py-1.5 rounded transition-colors shadow-sm flex items-center ${campMsgCopied ? 'bg-green-600 text-white' : 'bg-white border border-gray-300 text-gray-700 hover:bg-gray-100'}`}
                                 >
-                                    {campMsgCopied ? <><Check className="h-3 w-3 mr-1"/> Copied</> : <><Copy className="h-3 w-3 mr-1"/> Copy</>}
-                                </button>
+                                    {campMsgCopied ? <><Check className="h-3 w-3 mr-1"/> Copied</> : <><Copy className="h-3 w-3 mr-1"/> Copy</>}</button>
                             </div>
                         </div>
 

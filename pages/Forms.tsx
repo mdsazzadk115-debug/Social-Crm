@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { LeadForm } from '../types';
-import { Plus, Edit2, Trash2, Link as LinkIcon, Copy, Check, Globe, ShieldCheck, User, Phone, FileText, DollarSign, Send, AlertCircle, Layout, RefreshCw } from 'lucide-react';
+import { Edit2, Trash2, Link as LinkIcon, Copy, Check, Globe, ShieldCheck, User, Phone, FileText, DollarSign, Send, AlertCircle, Layout } from 'lucide-react';
 
 const THEME_COLORS: Record<string, string> = {
     indigo: '#4f46e5',
@@ -30,7 +29,6 @@ const Forms: React.FC = () => {
     
     // Modal for Share/Embed
     const [showShareModal, setShowShareModal] = useState<string | null>(null);
-    const [copied, setCopied] = useState(false);
     const [copiedLinkMap, setCopiedLinkMap] = useState<Record<string, boolean>>({});
 
     useEffect(() => {
@@ -109,9 +107,6 @@ const Forms: React.FC = () => {
         if (id) {
             setCopiedLinkMap(prev => ({ ...prev, [id]: true }));
             setTimeout(() => setCopiedLinkMap(prev => ({ ...prev, [id]: false })), 2000);
-        } else {
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
         }
     };
 

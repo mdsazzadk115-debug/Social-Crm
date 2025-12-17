@@ -1,16 +1,14 @@
-
 import React, { useEffect, useState } from 'react';
 // @ts-ignore
-import { useParams } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { Phone, User, Facebook, Globe, MessageCircle, Zap, Send, Copy, Briefcase, DollarSign, Target, ShoppingBag, AlertCircle, ShieldCheck, FileText, CheckSquare, Wallet, TrendingUp } from 'lucide-react';
 import { mockService } from '../services/mockService';
-import { Lead, Interaction, LeadStatus, Channel, MessageDirection, MessageTemplate } from '../types';
+import { Lead, LeadStatus, Channel, MessageTemplate } from '../types';
 import { STATUS_LABELS, INDUSTRIES } from '../constants';
 
 const LeadDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const [lead, setLead] = useState<Lead | null>(null);
-  const [interactions, setInteractions] = useState<Interaction[]>([]);
   const [templates, setTemplates] = useState<MessageTemplate[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -20,9 +18,8 @@ const LeadDetail: React.FC = () => {
         mockService.getLeadById(id),
         mockService.getInteractions(id),
         mockService.getTemplates()
-      ]).then(([l, i, t]) => {
+      ]).then(([l, , t]) => {
         setLead(l || null);
-        setInteractions(i);
         setTemplates(t);
         setLoading(false);
       });
@@ -278,63 +275,49 @@ const LeadDetail: React.FC = () => {
                 )}
                 
                 <div className="mt-4 pt-3 border-t border-gray-100">
-                    <div className="flex gap-2">
-                        <input 
-                            type="text" 
-                            className="flex-1 border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-green-500 focus:border-green-500"
-                            placeholder="Or type a custom message..."
-                            onKeyDown={(e) => {
-                                if(e.key === 'Enter') {
-                                    handleQuickReply((e.target as HTMLInputElement).value);
-                                    (e.target as HTMLInputElement).value = '';
-                                }
-                            }}
-                        />
-                        <button className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors">
-                            <Send className="h-4 w-4"/>
-                        </button>
+                    <div className="flex items-center justify-between">
+                         <span className="text-xs text-gray-400 font-medium italic">* Interaction logged on WhatsApp click</span>
+                         {lead.status === LeadStatus.CLOSED_WON && (
+                             <Link to="/won-leads" className="text-xs font-bold text-indigo-600 hover:underline">Open in CRM &rarr;</Link>
+                         )}
                     </div>
                 </div>
             </div>
         </div>
 
-        {/* Timeline / Activity History (Consolidated) */}
+        {/* Interaction History */}
         <div className="bg-white shadow rounded-lg p-6">
-            <h3 className="text-lg font-medium text-gray-900 mb-4">Activity History (CRM)</h3>
-            <div className="flow-root">
-                <ul className="-mb-8">
-                    {(!lead.interactions || lead.interactions.length === 0) && (
-                        <li className="text-gray-500 text-sm text-center py-4">No interactions yet. Start by sending a message or creating a task!</li>
+          <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
+            <FileText className="h-5 w-5 mr-2 text-indigo-600" /> Interaction & Activity Timeline
+          </h3>
+          
+          <div className="space-y-6">
+            {(!lead.interactions || lead.interactions.length === 0) ? (
+              <div className="text-center py-10 text-gray-400 bg-gray-50 rounded-lg border border-dashed border-gray-200">
+                No activity records found.
+              </div>
+            ) : (
+              lead.interactions.map((interaction) => (
+                <div key={interaction.id} className="flex gap-4 relative">
+                  <div className={`mt-1 h-8 w-8 rounded-full border flex items-center justify-center shrink-0 shadow-sm ${getInteractionColor(interaction.type)}`}>
+                    {getInteractionIcon(interaction.type)}
+                  </div>
+                  <div className="flex-1 bg-white border border-gray-100 p-4 rounded-lg shadow-sm">
+                    <div className="flex justify-between items-start mb-2">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">{interaction.type}</span>
+                      <span className="text-xs text-gray-400">{new Date(interaction.date).toLocaleDateString()}</span>
+                    </div>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap">{interaction.notes}</p>
+                    {interaction.next_follow_up && (
+                        <div className="mt-3 text-xs font-bold text-amber-600 bg-amber-50 px-2 py-1 rounded inline-block">
+                           Follow-up: {new Date(interaction.next_follow_up).toLocaleDateString()}
+                        </div>
                     )}
-                    {lead.interactions?.map((interaction, idx) => (
-                        <li key={interaction.id}>
-                            <div className="relative pb-8">
-                                {idx !== (lead.interactions?.length || 0) - 1 ? (
-                                    <span className="absolute top-4 left-4 -ml-px h-full w-0.5 bg-gray-200" aria-hidden="true"></span>
-                                ) : null}
-                                <div className="relative flex space-x-3">
-                                    <div className={`h-8 w-8 rounded-full flex items-center justify-center ring-8 ring-white ${getInteractionColor(interaction.type)}`}>
-                                        {getInteractionIcon(interaction.type)}
-                                    </div>
-                                    <div className="min-w-0 flex-1 pt-1.5 flex justify-between space-x-4">
-                                        <div>
-                                            <p className="text-sm font-bold text-gray-900">
-                                                {interaction.type}
-                                                <span className="font-normal text-gray-500 ml-2 text-xs">
-                                                    {new Date(interaction.date).toLocaleDateString()}
-                                                </span>
-                                            </p>
-                                            <div className="mt-1 text-sm text-gray-700 bg-gray-50 p-2 rounded-md border border-gray-100">
-                                                {interaction.notes}
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </li>
-                    ))}
-                </ul>
-            </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>
