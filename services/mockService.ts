@@ -1,5 +1,4 @@
 
-// ... (previous imports)
 import { 
   Lead, LeadStatus, LeadSource, Interaction, MessageTemplate, Campaign, 
   SimpleAutomationRule, LeadForm, Customer, Task, Invoice, Snippet, 
@@ -52,7 +51,6 @@ const FULL_TEMPLATES: MessageTemplate[] = INITIAL_TEMPLATES.map(t => ({ ...t, id
 const FULL_SNIPPETS: Snippet[] = INITIAL_SNIPPETS.map(s => ({ ...s, id: uuid() }));
 
 export const mockService = {
-    // ... (Existing Lead Methods)
     getLeads: async (): Promise<Lead[]> => {
         try {
             const res = await fetch(`${API_BASE}/leads.php?_t=${Date.now()}`);
@@ -222,7 +220,6 @@ export const mockService = {
         await mockService.createLead(newLead); 
     },
 
-    // ... (Customer, Task, Invoice methods)
     getCustomers: async (): Promise<Customer[]> => { try { const res = await fetch(`${API_BASE}/customers.php?action=get_customers&_t=${Date.now()}`); if (res.ok) return await res.json(); } catch (e) { console.warn("API Error", e); } return getStorage<Customer[]>('online_customers', []); },
     getCustomerCategories: async (): Promise<string[]> => { return getStorage<string[]>('customer_categories', ['Dress', 'Bag', 'Shoes', 'Watch', 'Gadget']); },
     addCustomerCategory: async (name: string) => { const cats = getStorage<string[]>('customer_categories', ['Dress', 'Bag', 'Shoes', 'Watch', 'Gadget']); if (!cats.includes(name)) { cats.push(name); setStorage('customer_categories', cats); } },
@@ -231,7 +228,6 @@ export const mockService = {
     deleteCustomer: async (id: string) => { try { await fetch(`${API_BASE}/customers.php`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete_customer', id }) }); } catch (e) { console.error("API Error", e); } },
     getTasks: async (): Promise<Task[]> => { try { const res = await fetch(`${API_BASE}/tasks.php?_t=${Date.now()}`); if (res.ok) { const data = await res.json(); if (Array.isArray(data)) return data; } else { console.warn(`Tasks API Error: ${res.status}`); } } catch (e) { console.warn("API Error", e); } return getStorage<Task[]>('tasks', []); },
     
-    // UPDATED: Create Task with Logging
     createTask: async (text: string, dueDate?: string, leadId?: string) => { 
         const newTask = { id: uuid(), text, is_completed: false, created_at: new Date().toISOString(), due_date: dueDate, lead_id: leadId }; 
         try { await fetch(`${API_BASE}/tasks.php`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'create', ...newTask, created_at: formatDateForMySQL(newTask.created_at), due_date: dueDate ? formatDateForMySQL(dueDate) : null }) }); } catch (e) { console.error("API Error Creating Task", e); } 
@@ -239,14 +235,12 @@ export const mockService = {
         tasks.push(newTask); 
         setStorage('tasks', tasks); 
         
-        // AUTO LOGGING: If leadId is present, add to interactions
         if (leadId) {
             await mockService.addLeadInteraction(leadId, {
                 type: 'TASK',
                 date: new Date().toISOString(),
                 notes: `Task Created: ${text} (Due: ${dueDate || 'No Date'})`,
             });
-            // Also attempt to add to Big Fish if exists
             await mockService.addClientInteraction(leadId, {
                 type: 'TASK',
                 date: new Date().toISOString(),
@@ -258,7 +252,6 @@ export const mockService = {
     deleteTask: async (id: string) => { try { await fetch(`${API_BASE}/tasks.php`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', id }) }); } catch (e) { console.error("API Error", e); } let tasks = getStorage<Task[]>('tasks', []); tasks = tasks.filter(t => t.id !== id); setStorage('tasks', tasks); },
     getInvoices: async (): Promise<Invoice[]> => { try { const res = await fetch(`${API_BASE}/invoices.php?_t=${Date.now()}`); if (res.ok) { const data = await res.json(); if (Array.isArray(data)) return data; } } catch(e) { console.warn("API Error, using local", e); } return getStorage<Invoice[]>('invoices', []); },
     
-    // UPDATED: Create Invoice with Logging
     createInvoice: async (inv: Partial<Invoice>) => { 
         const invoices = getStorage<Invoice[]>('invoices', []); 
         const num = invoices.length + 1; 
@@ -269,12 +262,10 @@ export const mockService = {
         if (idx !== -1) { invoices[idx] = newInv as Invoice; } else { invoices.unshift(newInv as Invoice); } 
         setStorage('invoices', invoices); 
 
-        // AUTO LOGGING: Find client by phone/name and log invoice creation
         if (inv.client_phone || inv.client_name) {
             const leads = await mockService.getLeads();
             const bigFish = await mockService.getBigFish();
             
-            // Try matching
             const matchedLead = leads.find(l => 
                 (inv.client_phone && l.primary_phone === inv.client_phone) || 
                 l.full_name === inv.client_name
@@ -314,6 +305,29 @@ export const mockService = {
     deleteDocument: async (id: string) => { let docs = getStorage<Document[]>('documents', []); docs = docs.filter(d => d.id !== id); setStorage('documents', docs); },
     
     getBigFish: async (): Promise<BigFish[]> => { 
+        try {
+            const res = await fetch(`${API_BASE}/bigfish.php?_t=${Date.now()}`);
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data)) {
+                    // Normalize data structure if needed
+                    const parsedData = data.map((f: any) => ({
+                        ...f,
+                        transactions: Array.isArray(f.transactions) ? f.transactions : safeJSONParse(f.transactions, []),
+                        campaign_records: Array.isArray(f.campaign_records) ? f.campaign_records : safeJSONParse(f.campaign_records, []),
+                        topup_requests: Array.isArray(f.topup_requests) ? f.topup_requests : safeJSONParse(f.topup_requests, []),
+                        growth_tasks: Array.isArray(f.growth_tasks) ? f.growth_tasks : safeJSONParse(f.growth_tasks, []),
+                        reports: Array.isArray(f.reports) ? f.reports : safeJSONParse(f.reports, []),
+                        interactions: Array.isArray(f.interactions) ? f.interactions : safeJSONParse(f.interactions, []),
+                        portal_config: typeof f.portal_config === 'object' ? f.portal_config : safeJSONParse(f.portal_config, {})
+                    }));
+                    setStorage('big_fish', parsedData);
+                    return parsedData;
+                }
+            }
+        } catch (e) {
+            console.warn("BigFish API Fetch Error, using local storage", e);
+        }
         return getStorage<BigFish[]>('big_fish', DEMO_BIG_FISH); 
     },
     
@@ -323,7 +337,6 @@ export const mockService = {
     toggleBigFishStatus: async (id: string) => { let fish = getStorage<BigFish[]>('big_fish', []); let f = fish.find(x => x.id === id); if (f) { f.status = f.status === 'Active Pool' ? 'Hall of Fame' : 'Active Pool'; if (f.status === 'Hall of Fame') f.end_date = new Date().toISOString(); else f.end_date = undefined; setStorage('big_fish', fish); try { await fetch(`${API_BASE}/bigfish.php`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update', id, updates: { status: f.status, end_date: f.end_date } }) }); } catch (e) { console.error("API Error", e); } } },
     updateBigFish: async (id: string, updates: Partial<BigFish>) => { let fish = getStorage<BigFish[]>('big_fish', []); const idx = fish.findIndex(f => f.id === id); if(idx !== -1) { fish[idx] = { ...fish[idx], ...updates }; setStorage('big_fish', fish); } try { await fetch(`${API_BASE}/bigfish.php`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update', id, updates }) }); } catch (e) { console.warn("API Error", e); } },
     
-    // UPDATED: Add Transaction with Logging
     addTransaction: async (fishId: string, type: Transaction['type'], amount: number, desc: string, metadata?: any, dateOverride?: string): Promise<BigFish | undefined> => { 
         let fish = getStorage<BigFish[]>('big_fish', []); 
         let f = fish.find(x => x.id === fishId); 
@@ -337,7 +350,6 @@ export const mockService = {
                 if (metadata && metadata.leads) { if (metadata.resultType === 'SALES') { f.current_sales = (f.current_sales || 0) + metadata.leads; } } 
             } 
             
-            // AUTO LOGGING
             if (!f.interactions) f.interactions = [];
             f.interactions.unshift({
                 id: uuid(),
@@ -360,13 +372,12 @@ export const mockService = {
     updatePortalConfig: async (fishId: string, config: any) => { const fish = getStorage<BigFish[]>('big_fish', []); const f = fish.find(x => x.id === fishId); if (f) { f.portal_config = { ...f.portal_config, ...config }; setStorage('big_fish', fish); try { await fetch(`${API_BASE}/bigfish.php`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_config', id: fishId, config: f.portal_config }) }); } catch (e) { console.error("API Error", e); } } },
     updateTargets: async (fishId: string, target: number, current: number) => { const fish = getStorage<BigFish[]>('big_fish', []); const f = fish.find(x => x.id === fishId); if (f) { f.target_sales = target; f.current_sales = current; setStorage('big_fish', fish); try { await fetch(`${API_BASE}/bigfish.php`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'update_targets', id: fishId, target, current }) }); } catch (e) { console.error("API Error", e); } } },
     addWorkLog: async (fishId: string, task: string) => { let fish = getStorage<BigFish[]>('big_fish', []); let f = fish.find(x => x.id === fishId); if (f) { const newLog = { id: uuid(), date: new Date().toISOString(), task }; if(!f.reports) f.reports = []; f.reports.unshift(newLog); setStorage('big_fish', fish); try { await fetch(`${API_BASE}/bigfish.php`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'add_log', id: fishId, log_id: newLog.id, task, date: newLog.date }) }); } catch (e) { console.error("API Error", e); } } },
-    checkExpiringCampaigns: async (): Promise<BigFish[]> => { const fish = getStorage<BigFish[]>('big_fish', []); const now = new Date(); const tomorrow = new Date(); tomorrow.setDate(now.getDate() + 1); return fish.filter(f => { if (f.status !== 'Active Pool' || !f.campaign_end_date) return false; const end = new Date(f.campaign_end_date); return end <= tomorrow && end >= now; }); },
-    checkRetainerRenewals: async (): Promise<BigFish[]> => { const fish = getStorage<BigFish[]>('big_fish', []); const now = new Date(); const nextWeek = new Date(); nextWeek.setDate(now.getDate() + 7); return fish.filter(f => { if (f.status !== 'Active Pool' || !f.is_retainer || !f.retainer_renewal_date) return false; const renew = new Date(f.retainer_renewal_date); return renew <= nextWeek; }); },
+    checkExpiringCampaigns: async (): Promise<BigFish[]> => { const fish = await mockService.getBigFish(); const now = new Date(); const tomorrow = new Date(); tomorrow.setDate(now.getDate() + 1); return fish.filter(f => { if (f.status !== 'Active Pool' || !f.campaign_end_date) return false; const end = new Date(f.campaign_end_date); return end <= tomorrow && end >= now; }); },
+    checkRetainerRenewals: async (): Promise<BigFish[]> => { const fish = await mockService.getBigFish(); const now = new Date(); const nextWeek = new Date(); nextWeek.setDate(now.getDate() + 7); return fish.filter(f => { if (f.status !== 'Active Pool' || !f.is_retainer || !f.retainer_renewal_date) return false; const renew = new Date(f.retainer_renewal_date); return renew <= nextWeek; }); },
     renewRetainer: async (fishId: string) => { const fish = getStorage<BigFish[]>('big_fish', []); const f = fish.find(x => x.id === fishId); if (f && f.retainer_renewal_date) { const current = new Date(f.retainer_renewal_date); current.setDate(current.getDate() + 30); f.retainer_renewal_date = current.toISOString().slice(0, 10); setStorage('big_fish', fish); } },
     addClientInteraction: async (fishId: string, interaction: Omit<ClientInteraction, 'id' | 'created_at'>) => { const fish = getStorage<BigFish[]>('big_fish', []); const f = fish.find(x => x.id === fishId); if (f) { if (!f.interactions) f.interactions = []; f.interactions.unshift({ id: uuid(), created_at: new Date().toISOString(), ...interaction }); setStorage('big_fish', fish); } },
     deleteClientInteraction: async (fishId: string, interactionId: string) => { const fish = getStorage<BigFish[]>('big_fish', []); const f = fish.find(x => x.id === fishId); if (f && f.interactions) { f.interactions = f.interactions.filter(i => i.id !== interactionId); setStorage('big_fish', fish); } },
     
-    // UPDATED: Add Campaign Record with Logging
     addCampaignRecord: async (fishId: string, record: Omit<CampaignRecord, 'id' | 'created_at'>): Promise<BigFish | undefined> => { 
         let fish = getStorage<BigFish[]>('big_fish', []); 
         let f = fish.find(x => x.id === fishId); 
@@ -383,11 +394,10 @@ export const mockService = {
             const tx: Transaction = { id: uuid(), date: record.end_date, type: 'AD_SPEND', amount: spend, description: `Campaign: ${new Date(record.start_date).toLocaleDateString()} - ${new Date(record.end_date).toLocaleDateString()}`, metadata: { impressions: record.impressions, reach: record.reach, leads: record.results_count, resultType: record.result_type } }; 
             f.transactions.unshift(tx); 
             
-            // AUTO LOGGING
             if (!f.interactions) f.interactions = [];
             f.interactions.unshift({
                 id: uuid(),
-                type: record.result_type === 'SALES' ? 'SALE' : 'BALANCE', // Treat message spend as balance update log
+                type: record.result_type === 'SALES' ? 'SALE' : 'BALANCE', 
                 date: new Date().toISOString(),
                 created_at: new Date().toISOString(),
                 notes: `Campaign Log: Spent $${spend} for ${record.results_count} ${record.result_type.toLowerCase()}`
@@ -424,7 +434,6 @@ export const mockService = {
     deleteAdInspiration: async (id: string) => { try { await fetch(`${API_BASE}/ad_swipe.php`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', id }) }); } catch(e) { console.warn("API Error", e); } let list = getStorage<AdInspiration[]>('ad_swipe_file', []); list = list.filter(a => a.id !== id); setStorage('ad_swipe_file', list); },
 
     triggerAutomationCheck: async () => {
-        console.log("Checking for automated actions...");
         return true;
     },
 
@@ -573,21 +582,16 @@ export const mockService = {
     },
 
     scheduleBulkMessages: async (leadIds: string[], messages: any[]) => {
-        console.log(`Scheduled messages for ${leadIds.length} leads.`);
         return true;
     },
 
     sendBulkSMS: async (leadIds: string[], messageBody: string) => {
-        console.log(`Sent SMS to ${leadIds.length} leads: ${messageBody}`);
-        
-        // AUTO LOGGING: Record SMS sending in interactions
         for (const leadId of leadIds) {
             await mockService.addLeadInteraction(leadId, {
                 type: 'OTHER',
                 date: new Date().toISOString(),
                 notes: `SMS Sent: ${messageBody.substring(0, 50)}...`,
             });
-            // Try matching BigFish
             await mockService.addClientInteraction(leadId, {
                 type: 'OTHER',
                 date: new Date().toISOString(),
