@@ -335,33 +335,33 @@ export const mockService = {
     updateBigFish: async (id: string, updates: Partial<BigFish>) => { 
         let fish = getStorage<BigFish[]>('big_fish', []); 
         const idx = fish.findIndex(f => f.id === id); 
-        let fullData = { ...updates };
+        let currentData = idx !== -1 ? fish[idx] : null;
         
-        if(idx !== -1) { 
-            fish[idx] = { ...fish[idx], ...updates }; 
+        if(currentData) { 
+            const merged = { ...currentData, ...updates };
+            fish[idx] = merged; 
             setStorage('big_fish', fish); 
-            fullData = fish[idx];
-        } 
-        
-        try { 
-            // Stringify all complex fields for database safety
-            const payload = {
-                ...fullData,
-                transactions: JSON.stringify(fullData.transactions || []),
-                campaign_records: JSON.stringify(fullData.campaign_records || []),
-                topup_requests: JSON.stringify(fullData.topup_requests || []),
-                growth_tasks: JSON.stringify(fullData.growth_tasks || []),
-                reports: JSON.stringify(fullData.reports || []),
-                interactions: JSON.stringify(fullData.interactions || []),
-                portal_config: JSON.stringify(fullData.portal_config || {})
-            };
             
-            await fetch(`${API_BASE}/bigfish.php`, { 
-                method: 'POST', 
-                headers: { 'Content-Type': 'application/json' }, 
-                body: JSON.stringify({ action: 'update', id, updates: payload }) 
-            }); 
-        } catch (e) { console.warn("API Error", e); } 
+            try { 
+                // Stringify all complex fields for database safety
+                const payload = {
+                    ...merged,
+                    transactions: JSON.stringify(merged.transactions || []),
+                    campaign_records: JSON.stringify(merged.campaign_records || []),
+                    topup_requests: JSON.stringify(merged.topup_requests || []),
+                    growth_tasks: JSON.stringify(merged.growth_tasks || []),
+                    reports: JSON.stringify(merged.reports || []),
+                    interactions: JSON.stringify(merged.interactions || []),
+                    portal_config: JSON.stringify(merged.portal_config || {})
+                };
+                
+                await fetch(`${API_BASE}/bigfish.php`, { 
+                    method: 'POST', 
+                    headers: { 'Content-Type': 'application/json' }, 
+                    body: JSON.stringify({ action: 'update', id, ...payload }) 
+                }); 
+            } catch (e) { console.warn("API Error", e); } 
+        }
     },
 
     createBigFish: async (data: Partial<BigFish>) => { 
