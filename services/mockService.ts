@@ -333,19 +333,22 @@ export const mockService = {
     getBigFishById: async (id: string): Promise<BigFish | undefined> => { const fish = await mockService.getBigFish(); return fish.find(f => f.id === id); },
     
     updateBigFish: async (id: string, updates: Partial<BigFish>) => { 
-        let fish = getStorage<BigFish[]>('big_fish', []); 
-        const idx = fish.findIndex(f => f.id === id); 
-        let currentData = idx !== -1 ? fish[idx] : null;
+        let fishList = getStorage<BigFish[]>('big_fish', []); 
+        const idx = fishList.findIndex(f => f.id === id); 
+        let currentData = idx !== -1 ? fishList[idx] : null;
         
         if(currentData) { 
             const merged = { ...currentData, ...updates };
-            fish[idx] = merged; 
-            setStorage('big_fish', fish); 
+            fishList[idx] = merged; 
+            setStorage('big_fish', fishList); 
             
             try { 
-                // Stringify all complex fields for database safety
+                // Separate id and action from the data payload to avoid conflicts
+                const { id: _, ...dataPayload } = merged;
+                
+                // Stringify complex objects for database safety
                 const payload = {
-                    ...merged,
+                    ...dataPayload,
                     transactions: JSON.stringify(merged.transactions || []),
                     campaign_records: JSON.stringify(merged.campaign_records || []),
                     topup_requests: JSON.stringify(merged.topup_requests || []),
@@ -358,9 +361,9 @@ export const mockService = {
                 await fetch(`${API_BASE}/bigfish.php`, { 
                     method: 'POST', 
                     headers: { 'Content-Type': 'application/json' }, 
-                    body: JSON.stringify({ action: 'update', ...payload }) 
+                    body: JSON.stringify({ action: 'update', id, ...payload }) 
                 }); 
-            } catch (e) { console.warn("API Error", e); } 
+            } catch (e) { console.warn("API Sync Error:", e); } 
         }
     },
 
@@ -430,15 +433,15 @@ export const mockService = {
     },
 
     addTransaction: async (fishId: string, type: Transaction['type'], amount: number, desc: string, metadata?: any, dateOverride?: string): Promise<BigFish | undefined> => { 
-        let fish = getStorage<BigFish[]>('big_fish', []); 
-        let f = fish.find(x => x.id === fishId); 
+        let fishList = getStorage<BigFish[]>('big_fish', []); 
+        let f = fishList.find(x => x.id === fishId); 
         if (f) { 
-            const tx: Transaction = { id: uuid(), date: dateOverride || new Date().toISOString(), type, amount, description: desc, metadata }; 
+            const tx: Transaction = { id: uuid(), date: dateOverride || new Date().toISOString(), type, amount: Number(amount), description: desc, metadata }; 
             f.transactions.unshift(tx); 
-            const currentBalance = parseFloat(f.balance as any) || 0; 
-            if (type === 'DEPOSIT') f.balance = currentBalance + amount; else f.balance = currentBalance - amount; 
+            const currentBalance = Number(f.balance) || 0; 
+            if (type === 'DEPOSIT') f.balance = currentBalance + Number(amount); else f.balance = currentBalance - Number(amount); 
             if (type === 'AD_SPEND') { 
-                const currentSpent = parseFloat(f.spent_amount as any) || 0; f.spent_amount = currentSpent + amount; f.reports.unshift({ id: uuid(), date: dateOverride || new Date().toISOString(), task: `Ad Run: Spent $${amount} (${desc})` }); 
+                const currentSpent = Number(f.spent_amount) || 0; f.spent_amount = currentSpent + Number(amount); f.reports.unshift({ id: uuid(), date: dateOverride || new Date().toISOString(), task: `Ad Run: Spent $${amount} (${desc})` }); 
                 if (metadata && metadata.leads) { if (metadata.resultType === 'SALES') { f.current_sales = (f.current_sales || 0) + metadata.leads; } } 
             } 
             
@@ -451,7 +454,7 @@ export const mockService = {
                 notes: `${type === 'DEPOSIT' ? 'Added' : 'Deducted'} $${amount}: ${desc}`
             });
 
-            setStorage('big_fish', fish); 
+            setStorage('big_fish', fishList); 
             await mockService.updateBigFish(fishId, { 
                 balance: f.balance, 
                 spent_amount: f.spent_amount, 
@@ -466,17 +469,17 @@ export const mockService = {
     },
     
     deleteTransaction: async (fishId: string, txId: string) => { 
-        let fish = getStorage<BigFish[]>('big_fish', []); 
-        let f = fish.find(x => x.id === fishId); 
+        let fishList = getStorage<BigFish[]>('big_fish', []); 
+        let f = fishList.find(x => x.id === fishId); 
         if (f) { 
             const tx = f.transactions.find(t => t.id === txId); 
             if (tx) { 
-                const currentBalance = parseFloat(f.balance as any) || 0; 
+                const currentBalance = Number(f.balance) || 0; 
                 if (tx.type === 'DEPOSIT') f.balance = currentBalance - tx.amount; 
                 else f.balance = currentBalance + tx.amount; 
                 
                 if (tx.type === 'AD_SPEND') { 
-                    const currentSpent = parseFloat(f.spent_amount as any) || 0; 
+                    const currentSpent = Number(f.spent_amount) || 0; 
                     f.spent_amount = currentSpent - tx.amount; 
                     if (tx.metadata && tx.metadata.resultType === 'SALES' && tx.metadata.leads) { 
                         const currentSales = (f.current_sales || 0); 
@@ -484,7 +487,7 @@ export const mockService = {
                     } 
                 } 
                 f.transactions = f.transactions.filter(t => t.id !== txId); 
-                setStorage('big_fish', fish); 
+                setStorage('big_fish', fishList); 
                 await mockService.updateBigFish(fishId, { 
                     balance: f.balance, 
                     spent_amount: f.spent_amount, 
@@ -496,14 +499,14 @@ export const mockService = {
     },
 
     addCampaignRecord: async (fishId: string, record: Omit<CampaignRecord, 'id' | 'created_at'>): Promise<BigFish | undefined> => { 
-        let fish = getStorage<BigFish[]>('big_fish', []); 
-        let f = fish.find(x => x.id === fishId); 
+        let fishList = getStorage<BigFish[]>('big_fish', []); 
+        let f = fishList.find(x => x.id === fishId); 
         if (f) { 
             const newRecord: CampaignRecord = { id: uuid(), created_at: new Date().toISOString(), ...record }; 
             if(!f.campaign_records) f.campaign_records = []; f.campaign_records.unshift(newRecord); 
-            const currentBalance = parseFloat(f.balance as any) || 0; 
-            const currentSpent = parseFloat(f.spent_amount as any) || 0; 
-            const spend = parseFloat(record.amount_spent as any) || 0; 
+            const currentBalance = Number(f.balance) || 0; 
+            const currentSpent = Number(f.spent_amount) || 0; 
+            const spend = Number(record.amount_spent) || 0; 
             f.balance = currentBalance - spend; 
             f.spent_amount = currentSpent + spend; 
             if (record.result_type === 'SALES') { f.current_sales = (f.current_sales || 0) + (record.results_count || 0); } 
@@ -520,7 +523,7 @@ export const mockService = {
                 notes: `Campaign Log: Spent $${spend} for ${record.results_count} ${record.result_type.toLowerCase()}`
             });
 
-            setStorage('big_fish', fish); 
+            setStorage('big_fish', fishList); 
             await mockService.updateBigFish(fishId, { 
                 balance: f.balance, 
                 spent_amount: f.spent_amount, 
@@ -535,18 +538,18 @@ export const mockService = {
     },
     
     deleteCampaignRecord: async (fishId: string, recordId: string) => { 
-        let fish = getStorage<BigFish[]>('big_fish', []); 
-        let f = fish.find(x => x.id === fishId); 
+        let fishList = getStorage<BigFish[]>('big_fish', []); 
+        let f = fishList.find(x => x.id === fishId); 
         if (f && f.campaign_records) { 
             const rec = f.campaign_records.find(r => r.id === recordId); 
             if (rec) { 
-                const currentBalance = parseFloat(f.balance as any) || 0; 
-                const currentSpent = parseFloat(f.spent_amount as any) || 0; 
-                f.balance = currentBalance + rec.amount_spent; 
-                f.spent_amount = currentSpent - rec.amount_spent; 
+                const currentBalance = Number(f.balance) || 0; 
+                const currentSpent = Number(f.spent_amount) || 0; 
+                f.balance = currentBalance + Number(rec.amount_spent); 
+                f.spent_amount = currentSpent - Number(rec.amount_spent); 
                 if (rec.result_type === 'SALES') { f.current_sales = Math.max(0, (f.current_sales || 0) - rec.results_count); } 
                 f.campaign_records = f.campaign_records.filter(r => r.id !== recordId); 
-                setStorage('big_fish', fish); 
+                setStorage('big_fish', fishList); 
                 await mockService.updateBigFish(fishId, { 
                     balance: f.balance, 
                     spent_amount: f.spent_amount, 
@@ -558,106 +561,106 @@ export const mockService = {
     },
 
     updateTransaction: async (fishId: string, txId: string, updates: { date: string, description: string, amount: number }) => { 
-        let fish = getStorage<BigFish[]>('big_fish', []); 
-        let f = fish.find(x => x.id === fishId); 
+        let fishList = getStorage<BigFish[]>('big_fish', []); 
+        let f = fishList.find(x => x.id === fishId); 
         if (f) { 
             const txIndex = f.transactions.findIndex(t => t.id === txId); 
             if (txIndex !== -1) { 
                 const oldTx = f.transactions[txIndex]; 
-                let currentBalance = parseFloat(f.balance as any) || 0; 
+                let currentBalance = Number(f.balance) || 0; 
                 if (oldTx.type === 'DEPOSIT') currentBalance -= oldTx.amount; else currentBalance += oldTx.amount; 
                 if (oldTx.type === 'AD_SPEND') { 
-                    const currentSpent = parseFloat(f.spent_amount as any) || 0; 
+                    const currentSpent = Number(f.spent_amount) || 0; 
                     f.spent_amount = currentSpent - oldTx.amount; 
                 } 
-                const newAmount = updates.amount; 
+                const newAmount = Number(updates.amount); 
                 if (oldTx.type === 'DEPOSIT') currentBalance += newAmount; else currentBalance -= newAmount; 
                 if (oldTx.type === 'AD_SPEND') { 
-                    const currentSpent = parseFloat(f.spent_amount as any) || 0; 
+                    const currentSpent = Number(f.spent_amount) || 0; 
                     f.spent_amount = currentSpent + newAmount; 
                 } 
                 f.balance = currentBalance; 
-                f.transactions[txIndex] = { ...oldTx, ...updates }; 
-                setStorage('big_fish', fish); 
+                f.transactions[txIndex] = { ...oldTx, ...updates, amount: newAmount }; 
+                setStorage('big_fish', fishList); 
                 await mockService.updateBigFish(fishId, { balance: f.balance, spent_amount: f.spent_amount, transactions: f.transactions });
             } 
         } 
     },
 
     addGrowthTask: async (fishId: string, title: string, dueDate?: string) => { 
-        let fish = getStorage<BigFish[]>('big_fish', []); 
-        let f = fish.find(x => x.id === fishId); 
+        let fishList = getStorage<BigFish[]>('big_fish', []); 
+        let f = fishList.find(x => x.id === fishId); 
         if (f) { 
             const newTask = { id: uuid(), title, is_completed: false, due_date: dueDate }; 
             if(!f.growth_tasks) f.growth_tasks = []; f.growth_tasks.push(newTask); 
-            setStorage('big_fish', fish); 
+            setStorage('big_fish', fishList); 
             await mockService.updateBigFish(fishId, { growth_tasks: f.growth_tasks });
         } 
     },
 
     toggleGrowthTask: async (fishId: string, taskId: string) => { 
-        const fish = getStorage<BigFish[]>('big_fish', []); 
-        const f = fish.find(x => x.id === fishId); 
+        const fishList = getStorage<BigFish[]>('big_fish', []); 
+        const f = fishList.find(x => x.id === fishId); 
         if (f) { 
             const t = f.growth_tasks.find(x => x.id === taskId); 
             if (t) t.is_completed = !t.is_completed; 
-            setStorage('big_fish', fish); 
+            setStorage('big_fish', fishList); 
             await mockService.updateBigFish(fishId, { growth_tasks: f.growth_tasks });
         } 
     },
 
     updatePortalConfig: async (fishId: string, config: any) => { 
-        const fish = getStorage<BigFish[]>('big_fish', []); 
-        const f = fish.find(x => x.id === fishId); 
+        const fishList = getStorage<BigFish[]>('big_fish', []); 
+        const f = fishList.find(x => x.id === fishId); 
         if (f) { 
             f.portal_config = { ...f.portal_config, ...config }; 
-            setStorage('big_fish', fish); 
+            setStorage('big_fish', fishList); 
             await mockService.updateBigFish(fishId, { portal_config: f.portal_config });
         } 
     },
 
     updateTargets: async (fishId: string, target: number, current: number) => { 
-        const fish = getStorage<BigFish[]>('big_fish', []); 
-        const f = fish.find(x => x.id === fishId); 
+        const fishList = getStorage<BigFish[]>('big_fish', []); 
+        const f = fishList.find(x => x.id === fishId); 
         if (f) { 
             f.target_sales = target; 
             f.current_sales = current; 
-            setStorage('big_fish', fish); 
+            setStorage('big_fish', fishList); 
             await mockService.updateBigFish(fishId, { target_sales: f.target_sales, current_sales: f.current_sales });
         } 
     },
 
     addWorkLog: async (fishId: string, task: string) => { 
-        let fish = getStorage<BigFish[]>('big_fish', []); 
-        let f = fish.find(x => x.id === fishId); 
+        let fishList = getStorage<BigFish[]>('big_fish', []); 
+        let f = fishList.find(x => x.id === fishId); 
         if (f) { 
             const newLog = { id: uuid(), date: new Date().toISOString(), task }; 
             if(!f.reports) f.reports = []; f.reports.unshift(newLog); 
-            setStorage('big_fish', fish); 
+            setStorage('big_fish', fishList); 
             await mockService.updateBigFish(fishId, { reports: f.reports });
         } 
     },
 
     checkExpiringCampaigns: async (): Promise<BigFish[]> => { const fish = await mockService.getBigFish(); const now = new Date(); const tomorrow = new Date(); tomorrow.setDate(now.getDate() + 1); return fish.filter(f => { if (f.status !== 'Active Pool' || !f.campaign_end_date) return false; const end = new Date(f.campaign_end_date); return end <= tomorrow && end >= now; }); },
     checkRetainerRenewals: async (): Promise<BigFish[]> => { const fish = await mockService.getBigFish(); const now = new Date(); const nextWeek = new Date(); nextWeek.setDate(now.getDate() + 7); return fish.filter(f => { if (f.status !== 'Active Pool' || !f.is_retainer || !f.retainer_renewal_date) return false; const renew = new Date(f.retainer_renewal_date); return renew <= nextWeek; }); },
-    renewRetainer: async (fishId: string) => { const fish = getStorage<BigFish[]>('big_fish', []); const f = fish.find(x => x.id === fishId); if (f && f.retainer_renewal_date) { const current = new Date(f.retainer_renewal_date); current.setDate(current.getDate() + 30); f.retainer_renewal_date = current.toISOString().slice(0, 10); setStorage('big_fish', fish); await mockService.updateBigFish(fishId, { retainer_renewal_date: f.retainer_renewal_date }); } },
-    addClientInteraction: async (fishId: string, interaction: Omit<ClientInteraction, 'id' | 'created_at'>) => { const fish = getStorage<BigFish[]>('big_fish', []); const f = fish.find(x => x.id === fishId); if (f) { if (!f.interactions) f.interactions = []; f.interactions.unshift({ id: uuid(), created_at: new Date().toISOString(), ...interaction }); setStorage('big_fish', fish); await mockService.updateBigFish(fishId, { interactions: f.interactions }); } },
-    deleteClientInteraction: async (fishId: string, interactionId: string) => { const fish = getStorage<BigFish[]>('big_fish', []); const f = fish.find(x => x.id === fishId); if (f && f.interactions) { f.interactions = f.interactions.filter(i => i.id !== interactionId); setStorage('big_fish', fish); await mockService.updateBigFish(fishId, { interactions: f.interactions }); } },
+    renewRetainer: async (fishId: string) => { const fishList = getStorage<BigFish[]>('big_fish', []); const f = fishList.find(x => x.id === fishId); if (f && f.retainer_renewal_date) { const current = new Date(f.retainer_renewal_date); current.setDate(current.getDate() + 30); f.retainer_renewal_date = current.toISOString().slice(0, 10); setStorage('big_fish', fishList); await mockService.updateBigFish(fishId, { retainer_renewal_date: f.retainer_renewal_date }); } },
+    addClientInteraction: async (fishId: string, interaction: Omit<ClientInteraction, 'id' | 'created_at'>) => { const fishList = getStorage<BigFish[]>('big_fish', []); const f = fishList.find(x => x.id === fishId); if (f) { if (!f.interactions) f.interactions = []; f.interactions.unshift({ id: uuid(), created_at: new Date().toISOString(), ...interaction }); setStorage('big_fish', fishList); await mockService.updateBigFish(fishId, { interactions: f.interactions }); } },
+    deleteClientInteraction: async (fishId: string, interactionId: string) => { const fishList = getStorage<BigFish[]>('big_fish', []); const f = fishList.find(x => x.id === fishId); if (f && f.interactions) { f.interactions = f.interactions.filter(i => i.id !== interactionId); setStorage('big_fish', fishList); await mockService.updateBigFish(fishId, { interactions: f.interactions }); } },
     
     createTopUpRequest: async (request: Omit<TopUpRequest, 'id' | 'created_at' | 'status'>) => { 
-        let fish = getStorage<BigFish[]>('big_fish', []); 
-        let f = fish.find(x => x.id === request.client_id); 
+        let fishList = getStorage<BigFish[]>('big_fish', []); 
+        let f = fishList.find(x => x.id === request.client_id); 
         if (f) { 
             const newReq: TopUpRequest = { id: uuid(), created_at: new Date().toISOString(), status: 'PENDING', ...request }; 
             if(!f.topup_requests) f.topup_requests = []; f.topup_requests.unshift(newReq); 
-            setStorage('big_fish', fish); 
+            setStorage('big_fish', fishList); 
             await mockService.updateBigFish(request.client_id, { topup_requests: f.topup_requests });
         } 
     },
 
     approveTopUpRequest: async (fishId: string, reqId: string) => { 
-        let fish = getStorage<BigFish[]>('big_fish', []); 
-        let f = fish.find(x => x.id === fishId); 
+        let fishList = getStorage<BigFish[]>('big_fish', []); 
+        let f = fishList.find(x => x.id === fishId); 
         if (f && f.topup_requests) { 
             const req = f.topup_requests.find(r => r.id === reqId); 
             if (req && req.status === 'PENDING') { 
@@ -668,24 +671,24 @@ export const mockService = {
     },
 
     rejectTopUpRequest: async (fishId: string, reqId: string) => { 
-        let fish = getStorage<BigFish[]>('big_fish', []); 
-        let f = fish.find(x => x.id === fishId); 
+        let fishList = getStorage<BigFish[]>('big_fish', []); 
+        let f = fishList.find(x => x.id === fishId); 
         if (f && f.topup_requests) { 
             const req = f.topup_requests.find(r => r.id === reqId); 
             if (req) { 
                 req.status = 'REJECTED'; 
-                setStorage('big_fish', fish); 
+                setStorage('big_fish', fishList); 
                 await mockService.updateBigFish(fishId, { topup_requests: f.topup_requests });
             } 
         } 
     },
 
     deleteTopUpRequest: async (fishId: string, reqId: string) => { 
-        let fish = getStorage<BigFish[]>('big_fish', []); 
-        let f = fish.find(x => x.id === fishId); 
+        let fishList = getStorage<BigFish[]>('big_fish', []); 
+        let f = fishList.find(x => x.id === fishId); 
         if (f && f.topup_requests) { 
             f.topup_requests = f.topup_requests.filter(r => r.id !== reqId); 
-            setStorage('big_fish', fish); 
+            setStorage('big_fish', fishList); 
             await mockService.updateBigFish(fishId, { topup_requests: f.topup_requests });
         } 
     },
