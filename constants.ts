@@ -347,6 +347,7 @@ export const DEMO_BIG_FISH: BigFish[] = [
 export const INITIAL_TEMPLATES = [
     // --- GENERAL ---
     {
+        id: 't_1',
         name: "Generic Welcome",
         category: "General",
         channel: Channel.SMS,
@@ -355,6 +356,7 @@ export const INITIAL_TEMPLATES = [
         is_active: true
     },
     {
+        id: 't_2',
         name: "Office Hours / Away",
         category: "General",
         channel: Channel.SMS,
@@ -363,6 +365,7 @@ export const INITIAL_TEMPLATES = [
         is_active: true
     },
     {
+        id: 't_3',
         name: "Missed Call Reply",
         category: "General",
         channel: Channel.SMS,
@@ -371,6 +374,7 @@ export const INITIAL_TEMPLATES = [
         is_active: true
     },
     {
+        id: 't_4',
         name: "Payment Received",
         category: "General",
         channel: Channel.SMS,
@@ -379,6 +383,7 @@ export const INITIAL_TEMPLATES = [
         is_active: true
     },
     {
+        id: 't_5',
         name: "Review Request",
         category: "General",
         channel: Channel.SMS,
@@ -389,6 +394,7 @@ export const INITIAL_TEMPLATES = [
 
     // --- FACEBOOK MARKETING ---
     {
+        id: 't_6',
         name: "FB Ads Intro",
         category: "Facebook Marketing",
         channel: Channel.MESSENGER,
@@ -397,6 +403,7 @@ export const INITIAL_TEMPLATES = [
         is_active: true
     },
     {
+        id: 't_7',
         name: "Portfolio Share",
         category: "Facebook Marketing",
         channel: Channel.MESSENGER,
@@ -405,6 +412,7 @@ export const INITIAL_TEMPLATES = [
         is_active: true
     },
     {
+        id: 't_8',
         name: "Package Pricing",
         category: "Facebook Marketing",
         channel: Channel.MESSENGER,
@@ -413,6 +421,7 @@ export const INITIAL_TEMPLATES = [
         is_active: true
     },
     {
+        id: 't_9',
         name: "Ads Follow-up (3 Days)",
         category: "Facebook Marketing",
         channel: Channel.MESSENGER,
@@ -421,6 +430,7 @@ export const INITIAL_TEMPLATES = [
         is_active: true
     },
     {
+        id: 't_10',
         name: "Reporting Update",
         category: "Facebook Marketing",
         channel: Channel.MESSENGER,
@@ -431,6 +441,7 @@ export const INITIAL_TEMPLATES = [
 
     // --- LANDING PAGE ---
     {
+        id: 't_11',
         name: "LP Requirement Ask",
         category: "Landing Page",
         channel: Channel.MESSENGER,
@@ -439,6 +450,7 @@ export const INITIAL_TEMPLATES = [
         is_active: true
     },
     {
+        id: 't_12',
         name: "Domain/Hosting Info",
         category: "Landing Page",
         channel: Channel.MESSENGER,
@@ -447,6 +459,7 @@ export const INITIAL_TEMPLATES = [
         is_active: true
     },
     {
+        id: 't_13',
         name: "Design Draft Review",
         category: "Landing Page",
         channel: Channel.MESSENGER,
@@ -455,6 +468,7 @@ export const INITIAL_TEMPLATES = [
         is_active: true
     },
     {
+        id: 't_14',
         name: "LP Testing Phase",
         category: "Landing Page",
         channel: Channel.MESSENGER,
@@ -463,6 +477,7 @@ export const INITIAL_TEMPLATES = [
         is_active: true
     },
     {
+        id: 't_15',
         name: "Project Handover",
         category: "Landing Page",
         channel: Channel.MESSENGER,
@@ -473,6 +488,7 @@ export const INITIAL_TEMPLATES = [
 
     // --- BUSINESS PLAN ---
     {
+        id: 't_16',
         name: "Consultation Call",
         category: "Business Plan",
         channel: Channel.SMS,
@@ -481,6 +497,7 @@ export const INITIAL_TEMPLATES = [
         is_active: true
     },
     {
+        id: 't_17',
         name: "Strategy Sent",
         category: "Business Plan",
         channel: Channel.SMS,
@@ -489,6 +506,7 @@ export const INITIAL_TEMPLATES = [
         is_active: true
     },
     {
+        id: 't_18',
         name: "Budget Approval",
         category: "Business Plan",
         channel: Channel.SMS,
@@ -497,6 +515,7 @@ export const INITIAL_TEMPLATES = [
         is_active: true
     },
     {
+        id: 't_19',
         name: "Goal Setting",
         category: "Business Plan",
         channel: Channel.SMS,
@@ -505,6 +524,7 @@ export const INITIAL_TEMPLATES = [
         is_active: true
     },
     {
+        id: 't_20',
         name: "Month End Review",
         category: "Business Plan",
         channel: Channel.SMS,
