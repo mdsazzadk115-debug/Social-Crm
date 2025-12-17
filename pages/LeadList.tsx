@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 // @ts-ignore
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, ChevronRight, ChevronLeft, Download, Phone, Briefcase, User, AlertCircle, Globe, MessageCircle, PenTool, Calendar, FileText, Plus, X, Save, ArrowUpDown, Star, Facebook, Edit2, Filter, Check, Send, Smartphone } from 'lucide-react';
+import { Search, ChevronRight, ChevronLeft, Download, Phone, Briefcase, User, AlertCircle, Globe, MessageCircle, PenTool, Calendar, FileText, Plus, X, Save, ArrowUpDown, Star, Facebook, Edit2, Filter, Check, Smartphone } from 'lucide-react';
 import { mockService } from '../services/mockService';
 import { Lead, LeadStatus, LeadSource } from '../types';
 import { STATUS_LABELS, STATUS_COLORS, INDUSTRIES } from '../constants';

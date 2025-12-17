@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
-import { Lead, MessageTemplate, Channel, LeadStatus } from '../types';
-import { Search, Send, CheckSquare, Square, Smartphone, ArrowRight, CheckCircle, RefreshCcw, ExternalLink, MessageCircle } from 'lucide-react';
+import { Lead, MessageTemplate, LeadStatus } from '../types';
+import { Search, Send, CheckSquare, Square, Smartphone, ArrowRight, CheckCircle, RefreshCcw, MessageCircle } from 'lucide-react';
 import { STATUS_LABELS, STATUS_COLORS } from '../constants';
 
 interface QueueItem {
