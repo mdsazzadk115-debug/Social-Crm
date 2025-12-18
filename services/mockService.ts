@@ -95,8 +95,7 @@ export const mockService = {
                 if (Array.isArray(data)) return data;
             }
         } catch (e) { console.error("API Error", e); }
-        // Fallback removed to force API usage if connected, 
-        // OR you can keep fallback if API fails completely (network error)
+        // Fallback removed to force API usage if connected
         return getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
     },
 
@@ -115,27 +114,9 @@ export const mockService = {
             });
         } catch (e) {}
         
-        // Optimistic Local Update
+        // Local Sync
         const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
-        const newFish: BigFish = {
-            id: newId,
-            lead_id: fish.lead_id || uuid(),
-            name: fish.name || '',
-            phone: fish.phone || '',
-            status: 'Active Pool',
-            balance: 0,
-            low_balance_alert_threshold: 20,
-            spent_amount: 0,
-            total_budget: 0,
-            target_sales: 0,
-            current_sales: 0,
-            transactions: [],
-            growth_tasks: [],
-            reports: [],
-            portal_config: { show_balance: true, show_history: true, is_suspended: false },
-            start_date: new Date().toISOString(),
-            ...fish
-        } as BigFish;
+        const newFish = { id: newId, ...fish } as BigFish;
         setStorage('sae_big_fish', [newFish, ...allFish]);
     },
 
@@ -147,6 +128,7 @@ export const mockService = {
                 body: JSON.stringify({ action: 'update', id, ...updates })
             });
         } catch (e) {}
+        
         const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
         const updated = allFish.map(f => f.id === id ? { ...f, ...updates } : f);
         setStorage('sae_big_fish', updated);
@@ -188,77 +170,14 @@ export const mockService = {
                 body: JSON.stringify({ action: 'add_transaction', id: txId, big_fish_id: fishId, type, amount, description, date: new Date().toISOString() })
             });
         } catch (e) {}
-        
-        // Update local for immediate UI if needed and fallback storage sync
-        const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
-        const updated = allFish.map(f => {
-            if (f.id === fishId) {
-                const newTx: Transaction = { id: txId, type, amount, description, date: new Date().toISOString() };
-                const newBalance = (f.balance || 0) + (type === 'DEPOSIT' ? amount : -amount);
-                return { 
-                    ...f, 
-                    balance: newBalance,
-                    transactions: [newTx, ...(f.transactions || [])] 
-                };
-            }
-            return f;
-        });
-        setStorage('sae_big_fish', updated);
     },
 
     updateTransaction: async (fishId: string, txId: string, updates: Partial<Transaction>): Promise<void> => {
-        try {
-            // Note: PHP backend would need a dedicated 'update_transaction' action if we wanted full DB sync for this feature
-            // Currently mostly local-first in this mock service for advanced features not yet in PHP
-        } catch (e) {}
-        
-        const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
-        const updated = allFish.map(f => {
-            if (f.id === fishId && f.transactions) {
-                const oldTx = f.transactions.find(t => t.id === txId);
-                let newBalance = f.balance || 0;
-                
-                if (oldTx && updates.amount !== undefined) {
-                    // Reverse old effect
-                    const oldEffect = oldTx.type === 'DEPOSIT' ? oldTx.amount : -oldTx.amount;
-                    newBalance -= oldEffect;
-                    // Apply new effect
-                    const newEffect = (updates.type || oldTx.type) === 'DEPOSIT' ? updates.amount : -(updates.amount || 0);
-                    newBalance += newEffect;
-                }
-
-                return {
-                    ...f,
-                    balance: newBalance,
-                    transactions: f.transactions.map(t => t.id === txId ? { ...t, ...updates } : t)
-                };
-            }
-            return f;
-        });
-        setStorage('sae_big_fish', updated);
+       // Placeholder for PHP impl if needed
     },
 
     deleteTransaction: async (fishId: string, txId: string): Promise<void> => {
-        try {
-             // Placeholder for PHP delete
-        } catch (e) {}
-
-        const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
-        const updated = allFish.map(f => {
-            if (f.id === fishId && f.transactions) {
-                const txToDelete = f.transactions.find(t => t.id === txId);
-                if (txToDelete) {
-                    const balanceDiff = txToDelete.type === 'DEPOSIT' ? -txToDelete.amount : txToDelete.amount;
-                    return {
-                        ...f,
-                        balance: (f.balance || 0) + balanceDiff,
-                        transactions: f.transactions.filter(t => t.id !== txId)
-                    };
-                }
-            }
-            return f;
-        });
-        setStorage('sae_big_fish', updated);
+       // Placeholder for PHP impl
     },
 
     addCampaignRecord: async (fishId: string, record: Omit<CampaignRecord, 'id' | 'created_at'>): Promise<BigFish | undefined> => { 
@@ -275,7 +194,6 @@ export const mockService = {
                 })
             });
             if (res.ok) {
-                // Return fresh data from DB
                 return await mockService.getBigFishById(fishId);
             }
         } catch (e) { }
@@ -283,10 +201,90 @@ export const mockService = {
     },
 
     deleteCampaignRecord: async (fishId: string, recordId: string): Promise<void> => {
-        // DB impl pending
+        try {
+            await fetch(`${API_BASE}/big_fish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete_campaign_record', big_fish_id: fishId, record_id: recordId })
+            });
+        } catch (e) {}
     },
 
-    // --- TASKS ---
+    // --- TOP UP REQUESTS (UPDATED FOR DB) ---
+    createTopUpRequest: async (req: Omit<TopUpRequest, 'id' | 'status' | 'created_at'>): Promise<void> => {
+        try {
+            await fetch(`${API_BASE}/big_fish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'create_topup_request', id: uuid(), ...req })
+            });
+        } catch (e) {}
+    },
+
+    approveTopUpRequest: async (fishId: string, reqId: string): Promise<void> => {
+        try {
+            await fetch(`${API_BASE}/big_fish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update_topup_status', request_id: reqId, status: 'APPROVED' })
+            });
+        } catch (e) {}
+    },
+
+    rejectTopUpRequest: async (fishId: string, reqId: string): Promise<void> => {
+        try {
+            await fetch(`${API_BASE}/big_fish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update_topup_status', request_id: reqId, status: 'REJECTED' })
+            });
+        } catch (e) {}
+    },
+
+    deleteTopUpRequest: async (fishId: string, reqId: string): Promise<void> => {
+        try {
+            await fetch(`${API_BASE}/big_fish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete_topup_request', request_id: reqId })
+            });
+        } catch (e) {}
+    },
+
+    // --- GROWTH TASKS (UPDATED FOR DB) ---
+    addGrowthTask: async (fishId: string, title: string, dueDate?: string): Promise<void> => {
+        try {
+            await fetch(`${API_BASE}/big_fish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'add_growth_task', id: uuid(), big_fish_id: fishId, title, due_date: dueDate })
+            });
+        } catch (e) {}
+    },
+
+    toggleGrowthTask: async (fishId: string, taskId: string): Promise<void> => {
+        try {
+            await fetch(`${API_BASE}/big_fish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'toggle_growth_task', task_id: taskId })
+            });
+        } catch (e) {}
+    },
+
+    updateTargets: async (fishId: string, target: number, current: number): Promise<void> => {
+        await mockService.updateBigFish(fishId, { target_sales: target, current_sales: current });
+    },
+
+    addClientInteraction: async (fishId: string, interaction: Partial<ClientInteraction>): Promise<void> => {
+        // Placeholder as interactions are stored in JSON/Blob often or separate logic
+    },
+
+    deleteClientInteraction: async (fishId: string, interactionId: string): Promise<void> => {
+        // Placeholder
+    },
+
+    // --- TASKS (GENERAL) ---
     getTasks: async (): Promise<Task[]> => {
         return getStorage<Task[]>('sae_tasks', []);
     },
@@ -705,76 +703,6 @@ export const mockService = {
         const fish = await mockService.getBigFish();
         const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
         return fish.filter(f => f.campaign_end_date && new Date(f.campaign_end_date) <= tomorrow);
-    },
-
-    approveTopUpRequest: async (fishId: string, reqId: string): Promise<void> => {
-        const fish = await mockService.getBigFishById(fishId);
-        if (fish && fish.topup_requests) {
-            const req = fish.topup_requests.find(r => r.id === reqId);
-            if (req) {
-                req.status = 'APPROVED';
-                await mockService.addTransaction(fishId, 'DEPOSIT', req.amount, `Top-up via ${req.method_name}`);
-                await mockService.updateBigFish(fishId, { topup_requests: [...fish.topup_requests] });
-            }
-        }
-    },
-
-    rejectTopUpRequest: async (fishId: string, reqId: string): Promise<void> => {
-        const fish = await mockService.getBigFishById(fishId);
-        if (fish && fish.topup_requests) {
-            const updated = fish.topup_requests.map(r => r.id === reqId ? { ...r, status: 'REJECTED' } : r);
-            await mockService.updateBigFish(fishId, { topup_requests: updated as any });
-        }
-    },
-
-    deleteTopUpRequest: async (fishId: string, reqId: string): Promise<void> => {
-        const fish = await mockService.getBigFishById(fishId);
-        if (fish && fish.topup_requests) {
-            await mockService.updateBigFish(fishId, { topup_requests: fish.topup_requests.filter(r => r.id !== reqId) });
-        }
-    },
-
-    createTopUpRequest: async (req: Omit<TopUpRequest, 'id' | 'status' | 'created_at'>): Promise<void> => {
-        const fish = await mockService.getBigFishById(req.client_id);
-        if (fish) {
-            const newReq: TopUpRequest = { ...req, id: uuid(), status: 'PENDING', created_at: new Date().toISOString() };
-            await mockService.updateBigFish(req.client_id, { topup_requests: [newReq, ...(fish.topup_requests || [])] });
-        }
-    },
-
-    addGrowthTask: async (fishId: string, title: string, dueDate?: string): Promise<void> => {
-        const fish = await mockService.getBigFishById(fishId);
-        if (fish) {
-            const newTask = { id: uuid(), title, is_completed: false, due_date: dueDate };
-            await mockService.updateBigFish(fishId, { growth_tasks: [...(fish.growth_tasks || []), newTask] });
-        }
-    },
-
-    toggleGrowthTask: async (fishId: string, taskId: string): Promise<void> => {
-        const fish = await mockService.getBigFishById(fishId);
-        if (fish && fish.growth_tasks) {
-            const updated = fish.growth_tasks.map(t => t.id === taskId ? { ...t, is_completed: !t.is_completed } : t);
-            await mockService.updateBigFish(fishId, { growth_tasks: updated });
-        }
-    },
-
-    updateTargets: async (fishId: string, target: number, current: number): Promise<void> => {
-        await mockService.updateBigFish(fishId, { target_sales: target, current_sales: current });
-    },
-
-    addClientInteraction: async (fishId: string, interaction: Partial<ClientInteraction>): Promise<void> => {
-        const fish = await mockService.getBigFishById(fishId);
-        if (fish) {
-            const log = { id: uuid(), date: new Date().toISOString(), created_at: new Date().toISOString(), ...interaction } as ClientInteraction;
-            await mockService.updateBigFish(fishId, { interactions: [log, ...(fish.interactions || [])] });
-        }
-    },
-
-    deleteClientInteraction: async (fishId: string, interactionId: string): Promise<void> => {
-        const fish = await mockService.getBigFishById(fishId);
-        if (fish && fish.interactions) {
-            await mockService.updateBigFish(fishId, { interactions: fish.interactions.filter(i => i.id !== interactionId) });
-        }
     },
 
     getIndustries: async (): Promise<string[]> => {
