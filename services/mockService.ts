@@ -93,10 +93,12 @@ export const mockService = {
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data)) return data;
+            } else {
+                console.error("API GET Failed", await res.text());
             }
         } catch (e) { console.error("API Error", e); }
-        // Fallback removed to force API usage if connected
-        return getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
+        // Fallback to empty array if API fails, to prevent UI crash
+        return [];
     },
 
     getBigFishById: async (id: string): Promise<BigFish | undefined> => {
@@ -112,12 +114,7 @@ export const mockService = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'create', id: newId, ...fish })
             });
-        } catch (e) {}
-        
-        // Local Sync
-        const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
-        const newFish = { id: newId, ...fish } as BigFish;
-        setStorage('sae_big_fish', [newFish, ...allFish]);
+        } catch (e) { console.error("API Create Error", e); }
     },
 
     updateBigFish: async (id: string, updates: Partial<BigFish>): Promise<void> => {
@@ -127,11 +124,7 @@ export const mockService = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'update', id, ...updates })
             });
-        } catch (e) {}
-        
-        const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
-        const updated = allFish.map(f => f.id === id ? { ...f, ...updates } : f);
-        setStorage('sae_big_fish', updated);
+        } catch (e) { console.error("API Update Error", e); }
     },
 
     catchBigFish: async (leadId: string): Promise<BigFish | null> => {
@@ -169,7 +162,7 @@ export const mockService = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'add_transaction', id: txId, big_fish_id: fishId, type, amount, description, date: new Date().toISOString() })
             });
-        } catch (e) {}
+        } catch (e) { console.error("API Tx Error", e); }
     },
 
     updateTransaction: async (fishId: string, txId: string, updates: Partial<Transaction>): Promise<void> => {
@@ -196,7 +189,7 @@ export const mockService = {
             if (res.ok) {
                 return await mockService.getBigFishById(fishId);
             }
-        } catch (e) { }
+        } catch (e) { console.error("API Campaign Error", e); }
         return undefined;
     },
 
@@ -207,18 +200,19 @@ export const mockService = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'delete_campaign_record', big_fish_id: fishId, record_id: recordId })
             });
-        } catch (e) {}
+        } catch (e) { console.error("API Campaign Delete Error", e); }
     },
 
-    // --- TOP UP REQUESTS (UPDATED FOR DB) ---
+    // --- TOP UP REQUESTS (DB Updated) ---
     createTopUpRequest: async (req: Omit<TopUpRequest, 'id' | 'status' | 'created_at'>): Promise<void> => {
         try {
-            await fetch(`${API_BASE}/big_fish.php`, {
+            const res = await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'create_topup_request', id: uuid(), ...req })
             });
-        } catch (e) {}
+            if(!res.ok) console.error("TopUp Create Failed", await res.text());
+        } catch (e) { console.error("TopUp Error", e); }
     },
 
     approveTopUpRequest: async (fishId: string, reqId: string): Promise<void> => {
@@ -228,7 +222,7 @@ export const mockService = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'update_topup_status', request_id: reqId, status: 'APPROVED' })
             });
-        } catch (e) {}
+        } catch (e) { console.error("TopUp Approve Error", e); }
     },
 
     rejectTopUpRequest: async (fishId: string, reqId: string): Promise<void> => {
@@ -238,7 +232,7 @@ export const mockService = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'update_topup_status', request_id: reqId, status: 'REJECTED' })
             });
-        } catch (e) {}
+        } catch (e) { console.error("TopUp Reject Error", e); }
     },
 
     deleteTopUpRequest: async (fishId: string, reqId: string): Promise<void> => {
@@ -248,28 +242,30 @@ export const mockService = {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'delete_topup_request', request_id: reqId })
             });
-        } catch (e) {}
+        } catch (e) { console.error("TopUp Delete Error", e); }
     },
 
-    // --- GROWTH TASKS (UPDATED FOR DB) ---
+    // --- GROWTH TASKS (DB Updated) ---
     addGrowthTask: async (fishId: string, title: string, dueDate?: string): Promise<void> => {
         try {
-            await fetch(`${API_BASE}/big_fish.php`, {
+            const res = await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'add_growth_task', id: uuid(), big_fish_id: fishId, title, due_date: dueDate })
             });
-        } catch (e) {}
+            if(!res.ok) console.error("Task Add Failed", await res.text());
+        } catch (e) { console.error("Task Add Error", e); }
     },
 
     toggleGrowthTask: async (fishId: string, taskId: string): Promise<void> => {
         try {
-            await fetch(`${API_BASE}/big_fish.php`, {
+            const res = await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'toggle_growth_task', task_id: taskId })
             });
-        } catch (e) {}
+            if(!res.ok) console.error("Task Toggle Failed", await res.text());
+        } catch (e) { console.error("Task Toggle Error", e); }
     },
 
     updateTargets: async (fishId: string, target: number, current: number): Promise<void> => {
