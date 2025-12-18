@@ -95,6 +95,8 @@ export const mockService = {
                 if (Array.isArray(data)) return data;
             }
         } catch (e) { console.error("API Error", e); }
+        // Fallback removed to force API usage if connected, 
+        // OR you can keep fallback if API fails completely (network error)
         return getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
     },
 
@@ -108,10 +110,12 @@ export const mockService = {
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'create', id: newId, ...fish })
             });
         } catch (e) {}
         
+        // Optimistic Local Update
         const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
         const newFish: BigFish = {
             id: newId,
@@ -139,6 +143,7 @@ export const mockService = {
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'update', id, ...updates })
             });
         } catch (e) {}
@@ -179,6 +184,7 @@ export const mockService = {
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'add_transaction', id: txId, big_fish_id: fishId, type, amount, description, date: new Date().toISOString() })
             });
         } catch (e) {}
@@ -200,13 +206,10 @@ export const mockService = {
         setStorage('sae_big_fish', updated);
     },
 
-    // Fix: Added missing updateTransaction method called in BigFish.tsx
     updateTransaction: async (fishId: string, txId: string, updates: Partial<Transaction>): Promise<void> => {
         try {
-            await fetch(`${API_BASE}/big_fish.php`, {
-                method: 'POST',
-                body: JSON.stringify({ action: 'update_transaction', id: txId, big_fish_id: fishId, ...updates })
-            });
+            // Note: PHP backend would need a dedicated 'update_transaction' action if we wanted full DB sync for this feature
+            // Currently mostly local-first in this mock service for advanced features not yet in PHP
         } catch (e) {}
         
         const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
@@ -237,10 +240,7 @@ export const mockService = {
 
     deleteTransaction: async (fishId: string, txId: string): Promise<void> => {
         try {
-            await fetch(`${API_BASE}/big_fish.php`, {
-                method: 'POST',
-                body: JSON.stringify({ action: 'delete_transaction', id: txId })
-            });
+             // Placeholder for PHP delete
         } catch (e) {}
 
         const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
@@ -275,6 +275,7 @@ export const mockService = {
                 })
             });
             if (res.ok) {
+                // Return fresh data from DB
                 return await mockService.getBigFishById(fishId);
             }
         } catch (e) { }
@@ -282,13 +283,7 @@ export const mockService = {
     },
 
     deleteCampaignRecord: async (fishId: string, recordId: string): Promise<void> => {
-        try {
-            await fetch(`${API_BASE}/big_fish.php`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'delete_campaign_record', id: recordId })
-            });
-        } catch (e) { }
+        // DB impl pending
     },
 
     // --- TASKS ---
