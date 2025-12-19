@@ -621,21 +621,57 @@ export const mockService = {
         setStorage('sae_docs', docs.filter(d => d.id !== id));
     },
 
-    // --- SETTINGS ---
+    // --- SETTINGS (UPDATED TO SYNC WITH DB) ---
     getSystemSettings: async (): Promise<SystemSettings> => {
-        return getStorage<SystemSettings>('sae_settings', {
+        const defaults: SystemSettings = {
             facebook_page_token: '',
             facebook_verify_token: '',
             sms_api_key: '',
             sms_sender_id: '',
             sms_base_url: '',
             timezone: 'Asia/Dhaka',
+            system_api_key: '',
+            portal_support_phone: '',
+            portal_support_url: '',
+            portal_fb_group: ''
+        };
+
+        // 1. Try API
+        try {
+            const res = await fetch(`${API_BASE}/settings.php`);
+            if (res.ok) {
+                const data = await res.json();
+                return { ...defaults, ...data };
+            }
+        } catch (e) {
+            console.warn("Settings API Error, falling back to local");
+        }
+
+        // 2. Fallback Local Storage
+        return getStorage<SystemSettings>('sae_settings', {
+            ...defaults,
             system_api_key: 'lg_' + Math.random().toString(36).substr(2, 12)
         });
     },
 
     saveSystemSettings: async (settings: SystemSettings): Promise<void> => {
+        // 1. Local Storage
         setStorage('sae_settings', settings);
+
+        // 2. Database Sync
+        try {
+            const res = await fetch(`${API_BASE}/settings.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update', ...settings })
+            });
+            if(!res.ok) {
+                throw new Error(`Database save failed: ${res.statusText}`);
+            }
+        } catch (e) { 
+            console.error("API Settings Save Error", e);
+            throw e; // Rethrow to notify UI
+        }
     },
 
     // --- SALES GOALS ---
