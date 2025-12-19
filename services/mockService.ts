@@ -170,7 +170,13 @@ export const mockService = {
     },
 
     deleteTransaction: async (fishId: string, txId: string): Promise<void> => {
-       // Placeholder for PHP impl
+        try {
+            await fetch(`${API_BASE}/big_fish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete_transaction', transaction_id: txId })
+            });
+        } catch (e) { console.error("API Tx Delete Error", e); }
     },
 
     addCampaignRecord: async (fishId: string, record: Omit<CampaignRecord, 'id' | 'created_at'>): Promise<BigFish | undefined> => { 
