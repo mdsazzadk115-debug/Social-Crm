@@ -29,7 +29,19 @@ const setStorage = <T>(key: string, data: T): void => {
 export const mockService = {
     // --- LEADS ---
     getLeads: async (): Promise<Lead[]> => {
-        return getStorage<Lead[]>('sae_leads', DEMO_LEADS as any);
+        // 1. Try Fetching from Database API
+        try {
+            const res = await fetch(`${API_BASE}/leads.php`);
+            if (res.ok) {
+                const data = await res.json();
+                if (Array.isArray(data)) return data;
+            }
+        } catch (e) {
+            // console.error("API Fetch Error", e);
+        }
+        
+        // 2. Fallback to Local Storage (Default: Empty Array, NOT Demo Leads)
+        return getStorage<Lead[]>('sae_leads', []);
     },
 
     getLeadById: async (id: string): Promise<Lead | undefined> => {
@@ -38,7 +50,7 @@ export const mockService = {
     },
 
     createLead: async (lead: Partial<Lead>): Promise<void> => {
-        const leads = await mockService.getLeads();
+        // Prepare Object
         const newLead: Lead = {
             id: uuid(),
             full_name: lead.full_name || 'Unnamed Lead',
@@ -54,13 +66,35 @@ export const mockService = {
             created_at: new Date().toISOString(),
             ...lead
         } as Lead;
+
+        // 1. Update Local Storage (Optimistic)
+        const leads = getStorage<Lead[]>('sae_leads', []);
         setStorage('sae_leads', [newLead, ...leads]);
+
+        // 2. Sync to Database
+        try {
+            await fetch(`${API_BASE}/leads.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'create', ...newLead })
+            });
+        } catch (e) { console.error("API Create Error", e); }
     },
 
     updateLead: async (id: string, updates: Partial<Lead>): Promise<void> => {
-        const leads = await mockService.getLeads();
+        // 1. Update Local Storage
+        const leads = getStorage<Lead[]>('sae_leads', []);
         const updated = leads.map(l => l.id === id ? { ...l, ...updates, last_activity_at: new Date().toISOString() } : l);
         setStorage('sae_leads', updated);
+
+        // 2. Sync to Database
+        try {
+            await fetch(`${API_BASE}/leads.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update', id, ...updates })
+            });
+        } catch (e) { console.error("API Update Error", e); }
     },
 
     updateLeadStatus: async (id: string, status: LeadStatus): Promise<void> => {
@@ -81,6 +115,7 @@ export const mockService = {
     },
 
     incrementDownloadCount: async (ids: string[]): Promise<void> => {
+        // This is usually a local-only tracking or batch update, keeping it simple for now
         const leads = await mockService.getLeads();
         const updated = leads.map(l => ids.includes(l.id) ? { ...l, download_count: (l.download_count || 0) + 1 } : l);
         setStorage('sae_leads', updated);
@@ -166,7 +201,13 @@ export const mockService = {
     },
 
     updateTransaction: async (fishId: string, txId: string, updates: Partial<Transaction>): Promise<void> => {
-       // Placeholder for PHP impl if needed
+        try {
+            await fetch(`${API_BASE}/big_fish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+                body: JSON.stringify({ action: 'update_transaction', big_fish_id: fishId, transaction_id: txId, ...updates })
+            });
+        } catch (e) { console.error("API Tx Update Error", e); }
     },
 
     deleteTransaction: async (fishId: string, txId: string): Promise<void> => {
@@ -337,6 +378,9 @@ export const mockService = {
             return l;
         });
         setStorage('sae_leads', updated);
+        
+        // Try Sync if API available (Basic sync, assuming full lead update is heavy, but works for mock)
+        // In real app, interactions have their own table.
     },
 
     deleteLeadInteraction: async (leadId: string, interactionId: string): Promise<void> => {
@@ -402,7 +446,7 @@ export const mockService = {
     },
 
     triggerAutomationCheck: async (): Promise<void> => {
-        console.log("Automation Heartbeat: Checking for pending messages...");
+        // console.log("Automation Heartbeat: Checking for pending messages...");
     },
 
     // --- MESSAGING ---
