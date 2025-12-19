@@ -378,9 +378,6 @@ export const mockService = {
             return l;
         });
         setStorage('sae_leads', updated);
-        
-        // Try Sync if API available (Basic sync, assuming full lead update is heavy, but works for mock)
-        // In real app, interactions have their own table.
     },
 
     deleteLeadInteraction: async (leadId: string, interactionId: string): Promise<void> => {
@@ -449,10 +446,45 @@ export const mockService = {
         // console.log("Automation Heartbeat: Checking for pending messages...");
     },
 
-    // --- MESSAGING ---
+    // --- MESSAGING (UPDATED TO USE REAL API) ---
     sendBulkSMS: async (ids: string[], body: string): Promise<void> => {
-        console.log(`Sending SMS to ${ids.length} recipients: ${body}`);
+        console.log(`Sending SMS to ${ids.length} recipients...`);
+        
+        // 1. Get Config
+        const settings = await mockService.getSystemSettings();
         const leads = await mockService.getLeads();
+        const targets = leads.filter(l => ids.includes(l.id));
+
+        // 2. Try Sending via API
+        if (settings.sms_base_url && settings.sms_api_key) {
+            for (const lead of targets) {
+                // Ensure number is clean
+                const cleanNumber = lead.primary_phone.replace(/\D/g, ''); 
+                
+                // Generic Payload (Compatible with common Bulk SMS Gateways)
+                const payload = {
+                    api_key: settings.sms_api_key,
+                    senderid: settings.sms_sender_id,
+                    number: cleanNumber,
+                    message: body
+                };
+
+                try {
+                    // Try POST request first (Modern APIs)
+                    await fetch(settings.sms_base_url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                } catch (e) {
+                    console.error(`Failed to send SMS to ${cleanNumber}`, e);
+                }
+            }
+        } else {
+            console.warn("SMS Gateway URL or Key missing in Settings. Simulating sending...");
+        }
+
+        // 3. Update Local Storage Stats (For both Real & Simulation)
         const updated = leads.map(l => ids.includes(l.id) ? { ...l, total_messages_sent: (l.total_messages_sent || 0) + 1 } : l);
         setStorage('sae_leads', updated);
     },
