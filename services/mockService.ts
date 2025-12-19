@@ -446,47 +446,63 @@ export const mockService = {
         // console.log("Automation Heartbeat: Checking for pending messages...");
     },
 
-    // --- MESSAGING (UPDATED TO USE REAL API) ---
-    sendBulkSMS: async (ids: string[], body: string): Promise<void> => {
+    // --- MESSAGING (UPDATED TO FIX DELIVERY ISSUES) ---
+    sendBulkSMS: async (ids: string[], body: string): Promise<{ success: number, failed: number, errors: string[] }> => {
         console.log(`Sending SMS to ${ids.length} recipients...`);
         
-        // 1. Get Config
         const settings = await mockService.getSystemSettings();
         const leads = await mockService.getLeads();
         const targets = leads.filter(l => ids.includes(l.id));
+        
+        let success = 0;
+        let failed = 0;
+        let errors: string[] = [];
 
-        // 2. Try Sending via API
-        if (settings.sms_base_url && settings.sms_api_key) {
-            for (const lead of targets) {
-                // Ensure number is clean
-                const cleanNumber = lead.primary_phone.replace(/\D/g, ''); 
-                
-                // Generic Payload (Compatible with common Bulk SMS Gateways)
-                const payload = {
-                    api_key: settings.sms_api_key,
-                    senderid: settings.sms_sender_id,
-                    number: cleanNumber,
-                    message: body
-                };
-
-                try {
-                    // Try POST request first (Modern APIs)
-                    await fetch(settings.sms_base_url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(payload)
-                    });
-                } catch (e) {
-                    console.error(`Failed to send SMS to ${cleanNumber}`, e);
-                }
-            }
-        } else {
-            console.warn("SMS Gateway URL or Key missing in Settings. Simulating sending...");
+        // Validation
+        if (!settings.sms_base_url || !settings.sms_api_key) {
+            return { success: 0, failed: targets.length, errors: ["SMS Settings Missing (Check Settings > SMS Gateway)"] };
         }
 
-        // 3. Update Local Storage Stats (For both Real & Simulation)
-        const updated = leads.map(l => ids.includes(l.id) ? { ...l, total_messages_sent: (l.total_messages_sent || 0) + 1 } : l);
-        setStorage('sae_leads', updated);
+        // Try sending to each recipient
+        for (const lead of targets) {
+            const cleanNumber = lead.primary_phone.replace(/\D/g, ''); 
+            // Normalize to 880 format which is standard for BD Gateways
+            const formattedNumber = cleanNumber.startsWith('88') ? cleanNumber : '88' + cleanNumber;
+
+            try {
+                // Using URL construction for GET request (Standard for BD Bulk SMS)
+                // This avoids CORS issues if the provider supports simple GET and avoids JSON complexity
+                const url = new URL(settings.sms_base_url);
+                url.searchParams.append('api_key', settings.sms_api_key);
+                url.searchParams.append('senderid', settings.sms_sender_id);
+                url.searchParams.append('number', formattedNumber);
+                url.searchParams.append('message', body);
+
+                // Use 'no-cors' mode if standard fails, but standard fetch usually works for GET
+                const res = await fetch(url.toString(), { method: 'GET' }); 
+                const text = await res.text();
+
+                if (res.ok) {
+                    // Gateway success usually returns a specific code or string, but HTTP 200 is a good start
+                    // Many gateways return "1002" or "Success" in body
+                    success++;
+                } else {
+                    throw new Error(`HTTP Error ${res.status}: ${text}`);
+                }
+            } catch (e: any) {
+                console.error(`Failed to send to ${formattedNumber}`, e);
+                failed++;
+                errors.push(`${lead.full_name} (${cleanNumber}): ${e.message}`);
+            }
+        }
+
+        // Update local stats only for successful sends
+        if (success > 0) {
+            const updated = leads.map(l => ids.includes(l.id) ? { ...l, total_messages_sent: (l.total_messages_sent || 0) + 1 } : l);
+            setStorage('sae_leads', updated);
+        }
+
+        return { success, failed, errors };
     },
 
     scheduleBulkMessages: async (ids: string[], schedule: any[]): Promise<void> => {

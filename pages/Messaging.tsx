@@ -138,9 +138,15 @@ const Messaging: React.FC = () => {
                 );
                 alert(`Successfully scheduled for ${targetIds.length} recipients.`);
             } else {
-                // Instant Mode
-                await mockService.sendBulkSMS(targetIds, messageBody);
-                alert(`Message sent to ${targetIds.length} recipients.`);
+                // Instant Mode (Wait for result report)
+                const report = await mockService.sendBulkSMS(targetIds, messageBody);
+                
+                let reportMsg = `📊 Report:\n✅ Sent Successfully: ${report.success}\n❌ Failed: ${report.failed}`;
+                if (report.failed > 0 && report.errors.length > 0) {
+                    reportMsg += `\n\nErrors:\n${report.errors.slice(0, 3).join('\n')}`;
+                    if(report.errors.length > 3) reportMsg += `\n...and ${report.errors.length - 3} more.`;
+                }
+                alert(reportMsg);
             }
             
             // Reset form
