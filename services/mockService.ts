@@ -446,7 +446,7 @@ export const mockService = {
         // console.log("Automation Heartbeat: Checking for pending messages...");
     },
 
-    // --- MESSAGING (UPDATED TO FIX DELIVERY ISSUES) ---
+    // --- MESSAGING (UPDATED TO FIX DELIVERY ISSUES + HTTPS) ---
     sendBulkSMS: async (ids: string[], body: string): Promise<{ success: number, failed: number, errors: string[] }> => {
         console.log(`Sending SMS to ${ids.length} recipients...`);
         
@@ -463,6 +463,12 @@ export const mockService = {
             return { success: 0, failed: targets.length, errors: ["SMS Settings Missing (Check Settings > SMS Gateway)"] };
         }
 
+        // --- FIX: Force HTTPS to prevent Mixed Content Error ---
+        let baseUrl = settings.sms_base_url;
+        if (baseUrl.startsWith('http://')) {
+            baseUrl = baseUrl.replace('http://', 'https://');
+        }
+
         // Try sending to each recipient
         for (const lead of targets) {
             const cleanNumber = lead.primary_phone.replace(/\D/g, ''); 
@@ -471,20 +477,17 @@ export const mockService = {
 
             try {
                 // Using URL construction for GET request (Standard for BD Bulk SMS)
-                // This avoids CORS issues if the provider supports simple GET and avoids JSON complexity
-                const url = new URL(settings.sms_base_url);
+                const url = new URL(baseUrl);
                 url.searchParams.append('api_key', settings.sms_api_key);
                 url.searchParams.append('senderid', settings.sms_sender_id);
                 url.searchParams.append('number', formattedNumber);
                 url.searchParams.append('message', body);
 
-                // Use 'no-cors' mode if standard fails, but standard fetch usually works for GET
+                // Use standard fetch
                 const res = await fetch(url.toString(), { method: 'GET' }); 
                 const text = await res.text();
 
                 if (res.ok) {
-                    // Gateway success usually returns a specific code or string, but HTTP 200 is a good start
-                    // Many gateways return "1002" or "Success" in body
                     success++;
                 } else {
                     throw new Error(`HTTP Error ${res.status}: ${text}`);
