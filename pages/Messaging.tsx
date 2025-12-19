@@ -142,6 +142,11 @@ const Messaging: React.FC = () => {
                 const report = await mockService.sendBulkSMS(targetIds, messageBody);
                 
                 let reportMsg = `📊 Report:\n✅ Sent Successfully: ${report.success}\n❌ Failed: ${report.failed}`;
+                
+                if (report.gatewayResponse) {
+                    reportMsg += `\n\n📡 Gateway Response: ${report.gatewayResponse.substring(0, 100)}`;
+                }
+
                 if (report.failed > 0 && report.errors.length > 0) {
                     reportMsg += `\n\nErrors:\n${report.errors.slice(0, 3).join('\n')}`;
                     if(report.errors.length > 3) reportMsg += `\n...and ${report.errors.length - 3} more.`;

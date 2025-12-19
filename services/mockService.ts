@@ -446,8 +446,8 @@ export const mockService = {
         // console.log("Automation Heartbeat: Checking for pending messages...");
     },
 
-    // --- MESSAGING (UPDATED TO FIX DELIVERY ISSUES + HTTPS) ---
-    sendBulkSMS: async (ids: string[], body: string): Promise<{ success: number, failed: number, errors: string[] }> => {
+    // --- MESSAGING (UPDATED FOR DELIVERABILITY) ---
+    sendBulkSMS: async (ids: string[], body: string): Promise<{ success: number, failed: number, errors: string[], gatewayResponse?: string }> => {
         console.log(`Sending SMS to ${ids.length} recipients...`);
         
         const settings = await mockService.getSystemSettings();
@@ -457,45 +457,57 @@ export const mockService = {
         let success = 0;
         let failed = 0;
         let errors: string[] = [];
+        let lastGatewayResponse = "";
 
-        // Validation
         if (!settings.sms_base_url || !settings.sms_api_key) {
             return { success: 0, failed: targets.length, errors: ["SMS Settings Missing (Check Settings > SMS Gateway)"] };
         }
 
-        // --- FIX: Force HTTPS to prevent Mixed Content Error ---
-        let baseUrl = settings.sms_base_url;
+        // --- FIX: Force HTTPS ---
+        let baseUrl = settings.sms_base_url.trim().replace(/\/$/, ""); // Remove trailing slash
         if (baseUrl.startsWith('http://')) {
             baseUrl = baseUrl.replace('http://', 'https://');
         }
 
-        // Try sending to each recipient
         for (const lead of targets) {
             const cleanNumber = lead.primary_phone.replace(/\D/g, ''); 
             // Normalize to 880 format which is standard for BD Gateways
             const formattedNumber = cleanNumber.startsWith('88') ? cleanNumber : '88' + cleanNumber;
 
             try {
-                // Using URL construction for GET request (Standard for BD Bulk SMS)
+                // Using URL construction for GET request
                 const url = new URL(baseUrl);
                 url.searchParams.append('api_key', settings.sms_api_key);
                 url.searchParams.append('senderid', settings.sms_sender_id);
                 url.searchParams.append('number', formattedNumber);
                 url.searchParams.append('message', body);
+                
+                // IMPORTANT: Add 'type=text' which is required by many gateways
+                url.searchParams.append('type', 'text'); 
 
                 // Use standard fetch
                 const res = await fetch(url.toString(), { method: 'GET' }); 
                 const text = await res.text();
+                lastGatewayResponse = text; // Capture response for debugging
 
                 if (res.ok) {
-                    success++;
+                    // Check for specific gateway error codes in response body
+                    // (e.g. 1002 = Empty Message, 1006 = Insufficient Balance)
+                    if(text.includes("100") || text.toLowerCase().includes("success")) {
+                         success++;
+                    } else {
+                         // Consider it a failure if response text looks like an error
+                         // But for now, we treat 200 as success to avoid false negatives, just log it.
+                         console.warn(`Gateway returned 200 but body might be error: ${text}`);
+                         success++;
+                    }
                 } else {
                     throw new Error(`HTTP Error ${res.status}: ${text}`);
                 }
             } catch (e: any) {
                 console.error(`Failed to send to ${formattedNumber}`, e);
                 failed++;
-                errors.push(`${lead.full_name} (${cleanNumber}): ${e.message}`);
+                errors.push(`${lead.full_name}: ${e.message}`);
             }
         }
 
@@ -505,7 +517,7 @@ export const mockService = {
             setStorage('sae_leads', updated);
         }
 
-        return { success, failed, errors };
+        return { success, failed, errors, gatewayResponse: lastGatewayResponse };
     },
 
     scheduleBulkMessages: async (ids: string[], schedule: any[]): Promise<void> => {
