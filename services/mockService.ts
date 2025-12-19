@@ -111,7 +111,7 @@ export const mockService = {
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
                 body: JSON.stringify({ action: 'create', id: newId, ...fish })
             });
         } catch (e) { console.error("API Create Error", e); }
@@ -121,7 +121,7 @@ export const mockService = {
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
                 body: JSON.stringify({ action: 'update', id, ...updates })
             });
         } catch (e) { console.error("API Update Error", e); }
@@ -159,7 +159,7 @@ export const mockService = {
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
                 body: JSON.stringify({ action: 'add_transaction', id: txId, big_fish_id: fishId, type, amount, description, date: new Date().toISOString() })
             });
         } catch (e) { console.error("API Tx Error", e); }
@@ -173,7 +173,7 @@ export const mockService = {
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
                 body: JSON.stringify({ action: 'delete_transaction', transaction_id: txId })
             });
         } catch (e) { console.error("API Tx Delete Error", e); }
@@ -184,7 +184,7 @@ export const mockService = {
         try {
             const res = await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
                 body: JSON.stringify({ 
                     action: 'add_campaign_record', 
                     id: newId, 
@@ -203,7 +203,7 @@ export const mockService = {
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
                 body: JSON.stringify({ action: 'delete_campaign_record', big_fish_id: fishId, record_id: recordId })
             });
         } catch (e) { console.error("API Campaign Delete Error", e); }
@@ -214,7 +214,7 @@ export const mockService = {
         try {
             const res = await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
                 body: JSON.stringify({ action: 'create_topup_request', id: uuid(), ...req })
             });
             if(!res.ok) console.error("TopUp Create Failed", await res.text());
@@ -225,7 +225,7 @@ export const mockService = {
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
                 body: JSON.stringify({ action: 'update_topup_status', request_id: reqId, status: 'APPROVED' })
             });
         } catch (e) { console.error("TopUp Approve Error", e); }
@@ -235,7 +235,7 @@ export const mockService = {
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
                 body: JSON.stringify({ action: 'update_topup_status', request_id: reqId, status: 'REJECTED' })
             });
         } catch (e) { console.error("TopUp Reject Error", e); }
@@ -245,7 +245,7 @@ export const mockService = {
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
                 body: JSON.stringify({ action: 'delete_topup_request', request_id: reqId })
             });
         } catch (e) { console.error("TopUp Delete Error", e); }
@@ -256,7 +256,7 @@ export const mockService = {
         try {
             const res = await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
                 body: JSON.stringify({ action: 'add_growth_task', id: uuid(), big_fish_id: fishId, title, due_date: dueDate })
             });
             if(!res.ok) console.error("Task Add Failed", await res.text());
@@ -267,7 +267,7 @@ export const mockService = {
         try {
             const res = await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
                 body: JSON.stringify({ action: 'toggle_growth_task', task_id: taskId })
             });
             if(!res.ok) console.error("Task Toggle Failed", await res.text());
