@@ -33,6 +33,9 @@ const BigFishPage: React.FC = () => {
     const [amount, setAmount] = useState<number>(0);
     const [desc, setDesc] = useState('');
     
+    // Image Preview State
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
+
     // Detailed Campaign Entry State
     const [campStartDateInput, setCampStartDateInput] = useState(new Date().toISOString().slice(0, 10));
     const [campEndDateInput, setCampEndDateInput] = useState(new Date().toISOString().slice(0, 10));
@@ -545,7 +548,7 @@ const BigFishPage: React.FC = () => {
                                 {activeTab === 'topups' && (
                                     <div className="space-y-6"><h3 className="font-bold text-gray-800">Pending Requests</h3><div className="space-y-4">
                                             {selectedFish.topup_requests?.filter(r => r.status === 'PENDING').map(req => (
-                                                <div key={req.id} className="bg-amber-50 p-4 rounded-lg border border-amber-200 flex flex-col md:flex-row justify-between items-center gap-4"><div><div className="font-bold text-amber-900 text-lg">{formatCurrency(req.amount)}</div><div className="text-sm text-amber-800">Via: {req.method_name} ({req.sender_number})</div><div className="text-xs text-amber-600 mt-1">{new Date(req.created_at).toLocaleString()}</div></div>{req.screenshot_url && (<button onClick={() => window.open(req.screenshot_url, '_blank')} className="text-xs flex items-center text-blue-600 hover:underline"><Layout className="h-3 w-3 mr-1"/> View Screenshot</button>)}<div className="flex gap-2"><button onClick={() => handleApproveTopUp(req)} className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-green-700">Approve</button><button onClick={() => handleRejectTopUp(req.id)} className="bg-red-500 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-red-600">Reject</button></div></div>
+                                                <div key={req.id} className="bg-amber-50 p-4 rounded-lg border border-amber-200 flex flex-col md:flex-row justify-between items-center gap-4"><div><div className="font-bold text-amber-900 text-lg">{formatCurrency(req.amount)}</div><div className="text-sm text-amber-800">Via: {req.method_name} ({req.sender_number})</div><div className="text-xs text-amber-600 mt-1">{new Date(req.created_at).toLocaleString()}</div></div>{req.screenshot_url && (<button onClick={() => setPreviewImage(req.screenshot_url || '')} className="text-xs flex items-center text-blue-600 hover:underline"><Layout className="h-3 w-3 mr-1"/> View Screenshot</button>)}<div className="flex gap-2"><button onClick={() => handleApproveTopUp(req)} className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-green-700">Approve</button><button onClick={() => handleRejectTopUp(req.id)} className="bg-red-500 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-red-600">Reject</button></div></div>
                                             ))}
                                             {(!selectedFish.topup_requests || !selectedFish.topup_requests.some(r => r.status === 'PENDING')) && (<p className="text-gray-400 text-sm">No pending requests.</p>)}
                                         </div><h3 className="font-bold text-gray-800 pt-4 border-t border-gray-200">History</h3><div className="opacity-70">
@@ -578,6 +581,16 @@ const BigFishPage: React.FC = () => {
             )}
             {isEditTxModalOpen && editingTx && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"><div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6"><h3 className="font-bold text-lg mb-4">Edit Transaction</h3><div className="space-y-3"><input type="date" className="w-full border border-gray-300 rounded p-2" value={editTxDate} onChange={e => setEditTxDate(e.target.value)} /><input type="number" className="w-full border border-gray-300 rounded p-2" value={editTxAmount} onChange={e => setEditTxAmount(parseFloat(e.target.value))} /><input type="text" className="w-full border border-gray-300 rounded p-2" value={editTxDesc} onChange={e => setEditTxDesc(e.target.value)} /><div className="flex gap-2 pt-2"><button onClick={handleUpdateTransaction} className="flex-1 bg-indigo-600 text-white font-bold py-2 rounded hover:bg-indigo-700">Update</button><button onClick={() => setIsEditTxModalOpen(false)} className="flex-1 border border-gray-300 text-gray-700 font-bold py-2 rounded hover:bg-gray-50">Cancel</button></div></div></div></div>
+            )}
+            {previewImage && (
+                <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-90 p-4 backdrop-blur-sm" onClick={() => setPreviewImage(null)}>
+                    <div className="relative max-w-3xl w-full max-h-[90vh] flex flex-col items-center">
+                        <img src={previewImage} alt="Payment Screenshot" className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl border-2 border-white" />
+                        <button onClick={() => setPreviewImage(null)} className="mt-4 bg-white text-gray-900 px-6 py-2 rounded-full font-bold shadow-lg hover:bg-gray-200 transition-colors">
+                            Close Preview
+                        </button>
+                    </div>
+                </div>
             )}
         </div>
     );
