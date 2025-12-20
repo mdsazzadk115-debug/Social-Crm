@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { LeadForm } from '../types';
@@ -112,11 +113,30 @@ const Forms: React.FC = () => {
 
     // --- UNIVERSAL LINK GENERATOR (Safe for Unicode/Bangla) ---
     const getPublicLink = (form: Partial<LeadForm>) => {
-        // We use the ID if it exists for a persistent link, OR we can use the config payload
-        // Ideally, use ID so updates to the form reflect on the public link without changing the URL
+        const baseUrl = window.location.href.split('#')[0];
+        const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl; 
+        
+        // FIX: Encode form configuration into the URL (Portable Link)
+        // This ensures the form works on any browser/device without a shared database.
+        if (form.title) {
+            const payload = {
+                t: form.title,
+                s: form.subtitle,
+                type: form.type,
+                c: form.config
+            };
+            try {
+                const json = JSON.stringify(payload);
+                // Safe Base64 encoding for Unicode strings (Bangla support)
+                const encoded = window.btoa(unescape(encodeURIComponent(json)));
+                return `${cleanBase}/#/f/cfg-${encoded}`;
+            } catch (e) {
+                console.error("Link generation failed", e);
+            }
+        }
+
+        // Fallback to ID (Only works locally)
         if (form.id) {
-            const baseUrl = window.location.href.split('#')[0];
-            const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl; 
             return `${cleanBase}/#/f/${form.id}`;
         }
         
