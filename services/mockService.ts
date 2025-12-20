@@ -16,6 +16,9 @@ const API_BASE = '/api';
 // Helper to generate IDs
 const uuid = () => Math.random().toString(36).substr(2, 9);
 
+// Helper for MySQL Date (YYYY-MM-DD HH:MM:SS)
+const getMySQLDate = () => new Date().toISOString().slice(0, 19).replace('T', ' ');
+
 // Helper for local storage
 const getStorage = <T>(key: string, defaultValue: T): T => {
     const data = localStorage.getItem(key);
@@ -115,7 +118,6 @@ export const mockService = {
     },
 
     incrementDownloadCount: async (ids: string[]): Promise<void> => {
-        // This is usually a local-only tracking or batch update, keeping it simple for now
         const leads = await mockService.getLeads();
         const updated = leads.map(l => ids.includes(l.id) ? { ...l, download_count: (l.download_count || 0) + 1 } : l);
         setStorage('sae_leads', updated);
@@ -132,7 +134,6 @@ export const mockService = {
                 console.error("API GET Failed", await res.text());
             }
         } catch (e) { console.error("API Error", e); }
-        // Fallback to empty array if API fails, to prevent UI crash
         return [];
     },
 
@@ -320,7 +321,7 @@ export const mockService = {
     },
 
     addClientInteraction: async (fishId: string, interaction: Partial<ClientInteraction>): Promise<void> => {
-        // Placeholder as interactions are stored in JSON/Blob often or separate logic
+        // Placeholder
     },
 
     deleteClientInteraction: async (fishId: string, interactionId: string): Promise<void> => {
@@ -446,7 +447,7 @@ export const mockService = {
         // console.log("Automation Heartbeat: Checking for pending messages...");
     },
 
-    // --- MESSAGING (UPDATED FOR DELIVERABILITY) ---
+    // --- MESSAGING ---
     sendBulkSMS: async (ids: string[], body: string): Promise<{ success: number, failed: number, errors: string[], gatewayResponse?: string }> => {
         console.log(`Sending SMS to ${ids.length} recipients...`);
         
@@ -463,41 +464,31 @@ export const mockService = {
             return { success: 0, failed: targets.length, errors: ["SMS Settings Missing (Check Settings > SMS Gateway)"] };
         }
 
-        // --- FIX: Force HTTPS ---
-        let baseUrl = settings.sms_base_url.trim().replace(/\/$/, ""); // Remove trailing slash
+        let baseUrl = settings.sms_base_url.trim().replace(/\/$/, ""); 
         if (baseUrl.startsWith('http://')) {
             baseUrl = baseUrl.replace('http://', 'https://');
         }
 
         for (const lead of targets) {
             const cleanNumber = lead.primary_phone.replace(/\D/g, ''); 
-            // Normalize to 880 format which is standard for BD Gateways
             const formattedNumber = cleanNumber.startsWith('88') ? cleanNumber : '88' + cleanNumber;
 
             try {
-                // Using URL construction for GET request
                 const url = new URL(baseUrl);
                 url.searchParams.append('api_key', settings.sms_api_key);
                 url.searchParams.append('senderid', settings.sms_sender_id);
                 url.searchParams.append('number', formattedNumber);
                 url.searchParams.append('message', body);
-                
-                // IMPORTANT: Add 'type=text' which is required by many gateways
                 url.searchParams.append('type', 'text'); 
 
-                // Use standard fetch
                 const res = await fetch(url.toString(), { method: 'GET' }); 
                 const text = await res.text();
-                lastGatewayResponse = text; // Capture response for debugging
+                lastGatewayResponse = text; 
 
                 if (res.ok) {
-                    // Check for specific gateway error codes in response body
-                    // (e.g. 1002 = Empty Message, 1006 = Insufficient Balance)
                     if(text.includes("100") || text.toLowerCase().includes("success")) {
                          success++;
                     } else {
-                         // Consider it a failure if response text looks like an error
-                         // But for now, we treat 200 as success to avoid false negatives, just log it.
                          console.warn(`Gateway returned 200 but body might be error: ${text}`);
                          success++;
                     }
@@ -511,7 +502,6 @@ export const mockService = {
             }
         }
 
-        // Update local stats only for successful sends
         if (success > 0) {
             const updated = leads.map(l => ids.includes(l.id) ? { ...l, total_messages_sent: (l.total_messages_sent || 0) + 1 } : l);
             setStorage('sae_leads', updated);
@@ -542,26 +532,23 @@ export const mockService = {
 
     // --- FORMS (STRICTLY DATABASE ONLY) ---
     getForms: async (): Promise<LeadForm[]> => {
-        // Ensure we fetch strictly from API. No local storage fallback for form definition.
         try {
-            const res = await fetch(`${API_BASE}/forms.php`);
+            const res = await fetch(`${API_BASE}/forms.php?t=${Date.now()}`); // Add timestamp to prevent caching
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data)) return data;
             } else {
-                throw new Error("API Returned Non-OK");
+                console.error(`API Forms Fetch Failed: ${res.status} ${res.statusText}`);
             }
         } catch (e) {
             console.error("API Form Fetch Error", e);
-            // Return empty array if DB fails, DO NOT return stale local storage data
-            return []; 
         }
         return [];
     },
 
     getFormById: async (id: string): Promise<LeadForm | undefined> => {
         try {
-            const res = await fetch(`${API_BASE}/forms.php?id=${id}`);
+            const res = await fetch(`${API_BASE}/forms.php?id=${id}&t=${Date.now()}`);
             if (res.ok) {
                 const data = await res.json();
                 if (data && data.id) return data;
@@ -573,9 +560,9 @@ export const mockService = {
     },
 
     createForm: async (form: Omit<LeadForm, 'id' | 'created_at'>): Promise<void> => {
-        const newForm = { ...form, id: uuid(), created_at: new Date().toISOString() };
+        const newForm = { ...form, id: uuid(), created_at: getMySQLDate() };
         
-        // Strict API Call. Propagate error if fails.
+        // Strict API Call. No Local Storage Fallback.
         const res = await fetch(`${API_BASE}/forms.php`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -584,7 +571,7 @@ export const mockService = {
 
         if (!res.ok) {
             const txt = await res.text();
-            throw new Error(`Database Error: ${txt}`);
+            throw new Error(`Database Error (${res.status}): ${txt}`);
         }
     },
 
@@ -597,7 +584,7 @@ export const mockService = {
 
         if (!res.ok) {
             const txt = await res.text();
-            throw new Error(`Database Update Error: ${txt}`);
+            throw new Error(`Database Update Error (${res.status}): ${txt}`);
         }
     },
 
