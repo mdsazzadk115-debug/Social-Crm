@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 // @ts-ignore
 import { useParams } from 'react-router-dom';
@@ -594,7 +595,7 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
                                             const totalRevenue = rec.results_count * (rec.product_price || 0);
                                             const totalCOGS = rec.results_count * (rec.product_cost || 0);
                                             const grossProfit = totalRevenue - totalCOGS; 
-                                            const adSpendBDT = rec.amount_spent * 120; 
+                                            const adSpendBDT = rec.amount_spent * 145; 
                                             const realNetProfit = grossProfit - adSpendBDT;
                                             const isProfit = realNetProfit >= 0;
                                             return (
@@ -624,7 +625,7 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
                                     data={salesCampaigns.map(r => {
                                         const totalRevenue = r.results_count * (r.product_price || 0);
                                         const totalCOGS = r.results_count * (r.product_cost || 0);
-                                        const adSpendBDT = r.amount_spent * 120;
+                                        const adSpendBDT = r.amount_spent * 145;
                                         const net = (totalRevenue - totalCOGS) - adSpendBDT;
                                         return { ...r, net_profit: net };
                                     })} 
