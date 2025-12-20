@@ -83,27 +83,49 @@ const LeadList: React.FC = () => {
   };
 
   const handleStatusChange = async (leadId: string, newStatus: LeadStatus) => {
-      // Use functional state update to ensure we are working with the latest state and merging correctly
+      // Find the current lead object to ensure we have all fields
+      const currentLead = leads.find(l => l.id === leadId);
+      if (!currentLead) return;
+
+      // Create a fully merged object with the new status
+      const updatedLead = { ...currentLead, status: newStatus };
+
+      // Update Local State with the full object
       setLeads(prevLeads => prevLeads.map(l => 
-          l.id === leadId ? { ...l, status: newStatus } : l
+          l.id === leadId ? updatedLead : l
       ));
-      await mockService.updateLeadStatus(leadId, newStatus);
+
+      // Send the FULL object to the backend to prevent other fields from being wiped
+      await mockService.updateLead(leadId, updatedLead);
   };
 
   const handleIndustryChange = async (leadId: string, newIndustry: string) => {
+      const currentLead = leads.find(l => l.id === leadId);
+      if (!currentLead) return;
+
+      const updatedLead = { ...currentLead, industry: newIndustry };
+
       setLeads(prevLeads => prevLeads.map(l => 
-          l.id === leadId ? { ...l, industry: newIndustry } : l
+          l.id === leadId ? updatedLead : l
       ));
-      await mockService.updateLeadIndustry(leadId, newIndustry);
+      
+      await mockService.updateLead(leadId, updatedLead);
   };
 
   const handleStarToggle = async (leadId: string, e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
+      
+      const currentLead = leads.find(l => l.id === leadId);
+      if (!currentLead) return;
+
+      const updatedLead = { ...currentLead, is_starred: !currentLead.is_starred };
+
       setLeads(prevLeads => prevLeads.map(l => 
-          l.id === leadId ? { ...l, is_starred: !l.is_starred } : l
+          l.id === leadId ? updatedLead : l
       ));
-      await mockService.toggleLeadStar(leadId);
+      
+      await mockService.updateLead(leadId, updatedLead);
   };
 
   // --- WHATSAPP INTEGRATION (SMART WEB OPENER) ---
@@ -147,10 +169,17 @@ const LeadList: React.FC = () => {
 
   const saveNote = async () => {
       if(editingNoteLeadId) {
+          const currentLead = leads.find(l => l.id === editingNoteLeadId);
+          if (!currentLead) return;
+
+          const updatedLead = { ...currentLead, quick_note: editingNoteText };
+
           setLeads(prevLeads => prevLeads.map(l => 
-              l.id === editingNoteLeadId ? { ...l, quick_note: editingNoteText } : l
+              l.id === editingNoteLeadId ? updatedLead : l
           ));
-          await mockService.updateLeadNote(editingNoteLeadId, editingNoteText);
+          
+          await mockService.updateLead(editingNoteLeadId, updatedLead);
+          
           setIsNoteModalOpen(false);
           setEditingNoteLeadId(null);
       }
@@ -206,12 +235,19 @@ const LeadList: React.FC = () => {
   const handleEditLeadSave = async () => {
       if (!editingLeadData.id) return;
       
-      await mockService.updateLead(editingLeadData.id, editingLeadData);
+      const currentLead = leads.find(l => l.id === editingLeadData.id);
+      if (!currentLead) return;
+
+      // Merge edits into full object
+      const updatedLead = { ...currentLead, ...editingLeadData };
       
-      // Local Update
+      // Update Local State
       setLeads(prevLeads => prevLeads.map(l => 
-          l.id === editingLeadData.id ? { ...l, ...editingLeadData } : l
+          l.id === editingLeadData.id ? updatedLead : l
       ));
+      
+      // Send FULL object to API
+      await mockService.updateLead(editingLeadData.id, updatedLead);
       
       setIsEditLeadOpen(false);
       setEditingLeadData({});
