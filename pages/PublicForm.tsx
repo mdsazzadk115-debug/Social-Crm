@@ -40,34 +40,14 @@ const PublicForm: React.FC = () => {
 
     useEffect(() => {
         if(id) {
-            // Check if ID is an encoded configuration (starts with 'cfg-')
-            if (id.startsWith('cfg-')) {
-                try {
-                    const encoded = id.substring(4);
-                    const decoded = decodeURIComponent(escape(window.atob(encoded)));
-                    const payload = JSON.parse(decoded);
-                    
-                    // Reconstruct Form Object from Payload
-                    setForm({
-                        id: 'portable_form',
-                        title: payload.t,
-                        subtitle: payload.s,
-                        type: payload.type || 'SIMPLE',
-                        config: payload.c,
-                        created_at: new Date().toISOString()
-                    });
-                    setLoading(false);
-                } catch (e) {
-                    console.error("Failed to decode form", e);
-                    setLoading(false);
-                }
-            } else {
-                // Legacy / Local Database Lookup
-                mockService.getFormById(id).then(f => {
-                    setForm(f || null);
-                    setLoading(false);
-                });
-            }
+            // Load form directly from Database via Service
+            mockService.getFormById(id).then(f => {
+                setForm(f || null);
+                setLoading(false);
+            }).catch(e => {
+                console.error("Failed to load form", e);
+                setLoading(false);
+            });
         }
     }, [id]);
 
@@ -80,7 +60,7 @@ const PublicForm: React.FC = () => {
 
         try {
             // Use ID if available, or 'portable' identifier
-            const formId = form?.id || 'portable';
+            const formId = form?.id || 'unknown';
             
             // Construct payload based on type
             const submissionData = {

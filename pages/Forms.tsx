@@ -95,8 +95,8 @@ const Forms: React.FC = () => {
                 await mockService.createForm(finalForm as Omit<LeadForm, 'id' | 'created_at'>);
             }
             setIsCreateMode(false);
-            // Wait a moment for local storage to update before reloading
-            setTimeout(loadForms, 200);
+            // Wait a moment for database sync
+            setTimeout(loadForms, 500);
         } catch(e) {
             console.error(e);
             alert("Failed to save form. Please try again.");
@@ -111,36 +111,16 @@ const Forms: React.FC = () => {
         }
     };
 
-    // --- UNIVERSAL LINK GENERATOR (Safe for Unicode/Bangla) ---
+    // --- STANDARD LINK GENERATOR (Uses ID, relies on Database) ---
     const getPublicLink = (form: Partial<LeadForm>) => {
         const baseUrl = window.location.href.split('#')[0];
         const cleanBase = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl; 
         
-        // FIX: Encode form configuration into the URL (Portable Link)
-        // This ensures the form works on any browser/device without a shared database.
-        if (form.title) {
-            const payload = {
-                t: form.title,
-                s: form.subtitle,
-                type: form.type,
-                c: form.config
-            };
-            try {
-                const json = JSON.stringify(payload);
-                // Safe Base64 encoding for Unicode strings (Bangla support)
-                const encoded = window.btoa(unescape(encodeURIComponent(json)));
-                return `${cleanBase}/#/f/cfg-${encoded}`;
-            } catch (e) {
-                console.error("Link generation failed", e);
-            }
-        }
-
-        // Fallback to ID (Only works locally)
+        // Return standard ID based link
         if (form.id) {
             return `${cleanBase}/#/f/${form.id}`;
         }
         
-        // Fallback for preview
         return '#';
     };
 
@@ -338,7 +318,7 @@ const Forms: React.FC = () => {
                     </div>
                     <div className="p-6 bg-gray-50 border-t border-gray-200 flex justify-between items-center">
                         <div className="text-xs text-gray-500">
-                            * Changes are saved locally.
+                            * Changes are saved to database.
                         </div>
                         <div className="flex gap-3">
                             <button 
