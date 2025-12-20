@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { BigFish, Lead, Transaction, PaymentMethod, CampaignRecord, TopUpRequest, PortalConfig } from '../types';
@@ -148,6 +149,13 @@ const BigFishPage: React.FC = () => {
     const handleCampaignEntry = async () => {
         if (!selectedFish || campSpend <= 0) return alert("Spend amount required");
         if (!campStartDateInput) return alert("Start date is required");
+
+        // AUTO UPDATE SALES GOAL
+        if (campResultType === 'SALES') {
+            const newSales = (selectedFish.current_sales || 0) + campResults;
+            await mockService.updateTargets(selectedFish.id, selectedFish.target_sales, newSales);
+        }
+
         const record: Partial<CampaignRecord> = {
             start_date: campStartDateInput,
             end_date: campEndDateInput || campStartDateInput,
@@ -175,6 +183,13 @@ const BigFishPage: React.FC = () => {
     const deleteCampaignRecord = async (recId: string) => {
         if(!selectedFish) return;
         if(confirm("Delete this campaign entry? This will refund the amount to wallet.")) {
+            // AUTO DEDUCT SALES GOAL
+            const recordToDelete = selectedFish.campaign_records?.find(r => r.id === recId);
+            if (recordToDelete && recordToDelete.result_type === 'SALES') {
+                const newSales = Math.max(0, (selectedFish.current_sales || 0) - recordToDelete.results_count);
+                await mockService.updateTargets(selectedFish.id, selectedFish.target_sales, newSales);
+            }
+
             await mockService.deleteCampaignRecord(selectedFish.id, recId);
             loadData();
         }
