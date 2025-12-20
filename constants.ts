@@ -11,7 +11,7 @@ export const STATUS_COLORS: Record<LeadStatus, string> = {
   [LeadStatus.INTERESTED]: "bg-indigo-100 text-indigo-800 border border-indigo-200",
   [LeadStatus.HOT]: "bg-orange-100 text-orange-800 border border-orange-200",
   [LeadStatus.WORKING]: "bg-purple-100 text-purple-800 border border-purple-200",
-  [LeadStatus.CLOSED_WON]: "bg-green-100 text-green-800 border border-green-200",
+  [LeadStatus.CLOSED_WON]: "bg-emerald-100 text-emerald-800 border border-emerald-200",
   [LeadStatus.CLOSED_LOST]: "bg-red-100 text-red-800 border border-red-200",
   [LeadStatus.COLD]: "bg-slate-100 text-slate-600 border border-slate-200",
 };

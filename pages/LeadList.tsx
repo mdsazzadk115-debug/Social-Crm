@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 // @ts-ignore
 import { Link, useNavigate } from 'react-router-dom';
@@ -241,7 +240,6 @@ const LeadList: React.FC = () => {
       attempted: leads.filter(l => l.status === LeadStatus.ATTEMPTED_CONTACT).length,
       interested: leads.filter(l => l.status === LeadStatus.INTERESTED).length,
       hot: leads.filter(l => l.status === LeadStatus.HOT).length,
-      won: leads.filter(l => l.status === LeadStatus.CLOSED_WON).length, // Added Won Stat
       lost: leads.filter(l => l.status === LeadStatus.CLOSED_LOST || l.status === LeadStatus.COLD).length,
   };
 
@@ -366,8 +364,8 @@ const LeadList: React.FC = () => {
         </div>
       </div>
 
-      {/* --- STATS ROW (UPDATED WITH WON CARD) --- */}
-      <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-8 gap-3">
+      {/* --- STATS ROW --- */}
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
           <div onClick={resetFilters} className={`cursor-pointer p-4 rounded-xl border-2 transition-all shadow-sm flex items-center justify-between group relative ${filterStatus === 'all' && !showFavoritesOnly ? 'bg-slate-50 border-slate-400 ring-1 ring-slate-400' : 'bg-white border-transparent hover:border-slate-300 hover:shadow-md'}`}>
               <div><p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Leads</p><p className="text-2xl font-extrabold text-gray-800 mt-1">{stats.total}</p></div>
               <button onClick={(e) => handleDownload(e, leads, 'all_leads')} className="absolute top-2 right-2 p-1.5 rounded-full hover:bg-gray-200 text-gray-400 hover:text-gray-700 transition-colors" title="Download All"><Download className="h-4 w-4"/></button>
@@ -396,11 +394,6 @@ const LeadList: React.FC = () => {
           <div onClick={() => { setFilterStatus(filterStatus === LeadStatus.HOT ? 'all' : LeadStatus.HOT); setShowFavoritesOnly(false); }} className={getStatCardClass(LeadStatus.HOT, 'orange')}>
               <div><p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Hot Leads</p><p className="text-2xl font-extrabold text-orange-600 mt-1">{stats.hot}</p></div>
               <button onClick={(e) => handleDownload(e, leads.filter(l => l.status === LeadStatus.HOT), 'hot_leads')} className="absolute top-2 right-2 p-1.5 rounded-full hover:bg-orange-200 text-orange-400 hover:text-orange-700 transition-colors" title="Download Hot"><Download className="h-4 w-4"/></button>
-          </div>
-
-          <div onClick={() => { setFilterStatus(filterStatus === LeadStatus.CLOSED_WON ? 'all' : LeadStatus.CLOSED_WON); setShowFavoritesOnly(false); }} className={getStatCardClass(LeadStatus.CLOSED_WON, 'green')}>
-              <div><p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Won</p><p className="text-2xl font-extrabold text-green-600 mt-1">{stats.won}</p></div>
-              <button onClick={(e) => handleDownload(e, leads.filter(l => l.status === LeadStatus.CLOSED_WON), 'won_leads')} className="absolute top-2 right-2 p-1.5 rounded-full hover:bg-green-200 text-green-400 hover:text-green-700 transition-colors" title="Download Won"><Download className="h-4 w-4"/></button>
           </div>
           
           <div onClick={() => { setFilterStatus(filterStatus === 'lost_group' ? 'all' : 'lost_group'); setShowFavoritesOnly(false); }} className={`cursor-pointer p-4 rounded-xl border-2 transition-all shadow-sm flex items-center justify-between group relative ${filterStatus === 'lost_group' && !showFavoritesOnly ? 'bg-red-50 border-red-500 ring-1 ring-red-500' : 'bg-white border-transparent hover:border-red-200 hover:shadow-md'}`}>
