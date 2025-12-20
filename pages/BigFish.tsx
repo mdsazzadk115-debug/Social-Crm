@@ -546,16 +546,41 @@ const BigFishPage: React.FC = () => {
                                         </div></div>
                                 )}
                                 {activeTab === 'topups' && (
-                                    <div className="space-y-6"><h3 className="font-bold text-gray-800">Pending Requests</h3><div className="space-y-4">
+                                    <div className="space-y-6">
+                                        <h3 className="font-bold text-gray-800">Pending Requests</h3>
+                                        <div className="space-y-4">
                                             {selectedFish.topup_requests?.filter(r => r.status === 'PENDING').map(req => (
                                                 <div key={req.id} className="bg-amber-50 p-4 rounded-lg border border-amber-200 flex flex-col md:flex-row justify-between items-center gap-4"><div><div className="font-bold text-amber-900 text-lg">{formatCurrency(req.amount)}</div><div className="text-sm text-amber-800">Via: {req.method_name} ({req.sender_number})</div><div className="text-xs text-amber-600 mt-1">{new Date(req.created_at).toLocaleString()}</div></div>{req.screenshot_url && (<button onClick={() => setPreviewImage(req.screenshot_url || '')} className="text-xs flex items-center text-blue-600 hover:underline"><Layout className="h-3 w-3 mr-1"/> View Screenshot</button>)}<div className="flex gap-2"><button onClick={() => handleApproveTopUp(req)} className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-green-700">Approve</button><button onClick={() => handleRejectTopUp(req.id)} className="bg-red-500 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-red-600">Reject</button></div></div>
                                             ))}
                                             {(!selectedFish.topup_requests || !selectedFish.topup_requests.some(r => r.status === 'PENDING')) && (<p className="text-gray-400 text-sm">No pending requests.</p>)}
-                                        </div><h3 className="font-bold text-gray-800 pt-4 border-t border-gray-200">History</h3><div className="opacity-70">
+                                        </div>
+                                        <h3 className="font-bold text-gray-800 pt-4 border-t border-gray-200">History</h3>
+                                        <div className="opacity-90"> {/* Changed opacity-70 to 90 for better visibility */}
                                             {selectedFish.topup_requests?.filter(r => r.status !== 'PENDING').map(req => (
-                                                <div key={req.id} className="flex justify-between items-center py-2 border-b border-gray-100 text-sm"><div><span className={`font-bold ${req.status === 'APPROVED' ? 'text-green-600' : 'text-red-500'}`}>{req.status}</span><span className="mx-2 text-gray-400">|</span><span>{formatCurrency(req.amount)}</span></div><button onClick={() => handleDeleteTopUp(req.id)} className="text-gray-300 hover:text-red-500"><Trash2 className="h-3 w-3"/></button></div>
+                                                <div key={req.id} className="flex justify-between items-center py-3 border-b border-gray-100 text-sm hover:bg-gray-50 px-2 rounded">
+                                                    <div className="flex items-center gap-3">
+                                                        <span className={`font-bold w-20 ${req.status === 'APPROVED' ? 'text-green-600' : 'text-red-500'}`}>{req.status}</span>
+                                                        <span className="text-gray-300">|</span>
+                                                        <span className="font-mono font-bold w-16">{formatCurrency(req.amount)}</span>
+                                                        <span className="text-gray-300">|</span>
+                                                        <span className="text-xs text-gray-500">{new Date(req.created_at).toLocaleDateString()}</span>
+                                                        
+                                                        {/* ADDED SCREENSHOT BUTTON IN HISTORY */}
+                                                        {req.screenshot_url && (
+                                                            <button 
+                                                                onClick={() => setPreviewImage(req.screenshot_url || '')} 
+                                                                className="ml-4 text-xs flex items-center text-indigo-600 bg-indigo-50 px-2 py-1 rounded hover:bg-indigo-100 transition-colors"
+                                                            >
+                                                                <Layout className="h-3 w-3 mr-1"/> View Proof
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                    <button onClick={() => handleDeleteTopUp(req.id)} className="text-gray-300 hover:text-red-500 p-1"><Trash2 className="h-4 w-4"/></button>
+                                                </div>
                                             ))}
-                                        </div></div>
+                                            {(!selectedFish.topup_requests || !selectedFish.topup_requests.some(r => r.status !== 'PENDING')) && (<p className="text-gray-400 text-sm italic">No history available.</p>)}
+                                        </div>
+                                    </div>
                                 )}
                                 {activeTab === 'targets' && (
                                     <div className="max-w-md space-y-4"><div><label className="block text-sm font-medium text-gray-700 mb-1">Target Sales</label><input type="number" className="w-full border border-gray-300 rounded p-2" value={newTarget} onChange={e => setNewTarget(parseInt(e.target.value))} /></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Current Sales</label><input type="number" className="w-full border border-gray-300 rounded p-2" value={newCurrent} onChange={e => setNewCurrent(parseInt(e.target.value))} /></div><button onClick={handleUpdateTargets} className="bg-indigo-600 text-white px-4 py-2 rounded font-bold hover:bg-indigo-700">Update Targets</button></div>
