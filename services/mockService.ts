@@ -540,24 +540,26 @@ export const mockService = {
         return resultIds;
     },
 
-    // --- FORMS (DATABASE CONNECTED) ---
+    // --- FORMS (STRICTLY DATABASE ONLY) ---
     getForms: async (): Promise<LeadForm[]> => {
-        // 1. Try API
+        // Ensure we fetch strictly from API. No local storage fallback for form definition.
         try {
             const res = await fetch(`${API_BASE}/forms.php`);
             if (res.ok) {
                 const data = await res.json();
                 if (Array.isArray(data)) return data;
+            } else {
+                throw new Error("API Returned Non-OK");
             }
         } catch (e) {
-            // console.error("API Form Fetch Error", e);
+            console.error("API Form Fetch Error", e);
+            // Return empty array if DB fails, DO NOT return stale local storage data
+            return []; 
         }
-        // 2. Fallback
-        return getStorage<LeadForm[]>('sae_forms', []);
+        return [];
     },
 
     getFormById: async (id: string): Promise<LeadForm | undefined> => {
-        // 1. Try API
         try {
             const res = await fetch(`${API_BASE}/forms.php?id=${id}`);
             if (res.ok) {
@@ -565,59 +567,50 @@ export const mockService = {
                 if (data && data.id) return data;
             }
         } catch (e) {
-            // console.error("API Form Fetch Error", e);
+            console.error("API Form Fetch Error", e);
         }
-        
-        // 2. Fallback
-        const forms = await mockService.getForms();
-        return forms.find(f => f.id === id);
+        return undefined;
     },
 
     createForm: async (form: Omit<LeadForm, 'id' | 'created_at'>): Promise<void> => {
         const newForm = { ...form, id: uuid(), created_at: new Date().toISOString() };
         
-        // 1. Local
-        const forms = getStorage<LeadForm[]>('sae_forms', []);
-        setStorage('sae_forms', [newForm as LeadForm, ...forms]);
+        // Strict API Call. Propagate error if fails.
+        const res = await fetch(`${API_BASE}/forms.php`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'create', ...newForm })
+        });
 
-        // 2. API
-        try {
-            await fetch(`${API_BASE}/forms.php`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'create', ...newForm })
-            });
-        } catch (e) { console.error("API Form Create Error", e); }
+        if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(`Database Error: ${txt}`);
+        }
     },
 
     updateForm: async (id: string, updates: Partial<LeadForm>): Promise<void> => {
-        // 1. Local
-        const forms = getStorage<LeadForm[]>('sae_forms', []);
-        setStorage('sae_forms', forms.map(f => f.id === id ? { ...f, ...updates } : f));
+        const res = await fetch(`${API_BASE}/forms.php`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'update', id, ...updates })
+        });
 
-        // 2. API
-        try {
-            await fetch(`${API_BASE}/forms.php`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'update', id, ...updates })
-            });
-        } catch (e) { console.error("API Form Update Error", e); }
+        if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(`Database Update Error: ${txt}`);
+        }
     },
 
     deleteForm: async (id: string): Promise<void> => {
-        // 1. Local
-        const forms = getStorage<LeadForm[]>('sae_forms', []);
-        setStorage('sae_forms', forms.filter(f => f.id !== id));
+        const res = await fetch(`${API_BASE}/forms.php`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'delete', id })
+        });
 
-        // 2. API
-        try {
-            await fetch(`${API_BASE}/forms.php`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'delete', id })
-            });
-        } catch (e) { console.error("API Form Delete Error", e); }
+        if (!res.ok) {
+            throw new Error("Database Delete Error");
+        }
     },
 
     submitLeadForm: async (formId: string, data: any): Promise<void> => {
