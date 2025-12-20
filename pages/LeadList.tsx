@@ -83,22 +83,26 @@ const LeadList: React.FC = () => {
   };
 
   const handleStatusChange = async (leadId: string, newStatus: LeadStatus) => {
-      const updatedLeads = leads.map(l => l.id === leadId ? { ...l, status: newStatus } : l);
-      setLeads(updatedLeads);
+      // Use functional state update to ensure we are working with the latest state and merging correctly
+      setLeads(prevLeads => prevLeads.map(l => 
+          l.id === leadId ? { ...l, status: newStatus } : l
+      ));
       await mockService.updateLeadStatus(leadId, newStatus);
   };
 
   const handleIndustryChange = async (leadId: string, newIndustry: string) => {
-      const updatedLeads = leads.map(l => l.id === leadId ? { ...l, industry: newIndustry } : l);
-      setLeads(updatedLeads);
+      setLeads(prevLeads => prevLeads.map(l => 
+          l.id === leadId ? { ...l, industry: newIndustry } : l
+      ));
       await mockService.updateLeadIndustry(leadId, newIndustry);
   };
 
   const handleStarToggle = async (leadId: string, e: React.MouseEvent) => {
       e.preventDefault();
       e.stopPropagation();
-      const updatedLeads = leads.map(l => l.id === leadId ? { ...l, is_starred: !l.is_starred } : l);
-      setLeads(updatedLeads);
+      setLeads(prevLeads => prevLeads.map(l => 
+          l.id === leadId ? { ...l, is_starred: !l.is_starred } : l
+      ));
       await mockService.toggleLeadStar(leadId);
   };
 
@@ -143,8 +147,9 @@ const LeadList: React.FC = () => {
 
   const saveNote = async () => {
       if(editingNoteLeadId) {
-          const updatedLeads = leads.map(l => l.id === editingNoteLeadId ? { ...l, quick_note: editingNoteText } : l);
-          setLeads(updatedLeads);
+          setLeads(prevLeads => prevLeads.map(l => 
+              l.id === editingNoteLeadId ? { ...l, quick_note: editingNoteText } : l
+          ));
           await mockService.updateLeadNote(editingNoteLeadId, editingNoteText);
           setIsNoteModalOpen(false);
           setEditingNoteLeadId(null);
@@ -204,8 +209,9 @@ const LeadList: React.FC = () => {
       await mockService.updateLead(editingLeadData.id, editingLeadData);
       
       // Local Update
-      const updatedLeads = leads.map(l => l.id === editingLeadData.id ? { ...l, ...editingLeadData } : l);
-      setLeads(updatedLeads as Lead[]);
+      setLeads(prevLeads => prevLeads.map(l => 
+          l.id === editingLeadData.id ? { ...l, ...editingLeadData } : l
+      ));
       
       setIsEditLeadOpen(false);
       setEditingLeadData({});
@@ -300,8 +306,9 @@ const LeadList: React.FC = () => {
     const ids = data.map(l => l.id);
     await mockService.incrementDownloadCount(ids);
     
-    const updatedLeads = leads.map(l => ids.includes(l.id) ? { ...l, download_count: (l.download_count || 0) + 1 } : l);
-    setLeads(updatedLeads);
+    setLeads(prevLeads => prevLeads.map(l => 
+        ids.includes(l.id) ? { ...l, download_count: (l.download_count || 0) + 1 } : l
+    ));
 
     const csvContent = [
         ['Name', 'Phone', 'Facebook', 'Website', 'Note', 'Industry', 'Source', 'Status', 'Date Added'],
