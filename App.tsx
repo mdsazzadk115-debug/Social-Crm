@@ -24,7 +24,8 @@ import Settings from './pages/Settings';
 import SalesGoals from './pages/SalesGoals';
 import WonLeads from './pages/WonLeads';
 import AdSwipeFile from './pages/AdSwipeFile';
-import WhatsAppPanel from './pages/WhatsAppPanel'; // NEW
+import WhatsAppPanel from './pages/WhatsAppPanel'; 
+import AgencyProfit from './pages/AgencyProfit'; // NEW
 import { CurrencyProvider } from './context/CurrencyContext';
 
 // --- AUTH GUARD COMPONENT ---
@@ -33,7 +34,6 @@ const RequireAuth: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const location = useLocation();
 
     if (auth !== 'true') {
-        // Redirect them to the /login page, but save the current location they were trying to go to
         return <Navigate to="/login" state={{ from: location }} replace />;
     }
 
@@ -52,7 +52,6 @@ const LoginPage = () => {
 
     const handleLogin = () => {
         localStorage.setItem('sae_auth', 'true');
-        // Force reload/redirect to root to ensure clean state
         window.location.href = '#/';
         window.location.reload(); 
     };
@@ -69,14 +68,13 @@ const App: React.FC = () => {
     <CurrencyProvider>
       <Router>
         <Routes>
-          {/* --- PUBLIC ROUTES (No Password Required) --- */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/f/:id" element={<PublicForm />} />
           <Route path="/portal/:id" element={<ClientPortal />} /> 
 
-          {/* --- PROTECTED ADMIN ROUTES (Password Required) --- */}
           <Route path="/" element={<RequireAuth><Layout><Dashboard /></Layout></RequireAuth>} />
           <Route path="/big-fish" element={<RequireAuth><Layout><BigFishPage /></Layout></RequireAuth>} /> 
+          <Route path="/agency-profit" element={<RequireAuth><Layout><AgencyProfit /></Layout></RequireAuth>} /> 
           <Route path="/sales-goals" element={<RequireAuth><Layout><SalesGoals /></Layout></RequireAuth>} />
           <Route path="/leads" element={<RequireAuth><Layout><LeadList /></Layout></RequireAuth>} />
           <Route path="/leads/:id" element={<RequireAuth><Layout><LeadDetail /></Layout></RequireAuth>} />
@@ -95,7 +93,6 @@ const App: React.FC = () => {
           <Route path="/templates" element={<RequireAuth><Layout><Templates /></Layout></RequireAuth>} />
           <Route path="/settings" element={<RequireAuth><Layout><Settings /></Layout></RequireAuth>} />
           
-          {/* Fallback */}
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Router>

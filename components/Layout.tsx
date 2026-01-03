@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 // @ts-ignore
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, Settings, MessageSquare, Menu, X, LogOut, Send, FileText, ShoppingBag, CheckSquare, FileText as FileInvoice, Zap, ScrollText, Calculator, MessageCircle, Target, Coins, Bell, AlertTriangle, CheckCircle, Sparkles, Smartphone } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, MessageSquare, Menu, X, LogOut, Send, FileText, ShoppingBag, CheckSquare, FileText as FileInvoice, Zap, ScrollText, Calculator, MessageCircle, Target, Coins, Bell, AlertTriangle, CheckCircle, Sparkles, Smartphone, TrendingUp } from 'lucide-react';
 import { useCurrency } from '../context/CurrencyContext';
 import { mockService } from '../services/mockService';
 import { BigFish } from '../types';
@@ -16,22 +16,17 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const location = useLocation();
   const { currency, toggleCurrency, formatCurrency } = useCurrency();
   
-  // Task Reminder State
   const [showReminder, setShowReminder] = useState(false);
   const [pendingTasksCount, setPendingTasksCount] = useState(0);
 
-  // Low Balance Alert State
   const [showLowBalancePopup, setShowLowBalancePopup] = useState(false);
   const [lowBalanceClients, setLowBalanceClients] = useState<BigFish[]>([]);
 
-  // Check on mount/location change
   useEffect(() => {
       checkTaskReminders();
       checkLowBalance();
-      // Run Automation Check (Heartbeat)
       mockService.triggerAutomationCheck();
       
-      // Optional: Poll every 60 seconds if the tab is open
       const interval = setInterval(() => {
           mockService.triggerAutomationCheck();
       }, 60000);
@@ -41,7 +36,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const handleLogout = () => {
       if(confirm("Are you sure you want to sign out?")) {
           localStorage.removeItem('sae_auth');
-          window.location.reload(); // Reload to trigger App.tsx auth check
+          window.location.reload();
       }
   };
 
@@ -58,8 +53,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
               setPendingTasksCount(dueTasks.length);
               setShowReminder(true);
               localStorage.setItem('last_task_reminder_ts', now.toString());
-              
-              // Auto hide tasks after 5 seconds
               setTimeout(() => setShowReminder(false), 5000);
           }
       }
@@ -67,13 +60,11 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
 
   const checkLowBalance = async () => {
       const fish = await mockService.getBigFish();
-      // Filter: Active Pool AND Balance < 20
       const lowBal = fish.filter(f => f.status === 'Active Pool' && (f.balance || 0) < 20);
       
       if (lowBal.length > 0) {
           const now = Date.now();
           const lastShown = localStorage.getItem('last_low_bal_popup_ts');
-          // Cooldown: Show every 1 hour (to avoid spamming on every navigation)
           const ONE_HOUR = 1 * 60 * 60 * 1000;
 
           if (!lastShown || (now - parseInt(lastShown)) > ONE_HOUR) {
@@ -87,8 +78,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigation = [
     { name: 'Dashboard', href: '/', icon: LayoutDashboard },
     { name: 'Big Fish 🐟', href: '/big-fish', icon: null, special: true }, 
+    { name: 'Agency Profit', href: '/agency-profit', icon: Coins }, // NEW
     { name: 'Sales Goals', href: '/sales-goals', icon: Target }, 
-    { name: 'WhatsApp Panel', href: '/whatsapp', icon: Smartphone }, // NEW
+    { name: 'WhatsApp Panel', href: '/whatsapp', icon: Smartphone }, 
     { name: 'Leads', href: '/leads', icon: Users },
     { name: 'Won Clients', href: '/won-leads', icon: CheckCircle },
     { name: 'Messaging (SMS)', href: '/messaging', icon: Send },
@@ -110,7 +102,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
   return (
     <div className="min-h-screen bg-slate-50 flex font-inter relative">
       
-      {/* 1. TASK REMINDER POPUP */}
       {showReminder && !showLowBalancePopup && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-fade-in">
               <div className="bg-white border-t-8 border-amber-500 shadow-2xl rounded-xl p-8 max-w-xl w-full relative animate-scale-up">
@@ -139,11 +130,9 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
       )}
 
-      {/* 2. LOW BALANCE POPUP (Higher Priority) */}
       {showLowBalancePopup && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
               <div className="bg-white border-t-8 border-red-500 shadow-2xl rounded-xl p-0 max-w-lg w-full relative animate-scale-up overflow-hidden flex flex-col max-h-[80vh]">
-                  {/* Header */}
                   <div className="p-6 bg-red-50 border-b border-red-100 flex items-start gap-4">
                       <div className="p-3 bg-red-100 rounded-full text-red-600 shrink-0">
                           <AlertTriangle className="h-8 w-8 animate-pulse" />
@@ -159,7 +148,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                       </button>
                   </div>
 
-                  {/* List Body */}
                   <div className="p-0 overflow-y-auto flex-1 bg-white">
                       <table className="w-full text-sm text-left">
                           <thead className="bg-gray-50 text-gray-500 font-bold border-b border-gray-200">
@@ -186,7 +174,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
                       </table>
                   </div>
 
-                  {/* Footer */}
                   <div className="p-4 bg-gray-50 border-t border-gray-200 flex justify-end gap-3">
                       <Link 
                         to="/big-fish" 
@@ -206,7 +193,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
       )}
 
-      {/* Sidebar for Desktop */}
       <div className="hidden md:flex md:w-64 md:flex-col md:fixed md:inset-y-0 border-r border-indigo-50/50 bg-white shadow-[0_0_15px_rgba(0,0,0,0.03)] z-20">
         <div className="flex-1 flex flex-col min-h-0">
           <div className="flex items-center h-16 flex-shrink-0 px-6 bg-white border-b border-gray-50">
@@ -273,7 +259,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </div>
 
-      {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-10 bg-white h-16 flex items-center justify-between px-4 shadow-sm border-b border-gray-200">
         <span className="text-indigo-600 font-bold text-lg flex items-center">🚀 Social Ads</span>
         <div className="flex items-center gap-3">
@@ -293,7 +278,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       </div>
 
-      {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div className="md:hidden fixed inset-0 z-20 bg-gray-600 bg-opacity-75 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}>
           <div className="fixed inset-y-0 left-0 w-72 bg-white shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
@@ -329,10 +313,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
         </div>
       )}
 
-      {/* Main Content */}
       <div className="md:ml-64 flex-1 flex flex-col w-full transition-all duration-300">
-        
-        {/* Desktop Header Bar for Switcher */}
         <div className="hidden md:flex justify-end items-center px-8 py-3 bg-white border-b border-gray-50">
             <button 
                 onClick={toggleCurrency}
@@ -352,30 +333,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           {children}
         </main>
       </div>
-      
-      <style>{`
-        @keyframes shrink-width {
-            from { width: 100%; }
-            to { width: 0%; }
-        }
-        .animate-shrink-width {
-            animation: shrink-width 5s linear forwards;
-        }
-        @keyframes fade-in {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-        .animate-fade-in {
-            animation: fade-in 0.3s ease-out forwards;
-        }
-        @keyframes scale-up {
-            from { transform: scale(0.9); opacity: 0; }
-            to { transform: scale(1); opacity: 1; }
-        }
-        .animate-scale-up {
-            animation: scale-up 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-        }
-      `}</style>
     </div>
   );
 };

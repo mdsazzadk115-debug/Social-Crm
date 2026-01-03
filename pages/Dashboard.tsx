@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from 'react';
-import { Users, ShoppingBag, CheckSquare, FileText, Calculator, Zap, Wallet, ArrowUpRight, ArrowDownRight, Filter, Download, BarChart2, Phone, Globe, Layers, TrendingUp, AlertTriangle, Copy, Check, Repeat, RefreshCw } from 'lucide-react';
+
+import React, { useEffect, useState, useMemo } from 'react';
+import { Users, ShoppingBag, CheckSquare, FileText, Calculator, Zap, Wallet, ArrowUpRight, ArrowDownRight, Filter, Download, BarChart2, Phone, Globe, Layers, TrendingUp, AlertTriangle, Copy, Check, Repeat, RefreshCw, Coins, ArrowRightLeft, ShieldCheck, Target } from 'lucide-react';
 // @ts-ignore
 import { Link } from 'react-router-dom';
 import { mockService } from '../services/mockService';
@@ -64,6 +65,7 @@ const Dashboard: React.FC = () => {
 
   // Data States
   const [activeFish, setActiveFish] = useState<BigFish[]>([]);
+  const [allFish, setAllFish] = useState<BigFish[]>([]); // For profit calc
   const [lowBalanceFish, setLowBalanceFish] = useState<BigFish[]>([]); 
   const [retainerRenewals, setRetainerRenewals] = useState<BigFish[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -118,6 +120,7 @@ const Dashboard: React.FC = () => {
     ]);
     
     // Process Big Fish Data
+    setAllFish(f);
     const sortedFish = [...f].sort((a, b) => (b.spent_amount || 0) - (a.spent_amount || 0));
     const allActiveFish = sortedFish.filter(x => x.status === 'Active Pool');
     
@@ -146,6 +149,37 @@ const Dashboard: React.FC = () => {
 
     setLoading(false);
   };
+
+  // --- AGENCY PROFIT CALCULATION FOR DASHBOARD ---
+  const agencyProfitStats = useMemo(() => {
+    let currencyGain = 0;
+    let markupGain = 0;
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+
+    allFish.forEach(fish => {
+        fish.campaign_records?.forEach(rec => {
+            // Summary for This Month
+            if (rec.start_date >= monthStart) {
+                const bRate = rec.buying_rate || 130;
+                const cRate = rec.client_rate || 145;
+                const actualUSD = rec.real_amount_spent || rec.amount_spent;
+                const billedUSD = rec.amount_spent;
+
+                // 1. Currency Profit: (৳145 - ৳130) * Actual Dollar Spent
+                currencyGain += actualUSD * (cRate - bRate);
+                // 2. Markup Profit: (Billed USD - Actual USD) * ৳145
+                markupGain += (billedUSD - actualUSD) * cRate;
+            }
+        });
+    });
+
+    return {
+        currency: currencyGain,
+        markup: markupGain,
+        total: currencyGain + markupGain
+    };
+  }, [allFish]);
 
   const handleRenewRetainer = async (id: string) => {
       if(confirm("Renew this subscription for another 30 days?")) {
@@ -316,11 +350,71 @@ const Dashboard: React.FC = () => {
           />
       </div>
 
+      {/* NEW: AGENCY REVENUE INTEL SECTION (PROFIT SPLIT) */}
+      <div className="bg-white rounded-xl border border-indigo-100 shadow-sm overflow-hidden">
+          <div className="px-6 py-4 border-b border-gray-100 bg-gradient-to-r from-white to-blue-50/30 flex justify-between items-center">
+              <div className="flex items-center gap-3">
+                  <div className="p-2 bg-indigo-600 rounded-lg text-white">
+                      <Coins className="h-5 w-5"/>
+                  </div>
+                  <div>
+                      <h3 className="text-sm font-black text-gray-800 uppercase tracking-widest">Agency Revenue Intel</h3>
+                      <p className="text-[10px] text-gray-500 font-bold uppercase">Net Profit Split - This Month (৳)</p>
+                  </div>
+              </div>
+              <Link to="/agency-profit" className="text-[10px] font-black text-indigo-600 uppercase hover:underline">Full Analysis &rarr;</Link>
+          </div>
+          <div className="p-6 grid grid-cols-1 md:grid-cols-3 gap-8">
+              {/* Currency Margin Card */}
+              <div className="flex flex-col">
+                  <div className="flex items-center gap-2 mb-2">
+                      <ArrowRightLeft className="h-4 w-4 text-blue-500"/>
+                      <span className="text-xs font-bold text-gray-500 uppercase">Currency Margin</span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                      <h4 className="text-2xl font-black text-blue-600 font-mono">৳{agencyProfitStats.currency.toLocaleString()}</h4>
+                      <span className="text-[10px] text-gray-400 font-bold">${(agencyProfitStats.currency / exchangeRate).toFixed(1)}</span>
+                  </div>
+                  <div className="mt-3 w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                      <div className="bg-blue-500 h-full" style={{ width: `${Math.min((agencyProfitStats.currency / (agencyProfitStats.total || 1)) * 100, 100)}%` }}></div>
+                  </div>
+                  <p className="text-[9px] text-gray-400 mt-2 font-bold uppercase tracking-tighter">Arbitrage Income (৳১৫/$)</p>
+              </div>
+
+              {/* Service Markup Card */}
+              <div className="flex flex-col">
+                  <div className="flex items-center gap-2 mb-2">
+                      <ShieldCheck className="h-4 w-4 text-emerald-500"/>
+                      <span className="text-xs font-bold text-gray-500 uppercase">Service Markup</span>
+                  </div>
+                  <div className="flex items-baseline gap-2">
+                      <h4 className="text-2xl font-black text-emerald-600 font-mono">৳{agencyProfitStats.markup.toLocaleString()}</h4>
+                      <span className="text-[10px] text-gray-400 font-bold">${(agencyProfitStats.markup / exchangeRate).toFixed(1)}</span>
+                  </div>
+                  <div className="mt-3 w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
+                      <div className="bg-emerald-500 h-full" style={{ width: `${Math.min((agencyProfitStats.markup / (agencyProfitStats.total || 1)) * 100, 100)}%` }}></div>
+                  </div>
+                  <p className="text-[9px] text-gray-400 mt-2 font-bold uppercase tracking-tighter">Billed Spend Difference</p>
+              </div>
+
+              {/* Net Total Summary */}
+              <div className="bg-slate-900 p-5 rounded-xl text-white relative overflow-hidden flex flex-col justify-center">
+                  <div className="absolute top-0 right-0 p-2 opacity-10"><TrendingUp size={60}/></div>
+                  <p className="text-[10px] font-black text-indigo-300 uppercase tracking-widest mb-1">Monthly Net Profit</p>
+                  <h3 className="text-3xl font-black font-mono">৳{agencyProfitStats.total.toLocaleString()}</h3>
+                  <div className="flex items-center gap-2 mt-2">
+                      <span className="text-xs font-bold text-indigo-400">${(agencyProfitStats.total / exchangeRate).toLocaleString()} USD</span>
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></div>
+                  </div>
+              </div>
+          </div>
+      </div>
+
       {/* 2. MONTHLY GOAL TRACKER (UPDATED) */}
       <div className="bg-white rounded-xl border border-indigo-100 shadow-sm p-5">
           <div className="flex justify-between items-center mb-4">
               <h3 className="text-sm font-bold text-gray-700 flex items-center">
-                  <TrendingUp className="mr-2 h-4 w-4 text-indigo-600"/> Monthly Goal Tracker
+                  <Target className="mr-2 h-4 w-4 text-indigo-600"/> Monthly Goal Tracker
               </h3>
               <Link to="/sales-goals" className="text-xs text-indigo-600 font-bold hover:underline">Manage Goals</Link>
           </div>

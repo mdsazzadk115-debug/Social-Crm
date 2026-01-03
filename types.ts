@@ -21,8 +21,8 @@ export enum LeadSource {
   IMPORT = 'import',
   WEBSITE = 'website',
   FORM = 'form_submission',
-  N8N_WEBHOOK = 'n8n_automation', // Added N8N Source
-  GOOGLE_FORM = 'google_form', // Added Google Form Source
+  N8N_WEBHOOK = 'n8n_automation', 
+  GOOGLE_FORM = 'google_form',
 }
 
 export enum Channel {
@@ -47,19 +47,17 @@ export interface User {
 export interface ClientInteraction {
     id: string;
     date: string;
-    // UPDATED: Added INVOICE, TASK, SALE, BALANCE
     type: 'CALL' | 'MEETING' | 'EMAIL' | 'WHATSAPP' | 'OTHER' | 'INVOICE' | 'TASK' | 'SALE' | 'BALANCE';
     notes: string;
     next_follow_up?: string;
     created_at: string;
 }
 
-// NEW: Interface for the specific questions asked
 export interface OnboardingData {
-    current_plan?: string; // এখন সে কিভাবে কাজ করতে চাচ্ছে তার প্ল্যান কি
-    monthly_avg_budget?: string; // প্রতিমাসে এভারেজে বাজেট কত টাকা
-    product_price?: string; // তার প্রোডাক্ট প্রাইস কত
-    marketing_budget_willingness?: string; // মার্কেটিং বাজেট কত খরচ করতে সে রাজি আছে
+    current_plan?: string;
+    monthly_avg_budget?: string;
+    product_price?: string;
+    marketing_budget_willingness?: string;
 }
 
 export interface Lead {
@@ -70,23 +68,19 @@ export interface Lead {
   website_url?: string;
   source: LeadSource;
   status: LeadStatus;
-  
   industry?: string; 
-  service_category?: string; // NEW: Live Category (FB Marketing, Dev, LP)
-  quick_note?: string; // NEW: Single line quick note
-  download_count: number; // NEW: Track export count
+  service_category?: string;
+  quick_note?: string;
+  download_count: number;
   is_starred: boolean; 
   is_unread: boolean; 
-
   total_messages_sent: number;
-
   first_contact_at: string; 
   last_activity_at: string; 
   created_at: string;
   active_campaign_id?: string;
-
-  interactions?: ClientInteraction[]; // CRM: Interaction History
-  onboarding_data?: OnboardingData; // NEW: Stores the specific form answers
+  interactions?: ClientInteraction[];
+  onboarding_data?: OnboardingData;
 }
 
 export interface LeadNote {
@@ -160,7 +154,7 @@ export interface LeadForm {
     id: string;
     title: string;
     subtitle: string;
-    type?: 'SIMPLE' | 'ONBOARDING'; // NEW: To distinguish the detailed form
+    type?: 'SIMPLE' | 'ONBOARDING';
     config: {
         include_website: boolean;
         include_facebook: boolean;
@@ -170,26 +164,23 @@ export interface LeadForm {
     created_at: string;
 }
 
-// 1. Online Customers (Raw Data)
 export interface Customer {
     id: string;
     phone: string;
     name?: string;
-    category?: string; // e.g. Dress, Bag, Shoes
+    category?: string;
     date_added: string;
 }
 
-// 2. Daily Tasks
 export interface Task {
     id: string;
     text: string;
     is_completed: boolean;
     created_at: string;
-    due_date?: string; // NEW: Due Date & Time
-    lead_id?: string; // NEW: Link task to a specific lead/client
+    due_date?: string;
+    lead_id?: string;
 }
 
-// 3. Invoice
 export interface InvoiceItem {
     description: string;
     quantity: number;
@@ -206,34 +197,26 @@ export interface Invoice {
     status: 'paid' | 'unpaid' | 'new';
     date: string;
     created_at: string;
-    
-    // Payment Tracking
-    paid_amount: number; // For advance/partial payments
-
-    // New Fields
+    paid_amount: number;
     terms_enabled: boolean;
     terms_content?: string;
 }
 
-// 4. Quick Message Snippet
 export interface Snippet {
     id: string;
     title: string;
-    category: string; // e.g., Payment, Report, Intro
+    category: string;
     body: string;
 }
 
-// 5. Letterhead Document
 export interface Document {
     id: string;
     title: string;
     client_id?: string;
     client_name?: string;
-    content: string; // The HTML/Text content of the letter
+    content: string;
     created_at: string;
 }
-
-// 6. BIG FISH (VIP Clients) - EXPANDED
 
 export interface Transaction {
     id: string;
@@ -245,44 +228,38 @@ export interface Transaction {
         impressions?: number;
         reach?: number;
         leads?: number;
-        resultType?: 'SALES' | 'MESSAGES'; // NEW: Track what the result represents
+        resultType?: 'SALES' | 'MESSAGES';
         roas?: number;
     };
 }
 
-// NEW: Detailed Campaign Performance Record
 export interface CampaignRecord {
     id: string;
     start_date: string;
     end_date: string;
-    amount_spent: number;
-    
-    // Metrics
+    amount_spent: number; 
+    real_amount_spent?: number; 
+    buying_rate?: number; // NEW: Rate at which agency bought dollars (e.g. 130)
+    client_rate?: number; // NEW: Rate at which agency charged client (e.g. 145)
     impressions: number;
     reach: number;
     clicks: number;
-    
-    // Results
     result_type: 'SALES' | 'MESSAGES';
     results_count: number;
-    
-    // Financials (For Sales Type)
     product_price?: number;
     product_cost?: number;
-    
     notes?: string;
     created_at: string;
 }
 
-// NEW: Top Up Request
 export interface TopUpRequest {
     id: string;
     client_id: string;
     client_name: string;
     amount: number;
-    method_name: string; // bKash / Bank
+    method_name: string; 
     sender_number: string;
-    screenshot_url?: string; // Base64 or URL
+    screenshot_url?: string;
     status: 'PENDING' | 'APPROVED' | 'REJECTED';
     created_at: string;
 }
@@ -304,19 +281,14 @@ export interface PortalConfig {
     show_balance: boolean;
     show_history: boolean;
     is_suspended: boolean;
-    
-    // Advanced Toggles
     feature_flags?: {
-        show_profit_analysis: boolean; // Legacy flag (kept for compat)
-        show_cpr_metrics: boolean; // Legacy flag (kept for compat)
+        show_profit_analysis: boolean;
+        show_cpr_metrics: boolean;
         allow_topup_request: boolean;
-
-        // New Granular Report Toggles
         show_message_report?: boolean;
         show_sales_report?: boolean;
         show_profit_loss_report?: boolean;
     };
-
     announcement_title?: string;
     announcement_message?: string;
     shared_calculators?: {
@@ -333,70 +305,47 @@ export interface BigFish {
     id: string;
     lead_id: string;
     name: string;
-    status: 'Active Pool' | 'Hall of Fame'; // Active vs Completed
-    package_name?: string; // e.g. "Pro Scale Plan"
-
-    // Financials (Wallet)
+    status: 'Active Pool' | 'Hall of Fame'; 
+    package_name?: string; 
     balance: number;
     low_balance_alert_threshold: number;
-    
-    // Legacy fields (kept for compatibility or aggregate stats)
     total_budget: number;
     spent_amount: number;
-    
-    // Targets
     target_sales: number;
     current_sales: number;
-    
-    // Links & Contact
     facebook_page?: string;
     website_url?: string;
     phone: string;
-    notes?: string; // Admin Notes
-    
-    // Campaign Dates (New)
+    notes?: string;
     campaign_start_date?: string;
     campaign_end_date?: string;
-
-    // Advanced Data
     transactions: Transaction[];
-    campaign_records?: CampaignRecord[]; // New Detailed Logs
-    topup_requests?: TopUpRequest[]; // Request History
+    campaign_records?: CampaignRecord[];
+    topup_requests?: TopUpRequest[];
     growth_tasks: GrowthTask[];
     reports: WorkLog[];
-    interactions?: ClientInteraction[]; // NEW: CRM History
+    interactions?: ClientInteraction[];
     portal_config: PortalConfig;
-    
     start_date: string;
     end_date?: string;
-
-    // Retainer / Subscription
     is_retainer?: boolean;
     retainer_amount?: number;
-    retainer_renewal_date?: string; // Next payment date
+    retainer_renewal_date?: string;
     retainer_status?: 'ACTIVE' | 'PAUSED';
 }
 
-// 7. Payment Methods (Global)
 export interface PaymentMethod {
     id: string;
     type: 'BANK' | 'MOBILE';
-    provider_name: string; // "City Bank", "bKash"
-    
-    // Common
+    provider_name: string;
     account_number: string;
-    
-    // Bank Specific
     account_name?: string;
     branch_name?: string;
     routing_number?: string;
-    
-    // Mobile Specific
     mobile_type?: 'Personal' | 'Merchant' | 'Agent';
     instruction?: 'Send Money' | 'Payment' | 'Cash Out';
 }
 
-// 8. MESSAGE BABA (Messenger Integration)
 export interface MessengerMessage {
     id: string;
     sender: 'customer' | 'page';
@@ -409,42 +358,31 @@ export interface MessengerConversation {
     id: string;
     facebook_user_id: string;
     customer_name: string;
-    customer_phone?: string; // Extracted phone
+    customer_phone?: string;
     messages: MessengerMessage[];
     last_message: string;
     last_updated: string;
-    is_lead_linked: boolean; // True if connected to Lead system
+    is_lead_linked: boolean;
 }
 
-// 9. SYSTEM SETTINGS (API Keys & Config)
 export interface SystemSettings {
-    // Facebook
     facebook_page_token: string;
     facebook_verify_token: string;
-    
-    // SMS
     sms_api_key: string;
     sms_sender_id: string;
     sms_base_url: string;
-    
-    // General
     timezone: string;
-
-    // Global Portal Support Info
     portal_support_phone?: string;
     portal_support_url?: string;
     portal_fb_group?: string;
-
-    // n8n & External API
-    system_api_key?: string; // For incoming webhooks security
+    system_api_key?: string;
 }
 
-// 10. SALES GOALS & TRACKING (NEW)
 export type SalesServiceType = 'FACEBOOK_ADS' | 'WEB_DEV' | 'LANDING_PAGE' | 'CONSULTANCY';
 
 export interface MonthlyTarget {
     id: string;
-    month: string; // Format: "YYYY-MM"
+    month: string;
     service: SalesServiceType;
     target_amount: number;
     target_clients: number;
@@ -452,20 +390,19 @@ export interface MonthlyTarget {
 
 export interface SalesEntry {
     id: string;
-    date: string; // ISO Date
+    date: string;
     service: SalesServiceType;
     amount: number;
-    description: string; // e.g. "Client Name - Project X"
+    description: string;
     created_at: string;
 }
 
-// 11. AD INSPIRATION SWIPE FILE (NEW)
 export interface AdInspiration {
     id: string;
     title: string;
-    url: string; // Ad Library Link or Post Link
-    image_url?: string; // Optional Screenshot URL
-    category: string; // Real Estate, Fashion, etc.
-    notes: string; // Why it's good
+    url: string;
+    image_url?: string;
+    category: string;
+    notes: string;
     created_at: string;
 }

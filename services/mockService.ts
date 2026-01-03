@@ -29,22 +29,40 @@ const setStorage = <T>(key: string, data: T): void => {
     localStorage.setItem(key, JSON.stringify(data));
 };
 
+/**
+ * Safer Fetch Wrapper
+ * Prevents "Unexpected end of JSON input" by checking if response has content
+ */
+const safeFetch = async (url: string, options?: RequestInit) => {
+    const res = await fetch(url, options);
+    const text = await res.text();
+    
+    if (!res.ok) {
+        throw new Error(`Server Error (${res.status}): ${text.substring(0, 100)}`);
+    }
+
+    if (!text || text.trim() === "") {
+        return null;
+    }
+
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        console.error("Failed to parse JSON response:", text);
+        throw new Error("Invalid JSON response from server");
+    }
+};
+
 export const mockService = {
     // --- LEADS ---
     getLeads: async (): Promise<Lead[]> => {
-        // 1. Try Fetching from Database API
         try {
-            const res = await fetch(`${API_BASE}/leads.php`);
-            if (res.ok) {
-                const data = await res.json();
-                if (Array.isArray(data)) return data;
-            }
+            const data = await safeFetch(`${API_BASE}/leads.php`);
+            if (Array.isArray(data)) return data;
         } catch (e) {
-            // console.error("API Fetch Error", e);
+            // console.warn("Leads API failed, using local fallback", e);
         }
-        
-        // 2. Fallback to Local Storage (Default: Empty Array, NOT Demo Leads)
-        return getStorage<Lead[]>('sae_leads', []);
+        return getStorage<Lead[]>('sae_leads', DEMO_LEADS as Lead[]);
     },
 
     getLeadById: async (id: string): Promise<Lead | undefined> => {
@@ -53,7 +71,6 @@ export const mockService = {
     },
 
     createLead: async (lead: Partial<Lead>): Promise<void> => {
-        // Prepare Object
         const newLead: Lead = {
             id: uuid(),
             full_name: lead.full_name || 'Unnamed Lead',
@@ -70,11 +87,9 @@ export const mockService = {
             ...lead
         } as Lead;
 
-        // 1. Update Local Storage (Optimistic)
-        const leads = getStorage<Lead[]>('sae_leads', []);
+        const leads = getStorage<Lead[]>('sae_leads', DEMO_LEADS as Lead[]);
         setStorage('sae_leads', [newLead, ...leads]);
 
-        // 2. Sync to Database
         try {
             await fetch(`${API_BASE}/leads.php`, {
                 method: 'POST',
@@ -85,12 +100,10 @@ export const mockService = {
     },
 
     updateLead: async (id: string, updates: Partial<Lead>): Promise<void> => {
-        // 1. Update Local Storage
-        const leads = getStorage<Lead[]>('sae_leads', []);
+        const leads = getStorage<Lead[]>('sae_leads', DEMO_LEADS as Lead[]);
         const updated = leads.map(l => l.id === id ? { ...l, ...updates, last_activity_at: new Date().toISOString() } : l);
         setStorage('sae_leads', updated);
 
-        // 2. Sync to Database
         try {
             await fetch(`${API_BASE}/leads.php`, {
                 method: 'POST',
@@ -126,15 +139,12 @@ export const mockService = {
     // --- BIG FISH (VIP CLIENTS) ---
     getBigFish: async (): Promise<BigFish[]> => {
         try {
-            const res = await fetch(`${API_BASE}/big_fish.php`);
-            if (res.ok) {
-                const data = await res.json();
-                if (Array.isArray(data)) return data;
-            } else {
-                console.error("API GET Failed", await res.text());
-            }
-        } catch (e) { console.error("API Error", e); }
-        return [];
+            const data = await safeFetch(`${API_BASE}/big_fish.php`);
+            if (Array.isArray(data)) return data;
+        } catch (e) {
+            // console.error("BigFish API Error", e);
+        }
+        return getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
     },
 
     getBigFishById: async (id: string): Promise<BigFish | undefined> => {
@@ -143,21 +153,28 @@ export const mockService = {
     },
 
     createBigFish: async (fish: Partial<BigFish>): Promise<void> => {
-        const newId = uuid();
+        const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
+        const newFish = { id: uuid(), ...fish } as BigFish;
+        setStorage('sae_big_fish', [newFish, ...allFish]);
+
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
-                body: JSON.stringify({ action: 'create', id: newId, ...fish })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'create', ...newFish })
             });
         } catch (e) { console.error("API Create Error", e); }
     },
 
     updateBigFish: async (id: string, updates: Partial<BigFish>): Promise<void> => {
+        const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
+        const updated = allFish.map(f => f.id === id ? { ...f, ...updates } : f);
+        setStorage('sae_big_fish', updated);
+
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'update', id, ...updates })
             });
         } catch (e) { console.error("API Update Error", e); }
@@ -172,16 +189,27 @@ export const mockService = {
         if (allFish.some(f => f.lead_id === leadId)) return null;
 
         const newFish: Partial<BigFish> = {
+            id: uuid(),
             lead_id: lead.id,
             name: lead.full_name,
             phone: lead.primary_phone,
             facebook_page: lead.facebook_profile_link,
-            website_url: lead.website_url
+            website_url: lead.website_url,
+            status: 'Active Pool',
+            balance: 0,
+            spent_amount: 0,
+            target_sales: 0,
+            current_sales: 0,
+            transactions: [],
+            campaign_records: [],
+            growth_tasks: [],
+            reports: [],
+            start_date: new Date().toISOString()
         };
 
         await mockService.createBigFish(newFish);
         await mockService.updateLeadStatus(leadId, LeadStatus.CLOSED_WON);
-        return await mockService.getBigFishById(leadId) || null;
+        return newFish as BigFish;
     },
 
     toggleBigFishStatus: async (id: string): Promise<void> => {
@@ -191,12 +219,43 @@ export const mockService = {
 
     // --- TRANSACTIONS & PERFORMANCE ---
     addTransaction: async (fishId: string, type: 'DEPOSIT' | 'DEDUCT' | 'AD_SPEND' | 'SERVICE_CHARGE', amount: number, description: string): Promise<void> => {
-        const txId = uuid();
+        const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
+        const newTx: Transaction = {
+            id: uuid(),
+            date: new Date().toISOString(),
+            type,
+            amount,
+            description
+        };
+        
+        const updated = allFish.map(f => {
+            if (f.id === fishId) {
+                const newBalance = type === 'DEPOSIT' ? (f.balance + amount) : (f.balance - amount);
+                const newSpent = type === 'AD_SPEND' ? (f.spent_amount + amount) : f.spent_amount;
+                return { 
+                    ...f, 
+                    balance: newBalance, 
+                    spent_amount: newSpent,
+                    transactions: [newTx, ...(f.transactions || [])]
+                };
+            }
+            return f;
+        });
+        setStorage('sae_big_fish', updated);
+
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
-                body: JSON.stringify({ action: 'add_transaction', id: txId, big_fish_id: fishId, type, amount, description, date: new Date().toISOString() })
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    action: 'add_transaction', 
+                    id: newTx.id, 
+                    big_fish_id: fishId, 
+                    type, 
+                    amount, 
+                    description, 
+                    date: newTx.date 
+                })
             });
         } catch (e) { console.error("API Tx Error", e); }
     },
@@ -205,7 +264,7 @@ export const mockService = {
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'update_transaction', big_fish_id: fishId, transaction_id: txId, ...updates })
             });
         } catch (e) { console.error("API Tx Update Error", e); }
@@ -215,28 +274,28 @@ export const mockService = {
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'delete_transaction', transaction_id: txId })
             });
         } catch (e) { console.error("API Tx Delete Error", e); }
     },
 
     addCampaignRecord: async (fishId: string, record: Omit<CampaignRecord, 'id' | 'created_at'>): Promise<BigFish | undefined> => { 
-        const newId = uuid();
+        const id = uuid();
         try {
-            const res = await fetch(`${API_BASE}/big_fish.php`, {
+            const data = await safeFetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     action: 'add_campaign_record', 
-                    id: newId, 
+                    id, 
                     big_fish_id: fishId, 
                     ...record 
                 })
             });
-            if (res.ok) {
-                return await mockService.getBigFishById(fishId);
-            }
+            // Update balance locally for immediate feedback
+            await mockService.addTransaction(fishId, 'AD_SPEND', record.amount_spent, `Ad Campaign: ${new Date(record.start_date).toLocaleDateString()}`);
+            return await mockService.getBigFishById(fishId);
         } catch (e) { console.error("API Campaign Error", e); }
         return undefined;
     },
@@ -245,21 +304,20 @@ export const mockService = {
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'delete_campaign_record', big_fish_id: fishId, record_id: recordId })
             });
         } catch (e) { console.error("API Campaign Delete Error", e); }
     },
 
-    // --- TOP UP REQUESTS (DB Updated) ---
+    // --- TOP UP REQUESTS ---
     createTopUpRequest: async (req: Omit<TopUpRequest, 'id' | 'status' | 'created_at'>): Promise<void> => {
         try {
-            const res = await fetch(`${API_BASE}/big_fish.php`, {
+            await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'create_topup_request', id: uuid(), ...req })
             });
-            if(!res.ok) console.error("TopUp Create Failed", await res.text());
         } catch (e) { console.error("TopUp Error", e); }
     },
 
@@ -267,7 +325,7 @@ export const mockService = {
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'update_topup_status', request_id: reqId, status: 'APPROVED' })
             });
         } catch (e) { console.error("TopUp Approve Error", e); }
@@ -277,7 +335,7 @@ export const mockService = {
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'update_topup_status', request_id: reqId, status: 'REJECTED' })
             });
         } catch (e) { console.error("TopUp Reject Error", e); }
@@ -287,32 +345,30 @@ export const mockService = {
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'delete_topup_request', request_id: reqId })
             });
         } catch (e) { console.error("TopUp Delete Error", e); }
     },
 
-    // --- GROWTH TASKS (DB Updated) ---
+    // --- GROWTH TASKS ---
     addGrowthTask: async (fishId: string, title: string, dueDate?: string): Promise<void> => {
         try {
-            const res = await fetch(`${API_BASE}/big_fish.php`, {
+            await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'add_growth_task', id: uuid(), big_fish_id: fishId, title, due_date: dueDate })
             });
-            if(!res.ok) console.error("Task Add Failed", await res.text());
         } catch (e) { console.error("Task Add Error", e); }
     },
 
     toggleGrowthTask: async (fishId: string, taskId: string): Promise<void> => {
         try {
-            const res = await fetch(`${API_BASE}/big_fish.php`, {
+            await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json; charset=UTF-8' },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'toggle_growth_task', task_id: taskId })
             });
-            if(!res.ok) console.error("Task Toggle Failed", await res.text());
         } catch (e) { console.error("Task Toggle Error", e); }
     },
 
@@ -320,12 +376,13 @@ export const mockService = {
         await mockService.updateBigFish(fishId, { target_sales: target, current_sales: current });
     },
 
+    // --- CRM / INTERACTIONS ---
     addClientInteraction: async (fishId: string, interaction: Partial<ClientInteraction>): Promise<void> => {
-        // Placeholder
+        // Implementation placeholder
     },
 
     deleteClientInteraction: async (fishId: string, interactionId: string): Promise<void> => {
-        // Placeholder
+        // Implementation placeholder
     },
 
     // --- TASKS (GENERAL) ---
@@ -444,13 +501,11 @@ export const mockService = {
     },
 
     triggerAutomationCheck: async (): Promise<void> => {
-        // console.log("Automation Heartbeat: Checking for pending messages...");
+        // Heartbeat logic
     },
 
     // --- MESSAGING ---
     sendBulkSMS: async (ids: string[], body: string): Promise<{ success: number, failed: number, errors: string[], gatewayResponse?: string }> => {
-        console.log(`Sending SMS to ${ids.length} recipients...`);
-        
         const settings = await mockService.getSystemSettings();
         const leads = await mockService.getLeads();
         const targets = leads.filter(l => ids.includes(l.id));
@@ -461,12 +516,7 @@ export const mockService = {
         let lastGatewayResponse = "";
 
         if (!settings.sms_base_url || !settings.sms_api_key) {
-            return { success: 0, failed: targets.length, errors: ["SMS Settings Missing (Check Settings > SMS Gateway)"] };
-        }
-
-        let baseUrl = settings.sms_base_url.trim().replace(/\/$/, ""); 
-        if (baseUrl.startsWith('http://')) {
-            baseUrl = baseUrl.replace('http://', 'https://');
+            return { success: 0, failed: targets.length, errors: ["SMS Settings Missing"] };
         }
 
         for (const lead of targets) {
@@ -474,29 +524,22 @@ export const mockService = {
             const formattedNumber = cleanNumber.startsWith('88') ? cleanNumber : '88' + cleanNumber;
 
             try {
-                const url = new URL(baseUrl);
+                const url = new URL(settings.sms_base_url.trim().replace(/\/$/, ""));
                 url.searchParams.append('api_key', settings.sms_api_key);
                 url.searchParams.append('senderid', settings.sms_sender_id);
                 url.searchParams.append('number', formattedNumber);
                 url.searchParams.append('message', body);
-                url.searchParams.append('type', 'text'); 
-
+                
                 const res = await fetch(url.toString(), { method: 'GET' }); 
                 const text = await res.text();
                 lastGatewayResponse = text; 
 
                 if (res.ok) {
-                    if(text.includes("100") || text.toLowerCase().includes("success")) {
-                         success++;
-                    } else {
-                         console.warn(`Gateway returned 200 but body might be error: ${text}`);
-                         success++;
-                    }
+                    success++;
                 } else {
-                    throw new Error(`HTTP Error ${res.status}: ${text}`);
+                    throw new Error(`Gateway Error: ${text}`);
                 }
             } catch (e: any) {
-                console.error(`Failed to send to ${formattedNumber}`, e);
                 failed++;
                 errors.push(`${lead.full_name}: ${e.message}`);
             }
@@ -511,7 +554,7 @@ export const mockService = {
     },
 
     scheduleBulkMessages: async (ids: string[], schedule: any[]): Promise<void> => {
-        console.log(`Scheduling messages for ${ids.length} recipients.`);
+        console.log(`Scheduled messages for ${ids.length} recipients.`);
     },
 
     resolvePhoneNumbersToIds: async (numbers: string[]): Promise<string[]> => {
@@ -533,13 +576,8 @@ export const mockService = {
     // --- FORMS (STRICTLY DATABASE ONLY) ---
     getForms: async (): Promise<LeadForm[]> => {
         try {
-            const res = await fetch(`${API_BASE}/forms.php?t=${Date.now()}`); // Add timestamp to prevent caching
-            if (res.ok) {
-                const data = await res.json();
-                if (Array.isArray(data)) return data;
-            } else {
-                console.error(`API Forms Fetch Failed: ${res.status} ${res.statusText}`);
-            }
+            const data = await safeFetch(`${API_BASE}/forms.php?t=${Date.now()}`);
+            if (Array.isArray(data)) return data;
         } catch (e) {
             console.error("API Form Fetch Error", e);
         }
@@ -548,11 +586,8 @@ export const mockService = {
 
     getFormById: async (id: string): Promise<LeadForm | undefined> => {
         try {
-            const res = await fetch(`${API_BASE}/forms.php?id=${id}&t=${Date.now()}`);
-            if (res.ok) {
-                const data = await res.json();
-                if (data && data.id) return data;
-            }
+            const data = await safeFetch(`${API_BASE}/forms.php?id=${id}&t=${Date.now()}`);
+            if (data && data.id) return data;
         } catch (e) {
             console.error("API Form Fetch Error", e);
         }
@@ -561,43 +596,27 @@ export const mockService = {
 
     createForm: async (form: Omit<LeadForm, 'id' | 'created_at'>): Promise<void> => {
         const newForm = { ...form, id: uuid(), created_at: getMySQLDate() };
-        
-        // Strict API Call. No Local Storage Fallback.
-        const res = await fetch(`${API_BASE}/forms.php`, {
+        await safeFetch(`${API_BASE}/forms.php`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'create', ...newForm })
         });
-
-        if (!res.ok) {
-            const txt = await res.text();
-            throw new Error(`Database Error (${res.status}): ${txt}`);
-        }
     },
 
     updateForm: async (id: string, updates: Partial<LeadForm>): Promise<void> => {
-        const res = await fetch(`${API_BASE}/forms.php`, {
+        await safeFetch(`${API_BASE}/forms.php`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'update', id, ...updates })
         });
-
-        if (!res.ok) {
-            const txt = await res.text();
-            throw new Error(`Database Update Error (${res.status}): ${txt}`);
-        }
     },
 
     deleteForm: async (id: string): Promise<void> => {
-        const res = await fetch(`${API_BASE}/forms.php`, {
+        await safeFetch(`${API_BASE}/forms.php`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'delete', id })
         });
-
-        if (!res.ok) {
-            throw new Error("Database Delete Error");
-        }
     },
 
     submitLeadForm: async (formId: string, data: any): Promise<void> => {
@@ -686,6 +705,7 @@ export const mockService = {
 
     // --- SNIPPETS ---
     getSnippets: async (): Promise<Snippet[]> => {
+        /* FIX: Changed typo 't' to 's' in INITIAL_SNIPPETS map function */
         return getStorage<Snippet[]>('sae_snippets', INITIAL_SNIPPETS.map(s => ({ ...s, id: uuid() })));
     },
 
@@ -719,7 +739,7 @@ export const mockService = {
         setStorage('sae_docs', docs.filter(d => d.id !== id));
     },
 
-    // --- SETTINGS (UPDATED TO SYNC WITH DB) ---
+    // --- SETTINGS ---
     getSystemSettings: async (): Promise<SystemSettings> => {
         const defaults: SystemSettings = {
             facebook_page_token: '',
@@ -734,18 +754,13 @@ export const mockService = {
             portal_fb_group: ''
         };
 
-        // 1. Try API
         try {
-            const res = await fetch(`${API_BASE}/settings.php`);
-            if (res.ok) {
-                const data = await res.json();
-                return { ...defaults, ...data };
-            }
+            const data = await safeFetch(`${API_BASE}/settings.php`);
+            if (data) return { ...defaults, ...data };
         } catch (e) {
-            console.warn("Settings API Error, falling back to local");
+            // console.warn("Settings API Error, falling back to local");
         }
 
-        // 2. Fallback Local Storage
         return getStorage<SystemSettings>('sae_settings', {
             ...defaults,
             system_api_key: 'lg_' + Math.random().toString(36).substr(2, 12)
@@ -753,22 +768,17 @@ export const mockService = {
     },
 
     saveSystemSettings: async (settings: SystemSettings): Promise<void> => {
-        // 1. Local Storage
         setStorage('sae_settings', settings);
 
-        // 2. Database Sync
         try {
-            const res = await fetch(`${API_BASE}/settings.php`, {
+            await safeFetch(`${API_BASE}/settings.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'update', ...settings })
             });
-            if(!res.ok) {
-                throw new Error(`Database save failed: ${res.statusText}`);
-            }
         } catch (e) { 
             console.error("API Settings Save Error", e);
-            throw e; // Rethrow to notify UI
+            throw e; 
         }
     },
 
@@ -851,18 +861,9 @@ export const mockService = {
             convs.push(conv);
         }
         setStorage('sae_messenger_convs', convs);
-        
-        // Simple regex phone capture
-        const phone = text.match(/(?:\+88|88)?01[3-9]\d{8}/);
-        if (phone) {
-            await mockService.createLead({ full_name: sender, primary_phone: phone[0], source: LeadSource.FACEBOOK_MESSENGER });
-            conv.is_lead_linked = true;
-            conv.customer_phone = phone[0];
-            setStorage('sae_messenger_convs', convs);
-        }
     },
 
-    // --- MISC BIG FISH METHODS ---
+    // --- MISC ---
     checkRetainerRenewals: async (): Promise<BigFish[]> => {
         const fish = await mockService.getBigFish();
         const now = new Date();
