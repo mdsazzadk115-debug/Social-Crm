@@ -175,7 +175,8 @@ export const mockService = {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'update', id, ...updates })
+                // FIX: PHP expects 'updates' key containing the fields
+                body: JSON.stringify({ action: 'update', id, updates: updates })
             });
         } catch (e) { console.error("API Update Error", e); }
     },
