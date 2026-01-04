@@ -67,20 +67,23 @@ const BigFishPage: React.FC = () => {
     const [profileFb, setProfileFb] = useState('');
     const [profileNotes, setProfileNotes] = useState('');
     
+    // Default Feature Flags
+    const DEFAULT_FLAGS = {
+        show_profit_analysis: true,
+        show_cpr_metrics: true,
+        allow_topup_request: true,
+        show_message_report: true,
+        show_sales_report: true,
+        show_profit_loss_report: false,
+        show_payment_methods: true
+    };
+
     // Initial Default State
     const [portalConfig, setPortalConfig] = useState<PortalConfig>({
         show_balance: true,
         show_history: true,
         is_suspended: false,
-        feature_flags: {
-            show_profit_analysis: true,
-            show_cpr_metrics: true,
-            allow_topup_request: true,
-            show_message_report: true,
-            show_sales_report: true,
-            show_profit_loss_report: false,
-            show_payment_methods: true
-        }
+        feature_flags: DEFAULT_FLAGS
     });
 
     const [interactionType, setInteractionType] = useState<'CALL' | 'MEETING' | 'EMAIL' | 'WHATSAPP' | 'OTHER' | 'INVOICE' | 'TASK' | 'SALE' | 'BALANCE'>('CALL');
@@ -112,22 +115,14 @@ const BigFishPage: React.FC = () => {
                 show_balance: true,
                 show_history: true,
                 is_suspended: false,
-                feature_flags: {
-                    show_profit_analysis: true,
-                    show_cpr_metrics: true,
-                    allow_topup_request: true,
-                    show_message_report: true,
-                    show_sales_report: true,
-                    show_profit_loss_report: false,
-                    show_payment_methods: true
-                }
+                feature_flags: DEFAULT_FLAGS
             };
             
-            const mergedConfig = {
+            const mergedConfig: PortalConfig = {
                 ...defaultConfig,
                 ...selectedFish.portal_config,
                 feature_flags: {
-                    ...defaultConfig.feature_flags,
+                    ...DEFAULT_FLAGS,
                     ...(selectedFish.portal_config?.feature_flags || {})
                 }
             };
@@ -346,18 +341,19 @@ const BigFishPage: React.FC = () => {
     // --- FIX: Robust Toggle Helper for Portal Config ---
     const toggleConfig = (field: string) => {
         setPortalConfig(prev => {
-            // Top level fields
             if (['show_balance', 'show_history', 'is_suspended'].includes(field)) {
                 return { ...prev, [field]: !prev[field as keyof PortalConfig] };
             }
             
-            // Feature flags - Ensure object exists and update immutably
+            const currentFlags = prev.feature_flags || DEFAULT_FLAGS;
+            
             return {
                 ...prev,
                 feature_flags: {
-                    ...(prev.feature_flags || {}), // ensure base exists
+                    ...DEFAULT_FLAGS, // Ensure mandatory fields are present
+                    ...currentFlags,
                     // @ts-ignore
-                    [field]: !prev.feature_flags?.[field]
+                    [field]: !currentFlags[field]
                 }
             };
         });
