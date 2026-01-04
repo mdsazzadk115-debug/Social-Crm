@@ -294,8 +294,12 @@ export const mockService = {
                     ...record 
                 })
             });
-            // Update balance locally for immediate feedback
-            await mockService.addTransaction(fishId, 'AD_SPEND', record.amount_spent, `Ad Campaign: ${new Date(record.start_date).toLocaleDateString()}`);
+            
+            // FIX: Removed the duplicate transaction call.
+            // The backend handles deduction via 'add_campaign_record' logic or we rely on server response.
+            // If you are using local demo data, uncomment below line, but for real backend, keep it commented.
+            // await mockService.addTransaction(fishId, 'AD_SPEND', record.amount_spent, `Ad Campaign: ${new Date(record.start_date).toLocaleDateString()}`);
+            
             return await mockService.getBigFishById(fishId);
         } catch (e) { console.error("API Campaign Error", e); }
         return undefined;
