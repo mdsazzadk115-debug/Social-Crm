@@ -903,5 +903,16 @@ export const mockService = {
 
     getPaymentMethods: async (): Promise<PaymentMethod[]> => {
         return getStorage<PaymentMethod[]>('sae_payment_methods', []);
+    },
+
+    addPaymentMethod: async (method: Partial<PaymentMethod>): Promise<void> => {
+        const methods = await mockService.getPaymentMethods();
+        const newMethod = { ...method, id: uuid() } as PaymentMethod;
+        setStorage('sae_payment_methods', [...methods, newMethod]);
+    },
+
+    deletePaymentMethod: async (id: string): Promise<void> => {
+        const methods = await mockService.getPaymentMethods();
+        setStorage('sae_payment_methods', methods.filter(m => m.id !== id));
     }
 };

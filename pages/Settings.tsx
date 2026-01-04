@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
-import { SystemSettings } from '../types';
-import { Save, Facebook, MessageSquare, Globe, Copy, Check, Info, Layout, Workflow, RefreshCw, Lock, FileText, AlertTriangle } from 'lucide-react';
+import { SystemSettings, PaymentMethod } from '../types';
+import { Save, Facebook, MessageSquare, Globe, Copy, Check, Info, Layout, Workflow, RefreshCw, Lock, FileText, AlertTriangle, CreditCard, Trash2, Plus } from 'lucide-react';
 
 const Settings: React.FC = () => {
     const [settings, setSettings] = useState<SystemSettings>({
@@ -16,21 +17,33 @@ const Settings: React.FC = () => {
         portal_fb_group: '',
         system_api_key: ''
     });
+    const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [activeTab, setActiveTab] = useState<'facebook' | 'sms' | 'portal' | 'general' | 'api'>('facebook');
+    const [activeTab, setActiveTab] = useState<'facebook' | 'sms' | 'portal' | 'general' | 'api' | 'payment'>('facebook');
     const [copied, setCopied] = useState(false);
     const [scriptCopied, setScriptCopied] = useState(false);
 
+    // Payment Form State
+    const [newPaymentMethod, setNewPaymentMethod] = useState<Partial<PaymentMethod>>({
+        type: 'MOBILE',
+        mobile_type: 'Personal',
+        instruction: 'Send Money'
+    });
+
     useEffect(() => {
-        mockService.getSystemSettings().then(data => {
+        Promise.all([
+            mockService.getSystemSettings(),
+            mockService.getPaymentMethods()
+        ]).then(([data, methods]) => {
             // Generate API key if missing
             if (!data.system_api_key) {
                 data.system_api_key = 'lg_' + Math.random().toString(36).substr(2, 16);
                 mockService.saveSystemSettings(data);
             }
             setSettings(data);
+            setPaymentMethods(methods);
             setIsLoading(false);
         });
     }, []);
@@ -72,6 +85,26 @@ const Settings: React.FC = () => {
         navigator.clipboard.writeText(text);
         setScriptCopied(true);
         setTimeout(() => setScriptCopied(false), 2000);
+    };
+
+    // Payment Method Handlers
+    const handleAddPayment = async () => {
+        if (!newPaymentMethod.provider_name || !newPaymentMethod.account_number) {
+            alert("Provider Name and Account Number are required.");
+            return;
+        }
+        await mockService.addPaymentMethod(newPaymentMethod);
+        const updated = await mockService.getPaymentMethods();
+        setPaymentMethods(updated);
+        setNewPaymentMethod({ type: 'MOBILE', mobile_type: 'Personal', instruction: 'Send Money' });
+    };
+
+    const handleDeletePayment = async (id: string) => {
+        if (confirm("Delete this payment method?")) {
+            await mockService.deletePaymentMethod(id);
+            const updated = await mockService.getPaymentMethods();
+            setPaymentMethods(updated);
+        }
     };
 
     if (isLoading) return <div className="p-8 text-center text-gray-500">Loading settings...</div>;
@@ -189,6 +222,12 @@ function onFormSubmit(e) {
                         className={`flex-1 py-4 px-4 text-sm font-medium text-center border-b-2 transition-colors flex items-center justify-center whitespace-nowrap ${activeTab === 'sms' ? 'border-green-600 text-green-600 bg-green-50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
                     >
                         <MessageSquare className="h-4 w-4 mr-2"/> SMS Gateway
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('payment')}
+                        className={`flex-1 py-4 px-4 text-sm font-medium text-center border-b-2 transition-colors flex items-center justify-center whitespace-nowrap ${activeTab === 'payment' ? 'border-purple-600 text-purple-600 bg-purple-50' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
+                    >
+                        <CreditCard className="h-4 w-4 mr-2"/> Payments
                     </button>
                     <button
                         onClick={() => setActiveTab('portal')}
@@ -442,6 +481,159 @@ function onFormSubmit(e) {
                                         placeholder="MyBrand"
                                     />
                                 </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* PAYMENT METHODS TAB (NEW) */}
+                    {activeTab === 'payment' && (
+                        <div className="space-y-8">
+                            <div className="bg-purple-50 p-4 rounded-lg border border-purple-100 mb-6">
+                                <h3 className="font-bold text-purple-800 text-sm flex items-center mb-1">
+                                    <Info className="h-4 w-4 mr-2"/> Manage Payment Methods
+                                </h3>
+                                <p className="text-xs text-purple-700">
+                                    Add bKash, Nagad, or Bank accounts here. These will be visible in the Client Portal and Invoices.
+                                </p>
+                            </div>
+
+                            {/* Add Form */}
+                            <div className="bg-gray-50 p-5 rounded-xl border border-gray-200">
+                                <h4 className="text-sm font-bold text-gray-800 mb-4 uppercase">Add New Method</h4>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-600 mb-1">Method Type</label>
+                                        <select 
+                                            className="w-full border border-gray-300 rounded p-2 text-sm"
+                                            value={newPaymentMethod.type}
+                                            onChange={e => setNewPaymentMethod({...newPaymentMethod, type: e.target.value as any})}
+                                        >
+                                            <option value="MOBILE">Mobile Banking (bKash/Nagad)</option>
+                                            <option value="BANK">Bank Account</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-600 mb-1">{newPaymentMethod.type === 'MOBILE' ? 'Provider Name' : 'Bank Name'}</label>
+                                        <input 
+                                            className="w-full border border-gray-300 rounded p-2 text-sm"
+                                            placeholder={newPaymentMethod.type === 'MOBILE' ? "e.g. bKash" : "e.g. Dutch Bangla Bank"}
+                                            value={newPaymentMethod.provider_name || ''}
+                                            onChange={e => setNewPaymentMethod({...newPaymentMethod, provider_name: e.target.value})}
+                                        />
+                                    </div>
+                                </div>
+
+                                {newPaymentMethod.type === 'MOBILE' ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-600 mb-1">Phone Number</label>
+                                            <input 
+                                                className="w-full border border-gray-300 rounded p-2 text-sm"
+                                                placeholder="017..."
+                                                value={newPaymentMethod.account_number || ''}
+                                                onChange={e => setNewPaymentMethod({...newPaymentMethod, account_number: e.target.value})}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-600 mb-1">Account Type</label>
+                                            <select 
+                                                className="w-full border border-gray-300 rounded p-2 text-sm"
+                                                value={newPaymentMethod.mobile_type}
+                                                onChange={e => setNewPaymentMethod({...newPaymentMethod, mobile_type: e.target.value as any})}
+                                            >
+                                                <option value="Personal">Personal</option>
+                                                <option value="Merchant">Merchant</option>
+                                                <option value="Agent">Agent</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-600 mb-1">Instruction</label>
+                                            <select 
+                                                className="w-full border border-gray-300 rounded p-2 text-sm"
+                                                value={newPaymentMethod.instruction}
+                                                onChange={e => setNewPaymentMethod({...newPaymentMethod, instruction: e.target.value as any})}
+                                            >
+                                                <option value="Send Money">Send Money</option>
+                                                <option value="Payment">Payment</option>
+                                                <option value="Cash Out">Cash Out</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-600 mb-1">Account Name</label>
+                                            <input 
+                                                className="w-full border border-gray-300 rounded p-2 text-sm"
+                                                placeholder="Account Holder Name"
+                                                value={newPaymentMethod.account_name || ''}
+                                                onChange={e => setNewPaymentMethod({...newPaymentMethod, account_name: e.target.value})}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-600 mb-1">Account Number</label>
+                                            <input 
+                                                className="w-full border border-gray-300 rounded p-2 text-sm"
+                                                placeholder="Account No."
+                                                value={newPaymentMethod.account_number || ''}
+                                                onChange={e => setNewPaymentMethod({...newPaymentMethod, account_number: e.target.value})}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-600 mb-1">Branch Name</label>
+                                            <input 
+                                                className="w-full border border-gray-300 rounded p-2 text-sm"
+                                                placeholder="Branch"
+                                                value={newPaymentMethod.branch_name || ''}
+                                                onChange={e => setNewPaymentMethod({...newPaymentMethod, branch_name: e.target.value})}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-bold text-gray-600 mb-1">Routing (Optional)</label>
+                                            <input 
+                                                className="w-full border border-gray-300 rounded p-2 text-sm"
+                                                placeholder="Routing Number"
+                                                value={newPaymentMethod.routing_number || ''}
+                                                onChange={e => setNewPaymentMethod({...newPaymentMethod, routing_number: e.target.value})}
+                                            />
+                                        </div>
+                                    </div>
+                                )}
+
+                                <button onClick={handleAddPayment} className="bg-purple-600 text-white px-4 py-2 rounded font-bold text-sm hover:bg-purple-700 flex items-center">
+                                    <Plus className="h-4 w-4 mr-1"/> Add Method
+                                </button>
+                            </div>
+
+                            {/* Existing Methods List */}
+                            <div className="space-y-4">
+                                <h4 className="text-sm font-bold text-gray-800 uppercase border-b pb-2">Active Methods</h4>
+                                {paymentMethods.length === 0 && <p className="text-gray-400 text-sm">No payment methods added.</p>}
+                                
+                                {paymentMethods.map(pm => (
+                                    <div key={pm.id} className="bg-white border border-gray-200 rounded-lg p-4 flex justify-between items-center shadow-sm">
+                                        <div className="flex items-center gap-4">
+                                            <div className={`p-3 rounded-full ${pm.type === 'MOBILE' ? 'bg-pink-100 text-pink-600' : 'bg-blue-100 text-blue-600'}`}>
+                                                {pm.type === 'MOBILE' ? <CreditCard className="h-5 w-5"/> : <Globe className="h-5 w-5"/>}
+                                            </div>
+                                            <div>
+                                                <h5 className="font-bold text-gray-900">{pm.provider_name}</h5>
+                                                {pm.type === 'MOBILE' ? (
+                                                    <p className="text-sm text-gray-600 font-mono">
+                                                        {pm.account_number} <span className="text-xs bg-gray-100 px-1 rounded ml-1">{pm.mobile_type} - {pm.instruction}</span>
+                                                    </p>
+                                                ) : (
+                                                    <p className="text-sm text-gray-600">
+                                                        {pm.account_name} | Acc: <span className="font-mono">{pm.account_number}</span> | {pm.branch_name}
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <button onClick={() => handleDeletePayment(pm.id)} className="text-gray-400 hover:text-red-600 p-2 rounded-full hover:bg-red-50">
+                                            <Trash2 className="h-5 w-5"/>
+                                        </button>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     )}
