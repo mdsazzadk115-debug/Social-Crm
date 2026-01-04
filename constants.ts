@@ -87,7 +87,6 @@ export const DEMO_LEADS = [
         is_starred: true,
         is_unread: true,
         total_messages_sent: 0,
-        /* FIX: Added missing download_count property */
         download_count: 0,
         first_contact_at: new Date().toISOString(),
         last_activity_at: new Date().toISOString(),
@@ -104,58 +103,6 @@ export const DEMO_LEADS = [
         is_starred: false,
         is_unread: false,
         total_messages_sent: 2,
-        /* FIX: Added missing download_count property */
-        download_count: 0,
-        first_contact_at: new Date().toISOString(),
-        last_activity_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-    },
-    {
-        id: 'dl_3',
-        full_name: 'Rahim Uddin',
-        primary_phone: '01655667788',
-        source: LeadSource.WEBSITE,
-        status: LeadStatus.INTERESTED,
-        industry: '🍽️ Restaurant (রেস্টুরেন্ট)',
-        service_category: 'Facebook Marketing',
-        is_starred: false,
-        is_unread: true,
-        total_messages_sent: 1,
-        /* FIX: Added missing download_count property */
-        download_count: 0,
-        first_contact_at: new Date().toISOString(),
-        last_activity_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-    },
-    {
-        id: 'dl_4',
-        full_name: 'Nusrat Jahan',
-        primary_phone: '01911223344',
-        source: LeadSource.FACEBOOK_MESSENGER,
-        status: LeadStatus.WORKING,
-        industry: '💄 Beauty (বিউটি)',
-        service_category: 'Development',
-        is_starred: true,
-        is_unread: false,
-        total_messages_sent: 5,
-        /* FIX: Added missing download_count property */
-        download_count: 0,
-        first_contact_at: new Date().toISOString(),
-        last_activity_at: new Date().toISOString(),
-        created_at: new Date().toISOString(),
-    },
-    {
-        id: 'dl_5',
-        full_name: 'Karim Enterprise',
-        primary_phone: '01555666777',
-        source: LeadSource.MANUAL,
-        status: LeadStatus.CLOSED_WON,
-        industry: '🏠 Real Estate (রিয়েল স্টেট)',
-        service_category: 'Development',
-        is_starred: false,
-        is_unread: false,
-        total_messages_sent: 10,
-        /* FIX: Added missing download_count property */
         download_count: 0,
         first_contact_at: new Date().toISOString(),
         last_activity_at: new Date().toISOString(),
@@ -172,26 +119,37 @@ export const DEMO_BIG_FISH: BigFish[] = [
         phone: '01711223344',
         status: 'Active Pool',
         package_name: 'Premium Growth Package',
-        balance: 155.50,
+        balance: 250.00, // Adjusted to handle $150 deduction
         low_balance_alert_threshold: 20,
         total_budget: 2000,
-        spent_amount: 1844.50,
+        spent_amount: 150.00,
         target_sales: 500,
-        current_sales: 342,
+        current_sales: 0,
         transactions: [
-            { id: 'tx_1', date: new Date().toISOString(), type: 'DEPOSIT', amount: 200, description: 'Balance Top-up via bKash' },
-            { id: 'tx_2', date: new Date(Date.now() - 86400000).toISOString(), type: 'AD_SPEND', amount: 15.50, description: 'Daily Ad Spend (May 15)' },
+            { id: 'tx_init', date: new Date().toISOString(), type: 'DEPOSIT', amount: 400, description: 'Initial Deposit' },
+            { id: 'tx_demo', date: new Date().toISOString(), type: 'AD_SPEND', amount: 150, description: 'Ad Campaign: Test Entry' },
         ],
         campaign_records: [
-            { id: 'cr_1', start_date: new Date(Date.now() - 432000000).toISOString(), end_date: new Date(Date.now() - 345600000).toISOString(), amount_spent: 45.00, real_amount_spent: 40.00, impressions: 12000, reach: 9000, clicks: 450, result_type: 'MESSAGES', results_count: 55, created_at: new Date().toISOString() }
+            { 
+                id: 'cr_demo_test', 
+                start_date: new Date().toISOString().slice(0, 10), 
+                end_date: new Date().toISOString().slice(0, 10), 
+                amount_spent: 150.00,       // Client Bill ($)
+                real_amount_spent: 100.00,  // Actual Cost ($)
+                buying_rate: 130,           // Buy Rate (৳)
+                client_rate: 145,           // Charge Rate (৳)
+                impressions: 25000, 
+                reach: 18000, 
+                clicks: 1200, 
+                result_type: 'MESSAGES', 
+                results_count: 500,         // 500 Results
+                created_at: new Date().toISOString() 
+            }
         ],
         growth_tasks: [
-            { id: 'gt_1', title: 'Launch Spring Collection Ads', is_completed: true, due_date: new Date().toISOString() },
-            { id: 'gt_2', title: 'Setup Meta Pixel V2', is_completed: false }
+            { id: 'gt_1', title: 'Verify Profit Calculation', is_completed: false },
         ],
-        reports: [
-            { id: 'rl_1', date: new Date().toISOString(), task: 'Optimized audience targeting for winter stock clearance.' }
-        ],
+        reports: [],
         portal_config: { 
             show_balance: true, 
             show_history: true, 
@@ -205,8 +163,7 @@ export const DEMO_BIG_FISH: BigFish[] = [
                 show_profit_loss_report: true
             } 
         },
-        start_date: new Date(Date.now() - 7776000000).toISOString(),
-        facebook_page: 'https://fb.com/urbanvoguebd'
+        start_date: new Date().toISOString(),
     },
     {
         id: 'bf_5',
@@ -218,94 +175,26 @@ export const DEMO_BIG_FISH: BigFish[] = [
         balance: 450.00,
         low_balance_alert_threshold: 50,
         total_budget: 5000,
-        spent_amount: 1200,
+        spent_amount: 0,
         target_sales: 1000,
-        current_sales: 420,
-        transactions: [
-            { id: 'tx_sl_1', date: new Date().toISOString(), type: 'DEPOSIT', amount: 1000, description: 'Bank Transfer (Initial)' }
-        ],
-        campaign_records: [
-            { 
-                id: 'cr_sl_1', 
-                start_date: new Date(Date.now() - 864000000).toISOString(), 
-                end_date: new Date(Date.now() - 432000000).toISOString(), 
-                amount_spent: 120.00, 
-                real_amount_spent: 100.00, 
-                impressions: 45000, 
-                reach: 38000, 
-                clicks: 1200, 
-                result_type: 'SALES', 
-                results_count: 85, 
-                product_price: 1500,
-                product_cost: 800,
-                created_at: new Date().toISOString() 
-            }
-        ],
-        growth_tasks: [
-            { id: 'gt_sl_1', title: 'Connect Conversion API', is_completed: true },
-            { id: 'gt_sl_2', title: 'Video Ad Production', is_completed: false }
-        ],
+        current_sales: 0,
+        transactions: [],
+        campaign_records: [],
+        growth_tasks: [],
         reports: [],
         portal_config: { 
             show_balance: true, 
             show_history: true, 
             is_suspended: false,
             feature_flags: {
-                /* FIX: Added missing required properties for feature_flags */
                 show_profit_analysis: true,
                 show_cpr_metrics: true,
-                show_message_report: false,
+                show_message_report: true,
                 show_sales_report: true,
                 show_profit_loss_report: true,
                 allow_topup_request: true
             }
         },
-        start_date: new Date().toISOString()
-    },
-    {
-        id: 'bf_6',
-        lead_id: 'dl_3',
-        name: 'Elite Properties',
-        phone: '01655667788',
-        status: 'Active Pool',
-        package_name: 'Lead Gen Authority',
-        balance: 1250.00,
-        low_balance_alert_threshold: 100,
-        total_budget: 10000,
-        spent_amount: 3400,
-        target_sales: 50,
-        current_sales: 12,
-        transactions: [],
-        campaign_records: [
-            { id: 'cr_ep_1', start_date: new Date().toISOString(), end_date: new Date().toISOString(), amount_spent: 250.00, real_amount_spent: 240.00, impressions: 8000, reach: 6500, clicks: 120, result_type: 'MESSAGES', results_count: 42, created_at: new Date().toISOString() }
-        ],
-        topup_requests: [
-            { id: 'tr_ep_1', client_id: 'bf_6', client_name: 'Elite Properties', amount: 500, method_name: 'City Bank', sender_number: 'Ref-8899', status: 'PENDING', created_at: new Date().toISOString() }
-        ],
-        growth_tasks: [],
-        reports: [],
-        portal_config: { show_balance: true, show_history: true, is_suspended: false },
-        start_date: new Date().toISOString()
-    },
-    {
-        id: 'bf_2',
-        lead_id: 'dl_5',
-        name: 'Dhaka Dine Restaurant',
-        phone: '01555666777',
-        status: 'Active Pool',
-        package_name: 'Local Awareness',
-        balance: 5.25, // LOW BALANCE
-        low_balance_alert_threshold: 15,
-        total_budget: 500,
-        spent_amount: 494.75,
-        target_sales: 100,
-        current_sales: 85,
-        transactions: [],
-        growth_tasks: [
-            { id: 'gt_dd_1', title: 'Renew Ad Budget', is_completed: false, due_date: new Date().toISOString() }
-        ],
-        reports: [],
-        portal_config: { show_balance: true, show_history: true, is_suspended: false },
         start_date: new Date().toISOString()
     }
 ];
@@ -318,14 +207,6 @@ export const INITIAL_TEMPLATES = [
         channel: Channel.SMS,
         type: "intro",
         body: "আসসালামু আলাইকুম! Social Ads Expert এ যোগাযোগ করার জন্য ধন্যবাদ। আমরা আপনার মেসেজটি পেয়েছি। একজন প্রতিনিধি শীঘ্রই আপনার সাথে যোগাযোগ করবেন। জরুরি প্রয়োজনে কল করুন: 01798205143",
-        is_active: true
-    },
-    {
-        name: "Payment Received",
-        category: "General",
-        channel: Channel.SMS,
-        type: "update",
-        body: "✅ পেমেন্ট রিসিভড! আপনার পেমেন্ট সফলভাবে জমা হয়েছে। আমাদের সাথে থাকার জন্য ধন্যবাদ। পরবর্তী আপডেট শীঘ্রই জানানো হবে।",
         is_active: true
     }
 ];
@@ -343,8 +224,7 @@ export const INITIAL_SNIPPETS = [
 export const INVOICE_SERVICE_TYPES = [
     "Facebook Marketing Service",
     "Website Development",
-    "Landing Page Design",
-    "Conversion API Setup"
+    "Landing Page Design"
 ];
 
 export const DEFAULT_INVOICE_TERMS = "1. Payment is due within 7 days.\n2. Please include invoice number in reference.";

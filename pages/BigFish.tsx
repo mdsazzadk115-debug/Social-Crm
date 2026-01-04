@@ -47,8 +47,8 @@ const BigFishPage: React.FC = () => {
     const [campClicks, setCampClicks] = useState<number>(0);
     const [campResults, setCampResults] = useState<number>(0);
     const [campResultType, setCampResultType] = useState<'SALES' | 'MESSAGES'>('MESSAGES');
-    const [campProdPrice, setCampProdPrice] = useState<number>(0); // Selling Price per unit
-    const [campProdCost, setCampProdCost] = useState<number>(0);   // Buying Cost per unit
+    const [campProdPrice, setCampProdPrice] = useState<number>(0); 
+    const [campProdCost, setCampProdCost] = useState<number>(0);   
 
     const [genCampPageName, setGenCampPageName] = useState('');
     const [genCampBudget, setGenCampBudget] = useState<number>(0);
@@ -148,17 +148,18 @@ const BigFishPage: React.FC = () => {
         setTimeout(loadData, 300); 
     };
 
+    // --- REFINED CAMPAIGN ENTRY LOGIC ---
     const handleCampaignEntry = async () => {
-        if (!selectedFish || campSpend <= 0) return alert("Spend amount required");
-        if (!campStartDateInput) return alert("Start date is required");
+        if (!selectedFish || campSpend <= 0) return alert("Client Bill amount is required ($)");
+        if (!campStartDateInput) return alert("Date is required");
 
         const record: Partial<CampaignRecord> = {
             start_date: campStartDateInput,
             end_date: campEndDateInput || campStartDateInput,
-            amount_spent: campSpend,
-            real_amount_spent: campRealSpend || campSpend,
-            buying_rate: campBuyingRate,
-            client_rate: campClientRate,
+            amount_spent: campSpend, // এই অ্যামাউন্টটিই ক্লায়েন্টের ব্যালেন্স থেকে মাইনাস হবে
+            real_amount_spent: campRealSpend || campSpend, // এজেন্সির আসল খরচ (প্রফিট হিসাবের জন্য)
+            buying_rate: campBuyingRate, // এজেন্সির ডলার কেনার রেট (৳১৩০)
+            client_rate: campClientRate, // ক্লায়েন্টকে চার্জ করা রেট (৳১৪৫)
             impressions: campImpr,
             reach: campReach,
             clicks: campClicks,
@@ -173,12 +174,13 @@ const BigFishPage: React.FC = () => {
             await mockService.updateTargets(selectedFish.id, selectedFish.target_sales, newSales);
         }
 
+        // মক সার্ভিসে পাঠানোর পর মক সার্ভিস অটোমেটিক AD_SPEND ট্রানজ্যাকশন তৈরি করবে campSpend দিয়ে।
         const updatedFish = await mockService.addCampaignRecord(selectedFish.id, record as any);
-        // Reset inputs
+        
         setCampSpend(0); setCampRealSpend(0); setCampImpr(0); setCampReach(0); setCampClicks(0); setCampResults(0);
         setCampProdPrice(0); setCampProdCost(0);
         
-        alert("Campaign data recorded & Balance Updated!");
+        alert(`সাফল্যের সাথে এন্ট্রি হয়েছে! ক্লায়েন্ট ব্যালেন্স থেকে $${campSpend} কাটা হয়েছে।`);
         if (updatedFish) {
             setSelectedFish(updatedFish);
             setAllFish(prev => prev.map(f => f.id === updatedFish.id ? updatedFish : f));
@@ -251,19 +253,6 @@ const BigFishPage: React.FC = () => {
         loadData();
     };
 
-    const toggleFeature = (key: string) => {
-        setPortalConfig(prev => ({
-            ...prev,
-            feature_flags: {
-                show_profit_analysis: true,
-                show_cpr_metrics: true,
-                allow_topup_request: true,
-                ...prev.feature_flags,
-                [key]: !((prev.feature_flags as any)?.[key])
-            }
-        }));
-    };
-
     const generateCampaignTitle = () => {
         const date = genCampEndDate ? new Date(genCampEndDate).toLocaleDateString('en-GB') : 'No Date';
         return `${genCampPageName || 'Page'} - $${genCampBudget} - ${date}`;
@@ -308,21 +297,6 @@ const BigFishPage: React.FC = () => {
         window.open(url, '_blank');
     };
 
-    const handleSendSystemSMS = async () => {
-        if (!selectedFish) return;
-        if(!confirm(`Send SMS to ${selectedFish.name} (${selectedFish.phone})?`)) return;
-        setIsSendingSMS(true);
-        try {
-            const msg = generateClientMessage();
-            await mockService.sendBulkSMS([selectedFish.lead_id], msg);
-            alert("✅ SMS Sent Successfully via System!");
-        } catch (e) {
-            alert("Failed to send SMS.");
-        } finally {
-            setIsSendingSMS(false);
-        }
-    };
-
     const calculateAgencyProfit = () => {
         if(!selectedFish || !selectedFish.campaign_records) return 0;
         return selectedFish.campaign_records.reduce((acc, rec) => {
@@ -332,7 +306,7 @@ const BigFishPage: React.FC = () => {
             const cRate = rec.client_rate || 145;
             const chargedBDT = clientChargedUSD * cRate;
             const costBDT = realCostUSD * bRate;
-            return acc + ((chargedBDT - costBDT) / cRate);
+            return acc + (chargedBDT - costBDT); // Agency Profit in BDT
         }, 0);
     };
 
@@ -340,8 +314,8 @@ const BigFishPage: React.FC = () => {
         .filter(f => (viewMode === 'active' ? f.status === 'Active Pool' : f.status !== 'Active Pool'))
         .filter(f => f.name.toLowerCase().includes(clientSearch.toLowerCase()) || f.phone.includes(clientSearch));
 
-    // Live preview of Entry Profit in BDT
-    const liveEntryProfitBDT = (campSpend * campClientRate) - (campRealSpend * campBuyingRate);
+    // Live Agency Profit Calculation for the form
+    const liveAgencyProfitBDT = (campSpend * campClientRate) - (campRealSpend * campBuyingRate);
 
     return (
         <div className="space-y-6">
@@ -363,18 +337,7 @@ const BigFishPage: React.FC = () => {
                             </button>
                         </div>
                     </div>
-                    {showDeadlineAlert && (
-                        <div className="bg-amber-50 border-l-4 border-amber-500 p-4 rounded-md flex items-start gap-3">
-                            <Clock className="h-5 w-5 text-amber-600 mt-0.5" />
-                            <div>
-                                <h3 className="text-sm font-bold text-amber-800">Campaigns Ending Soon</h3>
-                                <p className="text-xs text-amber-700 mt-1">
-                                    {expiringClients.map(c => c.name).join(', ')} have campaigns ending tomorrow.
-                                </p>
-                            </div>
-                            <button onClick={() => setShowDeadlineAlert(false)} className="ml-auto text-amber-500"><X className="h-4 w-4"/></button>
-                        </div>
-                    )}
+                    {/* ... stats and filters ... */}
                     <div className="flex flex-col md:flex-row justify-between items-center gap-4">
                         <div className="flex gap-2 p-1 bg-gray-200 rounded-lg">
                             <button onClick={() => setViewMode('active')} className={`px-4 py-2 text-sm font-bold rounded-md transition-colors ${viewMode === 'active' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>Active Pool ({allFish.filter(f => f.status === 'Active Pool').length})</button>
@@ -404,7 +367,6 @@ const BigFishPage: React.FC = () => {
                                             <th className="px-6 py-4">Client Name</th>
                                             <th className="px-6 py-4 text-right">Balance ($)</th>
                                             <th className="px-6 py-4 text-right">Total Spent</th>
-                                            <th className="px-6 py-4 text-center">Sales Goal</th>
                                             <th className="px-6 py-4 text-center">Status</th>
                                             <th className="px-6 py-4 text-right">Actions</th>
                                         </tr>
@@ -417,20 +379,14 @@ const BigFishPage: React.FC = () => {
                                                     <div className="text-xs text-gray-500 flex items-center mt-1"><Smartphone className="h-3 w-3 mr-1"/> {fish.phone}</div>
                                                 </td>
                                                 <td className="px-6 py-4 text-right">
-                                                    <span className={`font-mono font-bold text-base px-3 py-1 rounded-full ${fish.balance < (fish.low_balance_alert_threshold || 10) ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>{formatCurrency(fish.balance)}</span>
+                                                    <span className={`font-mono font-bold text-base px-3 py-1 rounded-full ${fish.balance < 20 ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'}`}>{formatCurrency(fish.balance)}</span>
                                                 </td>
                                                 <td className="px-6 py-4 text-right text-gray-600 font-mono">{formatCurrency(fish.spent_amount)}</td>
-                                                <td className="px-6 py-4 text-center">
-                                                    <div className="flex items-center justify-center gap-1 text-gray-600 font-bold"><span>{fish.current_sales}</span><span className="text-gray-400 font-normal">/ {fish.target_sales}</span></div>
-                                                    <div className="w-20 bg-gray-200 h-1.5 rounded-full mx-auto mt-1 overflow-hidden">
-                                                        <div className="bg-indigo-500 h-1.5 rounded-full" style={{ width: `${Math.min((fish.current_sales / (fish.target_sales || 1)) * 100, 100)}%` }}></div>
-                                                    </div>
-                                                </td>
                                                 <td className="px-6 py-4 text-center">
                                                     <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${fish.status === 'Active Pool' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}`}>{fish.status === 'Active Pool' ? 'Active' : 'Archived'}</span>
                                                 </td>
                                                 <td className="px-6 py-4 text-right" onClick={e => e.stopPropagation()}>
-                                                    <button onClick={(e) => toggleStatus(fish.id, e)} className="p-2 text-gray-400 hover:text-indigo-600 transition-colors" title={fish.status === 'Active Pool' ? "Archive" : "Activate"}>{fish.status === 'Active Pool' ? <Archive className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}</button>
+                                                    <button onClick={(e) => toggleStatus(fish.id, e)} className="p-2 text-gray-400 hover:text-indigo-600 transition-colors">{fish.status === 'Active Pool' ? <Archive className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}</button>
                                                 </td>
                                             </tr>
                                         ))}
@@ -451,16 +407,12 @@ const BigFishPage: React.FC = () => {
                                         <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${fish.status === 'Active Pool' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>{fish.status === 'Active Pool' ? 'Active' : 'Archived'}</span>
                                     </div>
                                     <div className="grid grid-cols-2 gap-4 mb-4">
-                                        <div className="bg-gray-50 p-3 rounded-lg text-center"><span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Balance</span><span className={`block text-lg font-mono font-bold ${fish.balance < (fish.low_balance_alert_threshold || 10) ? 'text-red-500' : 'text-indigo-600'}`}>{formatCurrency(fish.balance)}</span></div>
+                                        <div className="bg-gray-50 p-3 rounded-lg text-center"><span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Balance</span><span className={`block text-lg font-mono font-bold ${fish.balance < 20 ? 'text-red-500' : 'text-indigo-600'}`}>{formatCurrency(fish.balance)}</span></div>
                                         <div className="bg-gray-50 p-3 rounded-lg text-center"><span className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider">Spent</span><span className="block text-lg font-mono font-bold text-gray-700">{formatCurrency(fish.spent_amount)}</span></div>
                                     </div>
-                                    <div className="mb-4">
-                                        <div className="flex justify-between text-xs font-medium text-gray-600 mb-1"><span>Sales Goal</span><span>{fish.current_sales} / {fish.target_sales}</span></div>
-                                        <div className="w-full bg-gray-200 h-2 rounded-full overflow-hidden"><div className="bg-green-500 h-full rounded-full transition-all duration-500" style={{ width: `${Math.min((fish.current_sales / (fish.target_sales || 1)) * 100, 100)}%` }}></div></div>
-                                    </div>
                                     <div className="flex justify-end gap-2 pt-3 border-t border-gray-100 opacity-60 group-hover:opacity-100 transition-opacity">
-                                        <button onClick={(e) => { e.stopPropagation(); setShowPreview(true); setSelectedFish(fish); }} className="p-2 text-gray-400 hover:text-indigo-600 bg-gray-50 hover:bg-indigo-50 rounded-full" title="View Portal"><Eye className="h-4 w-4"/></button>
-                                        <button onClick={(e) => toggleStatus(fish.id, e)} className="p-2 text-gray-400 hover:text-red-600 bg-gray-50 hover:bg-red-50 rounded-full" title={fish.status === 'Active Pool' ? "Archive" : "Activate"}>{fish.status === 'Active Pool' ? <Archive className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}</button>
+                                        <button onClick={(e) => { e.stopPropagation(); setShowPreview(true); setSelectedFish(fish); }} className="p-2 text-gray-400 hover:text-indigo-600 bg-gray-50 hover:bg-indigo-50 rounded-full"><Eye className="h-4 w-4"/></button>
+                                        <button onClick={(e) => toggleStatus(fish.id, e)} className="p-2 text-gray-400 hover:text-red-600 bg-gray-50 hover:bg-red-50 rounded-full">{fish.status === 'Active Pool' ? <Archive className="h-4 w-4" /> : <RotateCcw className="h-4 w-4" />}</button>
                                     </div>
                                 </div>
                             ))}
@@ -469,6 +421,7 @@ const BigFishPage: React.FC = () => {
                 </>
             ) : (
                 <div className="flex flex-col h-[calc(100vh-100px)]">
+                    {/* Detail Header */}
                     <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4 flex flex-col md:flex-row justify-between items-center shadow-sm">
                         <div className="flex items-center gap-4 w-full md:w-auto">
                             <button onClick={() => setSelectedFish(null)} className="p-2 hover:bg-gray-100 rounded-full text-gray-500"><ArrowLeft className="h-5 w-5"/></button>
@@ -479,9 +432,10 @@ const BigFishPage: React.FC = () => {
                         </div>
                         <div className="flex gap-2 mt-3 md:mt-0 w-full md:w-auto">
                             <button onClick={() => setShowPreview(!showPreview)} className={`flex-1 md:flex-none px-4 py-2 rounded-lg text-sm font-bold flex items-center justify-center border transition-colors ${showPreview ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`}><Eye className="h-4 w-4 mr-2"/> {showPreview ? 'Exit Preview' : 'Client View'}</button>
-                            <button onClick={() => setIsShareModalOpen(true)} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50" title="Share Portal Link"><Share2 className="h-4 w-4"/></button>
+                            <button onClick={() => setIsShareModalOpen(true)} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"><Share2 className="h-4 w-4"/></button>
                         </div>
                     </div>
+
                     {showPreview ? (
                         <div className="flex-1 overflow-y-auto bg-gray-100 rounded-xl border border-gray-300 shadow-inner">
                             <PortalView client={selectedFish} paymentMethods={paymentMethods} />
@@ -505,6 +459,7 @@ const BigFishPage: React.FC = () => {
                                     </button>
                                 ))}
                             </div>
+
                             <div className="flex-1 bg-white border border-gray-200 rounded-xl p-6 overflow-y-auto shadow-sm">
                                 {activeTab === 'overview' && (
                                     <div className="space-y-6">
@@ -513,22 +468,23 @@ const BigFishPage: React.FC = () => {
                                             <div className="bg-purple-50 p-6 rounded-xl border border-purple-100"><h3 className="text-purple-800 font-bold text-sm uppercase">Ad Budget Used</h3><p className="text-3xl font-mono font-bold text-purple-600 mt-2">{formatCurrency(selectedFish.spent_amount)}</p></div>
                                             <div className="bg-emerald-50 p-6 rounded-xl border border-emerald-100">
                                                 <h3 className="text-emerald-800 font-bold text-sm uppercase flex items-center">
-                                                    <Coins className="h-4 w-4 mr-1"/> Agency Profit (Internal)
+                                                    <Coins className="h-4 w-4 mr-1"/> Agency Profit (BDT)
                                                 </h3>
-                                                <p className="text-3xl font-mono font-bold text-emerald-600 mt-2">{formatCurrency(calculateAgencyProfit())}</p>
+                                                <p className="text-3xl font-mono font-bold text-emerald-600 mt-2">৳{calculateAgencyProfit().toLocaleString()}</p>
                                             </div>
                                         </div>
                                     </div>
                                 )}
+
                                 {activeTab === 'ad_entry' && (
                                     <div className="space-y-8 pb-12">
+                                        {/* Entry Form */}
                                         <div className="bg-indigo-50 p-6 rounded-xl border border-indigo-200 shadow-sm">
                                             <h3 className="font-black text-indigo-900 mb-6 flex items-center uppercase tracking-wider text-sm">
-                                                <Activity className="h-5 w-5 mr-2 text-indigo-600"/> Dual-Spend Performance Log
+                                                <Activity className="h-5 w-5 mr-2 text-indigo-600"/> Ad Performance Log
                                             </h3>
                                             
                                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-                                                {/* Date and Rates */}
                                                 <div className="space-y-4">
                                                     <div>
                                                         <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Execution Period</label>
@@ -553,121 +509,73 @@ const BigFishPage: React.FC = () => {
                                                     </div>
                                                 </div>
 
-                                                {/* Dollar Amounts and Campaign Type */}
                                                 <div className="space-y-4">
                                                     <div className="grid grid-cols-2 gap-3">
                                                         <div>
-                                                            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Client Bill ($)</label>
-                                                            <input type="number" className="w-full border-indigo-200 rounded-lg p-2 text-sm font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500" value={campSpend || ''} onChange={e => setCampSpend(parseFloat(e.target.value))} placeholder="Charge Client"/>
+                                                            <label className="block text-[10px] font-black text-indigo-700 uppercase tracking-widest mb-1.5">Client Bill ($)</label>
+                                                            <input type="number" className="w-full border-indigo-200 rounded-lg p-2 text-sm font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500" value={campSpend || ''} onChange={e => setCampSpend(parseFloat(e.target.value))} placeholder="Will be deducted"/>
                                                         </div>
                                                         <div>
-                                                            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Actual Cost ($)</label>
+                                                            <label className="block text-[10px] font-black text-red-600 uppercase tracking-widest mb-1.5">Actual Cost ($)</label>
                                                             <input type="number" className="w-full border-red-200 rounded-lg p-2 text-sm font-bold text-red-600 bg-red-50/20 focus:ring-2 focus:ring-red-500" value={campRealSpend || ''} onChange={e => setCampRealSpend(parseFloat(e.target.value))} placeholder="Paid to FB"/>
                                                         </div>
                                                     </div>
                                                     <div>
                                                         <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Campaign Mode</label>
                                                         <div className="flex bg-white rounded-lg p-1 border border-indigo-100 shadow-sm">
-                                                            <button 
-                                                                onClick={() => setCampResultType('MESSAGES')}
-                                                                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2 ${campResultType === 'MESSAGES' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-indigo-600'}`}
-                                                            >
-                                                                <MessageCircle size={14}/> Message
-                                                            </button>
-                                                            <button 
-                                                                onClick={() => setCampResultType('SALES')}
-                                                                className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2 ${campResultType === 'SALES' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-indigo-600'}`}
-                                                            >
-                                                                <ShoppingBag size={14}/> Sales
-                                                            </button>
+                                                            <button onClick={() => setCampResultType('MESSAGES')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2 ${campResultType === 'MESSAGES' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-indigo-600'}`}><MessageCircle size={14}/> Message</button>
+                                                            <button onClick={() => setCampResultType('SALES')} className={`flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2 ${campResultType === 'SALES' ? 'bg-indigo-600 text-white shadow-md' : 'text-gray-400 hover:text-indigo-600'}`}><ShoppingBag size={14}/> Sales</button>
                                                         </div>
                                                     </div>
                                                 </div>
 
-                                                {/* Results and Performance Metrics */}
                                                 <div className="space-y-4">
-                                                    <div className="grid grid-cols-2 gap-3">
-                                                        <div className="col-span-2">
-                                                            <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Results (Count)</label>
-                                                            <div className="relative">
-                                                                <input type="number" className="w-full border-indigo-200 rounded-lg p-2.5 text-sm font-black text-indigo-700 pr-10 focus:ring-2 focus:ring-indigo-500" value={campResults || ''} onChange={e => setCampResults(parseInt(e.target.value))} placeholder="e.g. 50"/>
-                                                                <div className="absolute right-3 top-2.5 text-indigo-300 font-bold text-xs uppercase">{campResultType === 'SALES' ? 'Sales' : 'Msgs'}</div>
-                                                            </div>
-                                                        </div>
+                                                    <div>
+                                                        <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1.5">Results (Count)</label>
+                                                        <input type="number" className="w-full border-indigo-200 rounded-lg p-2.5 text-sm font-black text-indigo-700 pr-10 focus:ring-2 focus:ring-indigo-500" value={campResults || ''} onChange={e => setCampResults(parseInt(e.target.value))} placeholder="e.g. 50"/>
                                                     </div>
-                                                    
-                                                    {/* Conditional E-commerce Profit Fields */}
                                                     {campResultType === 'SALES' && (
-                                                        <div className="grid grid-cols-2 gap-3 animate-fade-in bg-indigo-100/50 p-3 rounded-lg border border-indigo-200">
-                                                            <div>
-                                                                <label className="block text-[9px] font-black text-gray-600 uppercase mb-1">Product Cost (৳)</label>
-                                                                <input type="number" className="w-full border-indigo-300 rounded p-1.5 text-xs font-bold focus:ring-1 focus:ring-indigo-500" value={campProdCost || ''} onChange={e => setCampProdCost(parseFloat(e.target.value))} placeholder="Buying Cost"/>
-                                                            </div>
-                                                            <div>
-                                                                <label className="block text-[9px] font-black text-gray-600 uppercase mb-1">Selling Price (৳)</label>
-                                                                <input type="number" className="w-full border-indigo-300 rounded p-1.5 text-xs font-bold focus:ring-1 focus:ring-indigo-500" value={campProdPrice || ''} onChange={e => setCampProdPrice(parseFloat(e.target.value))} placeholder="Sale Price"/>
-                                                            </div>
+                                                        <div className="grid grid-cols-2 gap-3 bg-indigo-100/50 p-3 rounded-lg border border-indigo-200">
+                                                            <div><label className="block text-[9px] font-black text-gray-600 uppercase mb-1">Product Cost (৳)</label><input type="number" className="w-full border-indigo-300 rounded p-1.5 text-xs font-bold" value={campProdCost || ''} onChange={e => setCampProdCost(parseFloat(e.target.value))}/></div>
+                                                            <div><label className="block text-[9px] font-black text-gray-600 uppercase mb-1">Selling Price (৳)</label><input type="number" className="w-full border-indigo-300 rounded p-1.5 text-xs font-bold" value={campProdPrice || ''} onChange={e => setCampProdPrice(parseFloat(e.target.value))}/></div>
                                                         </div>
                                                     )}
                                                 </div>
                                             </div>
 
-                                            {/* Advanced Summary Box */}
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                                                <div className="bg-white/70 p-4 rounded-xl border border-indigo-200 shadow-inner flex justify-between items-center">
-                                                    <div>
-                                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Agency Net Profit (BDT)</p>
-                                                        <div className="flex items-baseline gap-2">
-                                                            <h4 className={`text-3xl font-black font-mono ${liveEntryProfitBDT >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                                                                ৳ {liveEntryProfitBDT.toLocaleString()}
-                                                            </h4>
-                                                            <span className="text-[10px] text-emerald-500 font-bold">(Diff: ৳{campClientRate - campBuyingRate}/$)</span>
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-right hidden sm:block">
-                                                        <p className="text-[10px] font-bold text-indigo-400 uppercase italic">Ledger Preview</p>
+                                            {/* Agency Profit Preview (Internal Only) */}
+                                            <div className="mb-6 p-4 bg-emerald-900 rounded-xl text-white shadow-inner flex justify-between items-center">
+                                                <div>
+                                                    <p className="text-[10px] font-black text-emerald-400 uppercase tracking-widest mb-1">Agency Profit Preview (Internal Only)</p>
+                                                    <div className="flex items-baseline gap-2">
+                                                        <h4 className={`text-3xl font-black font-mono ${liveAgencyProfitBDT >= 0 ? 'text-emerald-300' : 'text-red-400'}`}>
+                                                            ৳ {liveAgencyProfitBDT.toLocaleString()}
+                                                        </h4>
+                                                        <span className="text-[10px] text-emerald-400 font-bold">(Profit = Charged BDT - Buy Cost BDT)</span>
                                                     </div>
                                                 </div>
-
-                                                {campResultType === 'SALES' && campResults > 0 && campProdPrice > 0 && (
-                                                    <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-200 shadow-inner flex justify-between items-center animate-fade-in">
-                                                        <div>
-                                                            <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Estimated Client Revenue</p>
-                                                            <div className="flex items-baseline gap-2">
-                                                                <h4 className="text-2xl font-black font-mono text-emerald-800">
-                                                                    ৳ {(campResults * (campProdPrice - campProdCost)).toLocaleString()}
-                                                                </h4>
-                                                                <span className="text-[10px] text-emerald-500 font-bold">(Net)</span>
-                                                            </div>
-                                                        </div>
-                                                        <div className="text-right">
-                                                            <p className="text-[10px] font-bold text-emerald-500 uppercase">ROI: {(((campResults * (campProdPrice - campProdCost)) / (campSpend * campClientRate)) * 100).toFixed(0)}%</p>
-                                                        </div>
-                                                    </div>
-                                                )}
+                                                <div className="text-right border-l border-emerald-800 pl-4">
+                                                    <p className="text-[10px] font-bold text-emerald-400 uppercase">Wallet Effect</p>
+                                                    <p className="text-xl font-black text-red-300">-$ {campSpend}</p>
+                                                </div>
                                             </div>
 
-                                            <button onClick={handleCampaignEntry} className="w-full bg-indigo-600 text-white font-black py-4 rounded-xl hover:bg-indigo-700 transition-all shadow-[0_4px_15px_rgba(79,70,229,0.2)] hover:shadow-[0_8px_25px_rgba(79,70,229,0.35)] flex items-center justify-center gap-2 transform active:scale-[0.98]">
-                                                <RefreshCw size={20} className="animate-spin-slow"/> UPDATE WALLET & SAVE PERFORMANCE LOG
+                                            <button onClick={handleCampaignEntry} className="w-full bg-indigo-600 text-white font-black py-4 rounded-xl hover:bg-indigo-700 transition-all shadow-lg flex items-center justify-center gap-2">
+                                                <RefreshCw size={20} className="animate-spin-slow"/> DEDUCT WALLET & SAVE RECORD
                                             </button>
                                         </div>
 
-                                        {/* Records Table */}
+                                        {/* Records Ledger */}
                                         <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden mt-8">
-                                            <div className="px-6 py-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                                                <h4 className="text-xs font-black text-gray-500 uppercase tracking-widest">Performance Ledger</h4>
-                                                <span className="text-[10px] text-gray-400 font-bold italic">{selectedFish.campaign_records?.length || 0} Entries Found</span>
-                                            </div>
                                             <div className="overflow-x-auto">
                                                 <table className="w-full text-sm text-left">
-                                                    <thead className="bg-white text-gray-500 uppercase text-[10px] font-black tracking-widest border-b border-gray-100">
+                                                    <thead className="bg-gray-50 text-gray-500 uppercase text-[10px] font-black border-b border-gray-100">
                                                         <tr>
                                                             <th className="px-6 py-4">Date</th>
-                                                            <th className="px-6 py-4">Type / Results</th>
-                                                            <th className="px-6 py-4 text-right">Charged</th>
-                                                            <th className="px-6 py-4 text-right">Cost</th>
-                                                            <th className="px-6 py-4 text-center">Buy/Client Rate</th>
-                                                            <th className="px-6 py-4 text-right font-bold">Agency Profit</th>
+                                                            <th className="px-6 py-4">Results</th>
+                                                            <th className="px-6 py-4 text-right">Client Bill ($)</th>
+                                                            <th className="px-6 py-4 text-right">Agency Cost ($)</th>
+                                                            <th className="px-6 py-4 text-right font-bold">Agency Profit (৳)</th>
                                                             <th className="px-6 py-4 text-right">Action</th>
                                                         </tr>
                                                     </thead>
@@ -678,37 +586,14 @@ const BigFishPage: React.FC = () => {
                                                             const chargedBDT = rec.amount_spent * cRate;
                                                             const actualCostBDT = (rec.real_amount_spent || rec.amount_spent) * bRate;
                                                             const totalMarginBDT = chargedBDT - actualCostBDT;
-                                                            const isSales = rec.result_type === 'SALES';
-                                                            
                                                             return (
-                                                                <tr key={rec.id} className="hover:bg-indigo-50/20 transition-colors group">
-                                                                    <td className="px-6 py-4 text-xs font-mono text-gray-500">{new Date(rec.start_date).toLocaleDateString('en-GB')}</td>
-                                                                    <td className="px-6 py-4">
-                                                                        <div className="flex items-center gap-2">
-                                                                            <span className={`p-1 rounded ${isSales ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600'}`}>
-                                                                                {isSales ? <ShoppingBag size={14}/> : <MessageCircle size={14}/>}
-                                                                            </span>
-                                                                            <div>
-                                                                                <div className="text-xs font-bold text-gray-900">{rec.results_count} {isSales ? 'Sales' : 'Messages'}</div>
-                                                                                {isSales && rec.product_price ? (
-                                                                                    <div className="text-[9px] text-gray-400">Sold @ ৳{rec.product_price} (C: ৳{rec.product_cost})</div>
-                                                                                ) : (
-                                                                                    <div className="text-[9px] text-gray-400">Cost: ${(rec.amount_spent / (rec.results_count || 1)).toFixed(2)}/each</div>
-                                                                                )}
-                                                                            </div>
-                                                                        </div>
-                                                                    </td>
-                                                                    <td className="px-6 py-4 text-right font-mono font-bold text-indigo-600">${rec.amount_spent.toFixed(1)}</td>
-                                                                    <td className="px-6 py-4 text-right font-mono text-red-500">${(rec.real_amount_spent || rec.amount_spent).toFixed(1)}</td>
-                                                                    <td className="px-6 py-4 text-center text-xs font-bold text-gray-400">{bRate}৳ / {cRate}৳</td>
-                                                                    <td className={`px-6 py-4 text-right font-mono font-black ${totalMarginBDT >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
-                                                                        ৳ {totalMarginBDT.toLocaleString()}
-                                                                    </td>
-                                                                    <td className="px-6 py-4 text-right">
-                                                                        <button onClick={() => deleteCampaignRecord(rec.id)} className="p-2 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-full transition-all">
-                                                                            <Trash2 className="h-4 w-4"/>
-                                                                        </button>
-                                                                    </td>
+                                                                <tr key={rec.id} className="hover:bg-gray-50">
+                                                                    <td className="px-6 py-4 font-mono text-xs">{new Date(rec.start_date).toLocaleDateString('en-GB')}</td>
+                                                                    <td className="px-6 py-4 text-xs font-bold">{rec.results_count} {rec.result_type}</td>
+                                                                    <td className="px-6 py-4 text-right font-mono font-bold text-red-500">${rec.amount_spent.toFixed(1)}</td>
+                                                                    <td className="px-6 py-4 text-right font-mono text-gray-500">${(rec.real_amount_spent || rec.amount_spent).toFixed(1)}</td>
+                                                                    <td className={`px-6 py-4 text-right font-mono font-black ${totalMarginBDT >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>৳ {totalMarginBDT.toLocaleString()}</td>
+                                                                    <td className="px-6 py-4 text-right"><button onClick={() => deleteCampaignRecord(rec.id)} className="p-2 text-gray-300 hover:text-red-600"><Trash2 className="h-4 w-4"/></button></td>
                                                                 </tr>
                                                             );
                                                         })}
@@ -721,42 +606,26 @@ const BigFishPage: React.FC = () => {
                                 {activeTab === 'wallet' && (
                                     <div className="space-y-8">
                                         <div className="bg-gray-50 p-6 rounded-xl border border-gray-200 shadow-sm">
-                                            <h3 className="font-black text-gray-800 mb-4 uppercase text-xs tracking-widest">Quick Adjust Wallet</h3>
+                                            <h3 className="font-black text-gray-800 mb-4 uppercase text-xs tracking-widest">Manual Wallet Adjustment</h3>
                                             <div className="flex flex-col md:flex-row gap-4">
-                                                <div className="flex-1 relative">
-                                                    <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-gray-400"/>
-                                                    <input type="number" className="w-full pl-9 border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 shadow-sm" placeholder="Amount ($)" value={amount || ''} onChange={e => setAmount(parseFloat(e.target.value))} />
-                                                </div>
-                                                <input type="text" className="flex-[2] border-gray-300 rounded-lg p-2 text-sm focus:ring-2 focus:ring-indigo-500 shadow-sm" placeholder="Ref Description (e.g. Bank Payment)" value={desc} onChange={e => setDesc(e.target.value)} />
+                                                <div className="flex-1 relative"><DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-gray-400"/><input type="number" className="w-full pl-9 border-gray-300 rounded-lg p-2 text-sm shadow-sm" placeholder="Amount ($)" value={amount || ''} onChange={e => setAmount(parseFloat(e.target.value))} /></div>
+                                                <input type="text" className="flex-[2] border-gray-300 rounded-lg p-2 text-sm shadow-sm" placeholder="Ref Description" value={desc} onChange={e => setDesc(e.target.value)} />
                                                 <div className="flex gap-2">
-                                                    <button onClick={() => handleTransaction('DEPOSIT')} className="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg text-sm font-bold flex items-center shadow-md transition-all"><Plus className="h-4 w-4 mr-2"/> Add</button>
-                                                    <button onClick={() => handleTransaction('AD_SPEND')} className="bg-red-500 hover:bg-red-600 text-white px-5 py-2 rounded-lg text-sm font-bold flex items-center shadow-md transition-all"><TrendingUp className="h-4 w-4 mr-2"/> Deduct</button>
+                                                    <button onClick={() => handleTransaction('DEPOSIT')} className="bg-emerald-600 text-white px-5 py-2 rounded-lg text-sm font-bold flex items-center shadow-md"><Plus className="h-4 w-4 mr-2"/> Add Funds</button>
+                                                    <button onClick={() => handleTransaction('AD_SPEND')} className="bg-red-500 text-white px-5 py-2 rounded-lg text-sm font-bold flex items-center shadow-md"><TrendingUp className="h-4 w-4 mr-2"/> Deduct</button>
                                                 </div>
                                             </div>
                                         </div>
                                         <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                                             <table className="w-full text-sm text-left">
-                                                <thead className="bg-gray-100 text-gray-500 font-black text-[10px] uppercase tracking-widest border-b border-gray-200">
-                                                    <tr>
-                                                        <th className="px-6 py-4">Date</th>
-                                                        <th className="px-6 py-4">Description</th>
-                                                        <th className="px-6 py-4 text-right">Amount</th>
-                                                        <th className="px-6 py-4 text-right">Action</th>
-                                                    </tr>
-                                                </thead>
+                                                <thead className="bg-gray-100 text-gray-500 font-black text-[10px] uppercase border-b border-gray-200"><tr><th className="px-6 py-4">Date</th><th className="px-6 py-4">Description</th><th className="px-6 py-4 text-right">Amount</th><th className="px-6 py-4 text-right">Action</th></tr></thead>
                                                 <tbody className="divide-y divide-gray-100">
                                                     {selectedFish.transactions?.map(tx => (
                                                         <tr key={tx.id} className="hover:bg-gray-50 transition-colors">
                                                             <td className="px-6 py-4 text-gray-500 font-mono text-xs">{new Date(tx.date).toLocaleDateString('en-GB')}</td>
                                                             <td className="px-6 py-4 font-medium text-gray-800">{tx.description}</td>
-                                                            <td className={`px-6 py-4 text-right font-mono font-bold ${tx.type === 'DEPOSIT' ? 'text-emerald-600' : 'text-red-500'}`}>
-                                                                {tx.type === 'DEPOSIT' ? '+' : '-'}{formatCurrency(tx.amount)}
-                                                            </td>
-                                                            <td className="px-6 py-4 text-right">
-                                                                <button onClick={() => deleteTransaction(tx.id)} className="p-2 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-full">
-                                                                    <Trash2 className="h-4 w-4"/>
-                                                                </button>
-                                                            </td>
+                                                            <td className={`px-6 py-4 text-right font-mono font-bold ${tx.type === 'DEPOSIT' ? 'text-emerald-600' : 'text-red-500'}`}>{tx.type === 'DEPOSIT' ? '+' : '-'}{formatCurrency(tx.amount)}</td>
+                                                            <td className="px-6 py-4 text-right"><button onClick={() => deleteTransaction(tx.id)} className="p-2 text-gray-300 hover:text-red-600"><Trash2 className="h-4 w-4"/></button></td>
                                                         </tr>
                                                     ))}
                                                 </tbody>
@@ -765,44 +634,28 @@ const BigFishPage: React.FC = () => {
                                     </div>
                                 )}
                                 {activeTab === 'camp_tools' && (
-                                    <div className="space-y-6"><div className="bg-orange-50 border border-orange-100 p-6 rounded-xl"><h3 className="font-bold text-orange-800 mb-4 flex items-center"><Layout className="h-5 w-5 mr-2"/> Campaign Generator</h3><div className="space-y-4"><div><label className="block text-xs font-bold text-gray-600 uppercase mb-1">Page Name</label><input type="text" className="w-full border-gray-300 rounded-md p-2 text-sm" value={genCampPageName} onChange={e => setGenCampPageName(e.target.value)}/></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-gray-600 uppercase mb-1">Budget ($)</label><input type="number" className="w-full border-gray-300 rounded-md p-2 text-sm" value={genCampBudget || ''} onChange={e => setGenCampBudget(parseFloat(e.target.value))}/></div><div><label className="block text-xs font-bold text-gray-600 uppercase mb-1">Start Date</label><input type="date" className="w-full border-gray-300 rounded-md p-2 text-sm" value={genCampStartDate} onChange={e => setGenCampStartDate(e.target.value)}/></div></div><div><label className="block text-xs font-bold text-gray-600 uppercase mb-1">End Date</label><input type="date" className="w-full border-gray-300 rounded-md p-2 text-sm" value={genCampEndDate} onChange={e => setGenCampEndDate(e.target.value)}/></div><div className="space-y-4 pt-4 border-t border-orange-200"><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Campaign Title (Internal)</label><div className="flex gap-2"><input readOnly value={generateCampaignTitle()} className="flex-1 bg-white border border-gray-300 rounded p-2 text-xs font-mono text-gray-700"/><button onClick={handleCopyCampTitle} className="p-2 border border-gray-300 rounded hover:bg-white text-gray-600 bg-gray-50">{genCampTitleCopied ? <Check className="h-4 w-4"/> : <Copy className="h-4 w-4"/>}</button></div></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Client Bill Message</label><div className="relative"><textarea readOnly value={generateClientMessage()} className="w-full text-xs text-gray-800 bg-white border border-gray-300 rounded p-3 h-40 resize-none font-sans"/><button onClick={handleCopyClientMsg} className={`absolute bottom-2 right-2 text-xs font-bold px-3 py-1.5 rounded transition-colors shadow-sm flex items-center ${genCampMsgCopied ? 'bg-green-600 text-white' : 'bg-gray-100 border border-gray-300 text-gray-700 hover:bg-white'}`}>{genCampMsgCopied ? <><Check className="h-3 w-3 mr-1"/> Copied</> : <><Copy className="h-3 w-3 mr-1"/> Copy</>}</button></div></div><div className="flex gap-3"><button onClick={handleSendWhatsApp} className="flex-1 bg-green-500 hover:bg-green-600 text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center shadow-sm transition-colors"><Smartphone className="h-4 w-4 mr-1.5"/> WhatsApp</button><button onClick={handleSendSystemSMS} disabled={isSendingSMS} className="flex-1 bg-indigo-500 hover:bg-indigo-600 text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center shadow-sm disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"><Send className="h-4 w-4 mr-1.5"/> Send SMS</button></div></div></div></div></div>
+                                    <div className="space-y-6"><div className="bg-orange-50 border border-orange-100 p-6 rounded-xl"><h3 className="font-bold text-orange-800 mb-4 flex items-center"><Layout className="h-5 w-5 mr-2"/> Campaign Messenger</h3><div className="space-y-4"><div><label className="block text-xs font-bold text-gray-600 uppercase mb-1">Page Name</label><input type="text" className="w-full border-gray-300 rounded-md p-2 text-sm" value={genCampPageName} onChange={e => setGenCampPageName(e.target.value)}/></div><div className="grid grid-cols-2 gap-4"><div><label className="block text-xs font-bold text-gray-600 uppercase mb-1">Budget ($)</label><input type="number" className="w-full border-gray-300 rounded-md p-2 text-sm" value={genCampBudget || ''} onChange={e => setGenCampBudget(parseFloat(e.target.value))}/></div><div><label className="block text-xs font-bold text-gray-600 uppercase mb-1">Charge Rate (৳)</label><input type="number" className="w-full border-gray-300 rounded-md p-2 text-sm" value={campClientRate} onChange={e => setCampClientRate(parseFloat(e.target.value))}/></div></div><div><label className="block text-xs font-bold text-gray-600 uppercase mb-1">Date Range</label><div className="flex gap-2"><input type="date" className="w-full border-gray-300 rounded-md p-2 text-sm" value={genCampStartDate} onChange={e => setGenCampStartDate(e.target.value)}/><input type="date" className="w-full border-gray-300 rounded-md p-2 text-sm" value={genCampEndDate} onChange={e => setGenCampEndDate(e.target.value)}/></div></div><div className="space-y-4 pt-4 border-t border-orange-200"><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Client Bill Message</label><div className="relative"><textarea readOnly value={generateClientMessage()} className="w-full text-xs text-gray-800 bg-white border border-gray-300 rounded p-3 h-40 resize-none"/><button onClick={handleCopyClientMsg} className={`absolute bottom-2 right-2 text-xs font-bold px-3 py-1.5 rounded shadow-sm ${genCampMsgCopied ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-700'}`}>{genCampMsgCopied ? 'Copied' : 'Copy Message'}</button></div></div><div className="flex gap-3"><button onClick={handleSendWhatsApp} className="flex-1 bg-green-500 text-white py-2 rounded-lg text-sm font-bold flex items-center justify-center shadow-sm transition-colors"><Smartphone className="h-4 w-4 mr-1.5"/> Send via WhatsApp</button></div></div></div></div></div>
                                 )}
                                 {activeTab === 'crm' && (
                                     <div className="space-y-6"><div className="bg-gray-50 p-4 rounded-lg border border-gray-200"><h3 className="font-bold text-gray-700 mb-3 text-sm uppercase">Log New Interaction</h3><div className="flex gap-2 mb-3"><select className="border border-gray-300 rounded p-2 text-sm" value={interactionType} onChange={e => setInteractionType(e.target.value as any)}><option value="CALL">Call</option><option value="MEETING">Meeting</option><option value="WHATSAPP">WhatsApp</option><option value="EMAIL">Email</option></select><input type="date" className="border border-gray-300 rounded p-2 text-sm" value={interactionDate} onChange={e => setInteractionDate(e.target.value)} /></div><textarea className="w-full border border-gray-300 rounded p-2 text-sm mb-3 focus:ring-indigo-500" rows={3} placeholder="Notes..." value={interactionNotes} onChange={e => setInteractionNotes(e.target.value)}/><div className="flex justify-between items-center"><div className="flex items-center gap-2"><span className="text-xs text-gray-500">Next Follow-up:</span><input type="date" className="border border-gray-300 rounded p-1 text-sm" value={nextFollowUp} onChange={e => setNextFollowUp(e.target.value)} /></div><button onClick={async () => { if(!interactionNotes) return alert("Notes required"); await mockService.addClientInteraction(selectedFish.id, { type: interactionType, date: interactionDate, notes: interactionNotes, next_follow_up: nextFollowUp }); setInteractionNotes(''); setNextFollowUp(''); loadData(); }} className="bg-indigo-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-indigo-700">Save Log</button></div></div></div>
                                 )}
                                 {activeTab === 'growth' && (
-                                    <div className="space-y-6"><div className="flex gap-2"><input className="flex-1 border border-gray-300 rounded p-2 text-sm" placeholder="Add new task..." value={taskTitle} onChange={e => setTaskTitle(e.target.value)}/><input type="date" className="border border-gray-300 rounded p-2 text-sm" value={taskDate} onChange={e => setTaskDate(e.target.value)}/><button onClick={addTask} className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"><Plus className="h-5 w-5"/></button></div><div className="space-y-2">
-                                            {selectedFish.growth_tasks?.map(task => (
-                                                <div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200"><div className="flex items-center gap-3"><button onClick={() => toggleTask(task.id)} className={`h-5 w-5 rounded border flex items-center justify-center ${task.is_completed ? 'bg-green-500 border-green-500' : 'bg-white border-gray-300'}`}>{task.is_completed && <CheckSquare className="h-3 w-3 text-white"/>}</button><div><p className={`text-sm ${task.is_completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>{task.title}</p>{task.due_date && <p className="text-xs text-gray-400">Due: {task.due_date}</p>}</div></div></div>
-                                            ))}
-                                        </div></div>
-                                )}
-                                {activeTab === 'topups' && (
-                                    <div className="space-y-6">
-                                        <h3 className="font-bold text-gray-800">Pending Requests</h3>
-                                        <div className="space-y-4">
-                                            {selectedFish.topup_requests?.filter(r => r.status === 'PENDING').map(req => (
-                                                <div key={req.id} className="bg-amber-50 p-4 rounded-lg border border-amber-200 flex flex-col md:flex-row justify-between items-center gap-4"><div><div className="font-bold text-amber-900 text-lg">{formatCurrency(req.amount)}</div><div className="text-sm text-amber-800">Via: {req.method_name} ({req.sender_number})</div><div className="text-xs text-amber-600 mt-1">{new Date(req.created_at).toLocaleString()}</div></div>{req.screenshot_url && (<button onClick={() => setPreviewImage(req.screenshot_url || '')} className="text-xs flex items-center text-blue-600 hover:underline"><Layout className="h-3 w-3 mr-1"/> View Screenshot</button>)}<div className="flex gap-2"><button onClick={() => handleApproveTopUp(req)} className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-green-700">Approve</button><button onClick={() => handleRejectTopUp(req.id)} className="bg-red-50 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-red-600">Reject</button></div></div>
-                                            ))}
-                                            {(!selectedFish.topup_requests || !selectedFish.topup_requests.some(r => r.status === 'PENDING')) && (<p className="text-gray-400 text-sm">No pending requests.</p>)}
-                                        </div>
-                                    </div>
+                                    <div className="space-y-6"><div className="flex gap-2"><input className="flex-1 border border-gray-300 rounded p-2 text-sm" placeholder="Add new task..." value={taskTitle} onChange={e => setTaskTitle(e.target.value)}/><input type="date" className="border border-gray-300 rounded p-2 text-sm" value={taskDate} onChange={e => setTaskDate(e.target.value)}/><button onClick={addTask} className="bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"><Plus className="h-5 w-5"/></button></div><div className="space-y-2">{selectedFish.growth_tasks?.map(task => (<div key={task.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border border-gray-200"><div className="flex items-center gap-3"><button onClick={() => toggleTask(task.id)} className={`h-5 w-5 rounded border flex items-center justify-center ${task.is_completed ? 'bg-green-500 border-green-500' : 'bg-white border-gray-300'}`}>{task.is_completed && <CheckSquare className="h-3 w-3 text-white"/>}</button><div><p className={`text-sm ${task.is_completed ? 'line-through text-gray-400' : 'text-gray-800'}`}>{task.title}</p>{task.due_date && <p className="text-xs text-gray-400">Due: {task.due_date}</p>}</div></div></div>))}</div></div>
                                 )}
                                 {activeTab === 'targets' && (
                                     <div className="max-w-md space-y-4"><div><label className="block text-sm font-medium text-gray-700 mb-1">Target Sales</label><input type="number" className="w-full border border-gray-300 rounded p-2" value={newTarget} onChange={e => setNewTarget(parseInt(e.target.value))} /></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Current Sales</label><input type="number" className="w-full border border-gray-300 rounded p-2" value={newCurrent} onChange={e => setNewCurrent(parseInt(e.target.value))} /></div><button onClick={handleUpdateTargets} className="bg-indigo-600 text-white px-4 py-2 rounded font-bold hover:bg-indigo-700">Update Targets</button></div>
                                 )}
                                 {activeTab === 'profile' && (
-                                    <div className="space-y-8"><div className="max-w-lg space-y-4"><h3 className="font-bold text-gray-900 border-b pb-2">Client Profile</h3><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Phone</label><input className="w-full border border-gray-300 rounded p-2" value={profilePhone} onChange={e => setProfilePhone(e.target.value)} /></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Website URL</label><input className="w-full border border-gray-300 rounded p-2" value={profileWeb} onChange={e => setProfileWeb(e.target.value)} /></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Facebook Page</label><input className="w-full border border-gray-300 rounded p-2" value={profileFb} onChange={e => setProfileFb(e.target.value)} /></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Admin Notes</label><textarea className="w-full border border-gray-300 rounded p-2 h-24" value={profileNotes} onChange={e => setProfileNotes(e.target.value)} /></div></div><div className="max-w-lg pt-4"><h3 className="font-bold text-gray-900 border-b pb-2 mb-4">Portal Visibility Settings</h3><div className="space-y-3"><label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer"><span className="text-sm font-medium text-gray-700">Show Wallet Balance</span><div onClick={() => setPortalConfig(prev => ({ ...prev, show_balance: !prev.show_balance }))} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.show_balance ? 'bg-indigo-600' : 'bg-gray-300'}`}><div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.show_balance ? 'translate-x-5' : ''}`}></div></div></label><label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer"><span className="text-sm font-medium text-gray-700">Show Transaction History</span><div onClick={() => setPortalConfig(prev => ({ ...prev, show_history: !prev.show_history }))} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.show_history ? 'bg-indigo-600' : 'bg-gray-300'}`}><div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.show_history ? 'translate-x-5' : ''}`}></div></div></label></div></div><button onClick={handleUpdateProfile} className="bg-indigo-600 text-white px-6 py-3 rounded font-bold hover:bg-indigo-700 w-full md:w-auto shadow-sm">Save All Settings</button></div>
+                                    <div className="space-y-8"><div className="max-w-lg space-y-4"><h3 className="font-bold text-gray-900 border-b pb-2">Client Profile</h3><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Phone</label><input className="w-full border border-gray-300 rounded p-2" value={profilePhone} onChange={e => setProfilePhone(e.target.value)} /></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Website URL</label><input className="w-full border border-gray-300 rounded p-2" value={profileWeb} onChange={e => setProfileWeb(e.target.value)} /></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Facebook Page</label><input className="w-full border border-gray-300 rounded p-2" value={profileFb} onChange={e => setProfileFb(e.target.value)} /></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Admin Notes</label><textarea className="w-full border border-gray-300 rounded p-2 h-24" value={profileNotes} onChange={e => setProfileNotes(e.target.value)} /></div></div><div className="max-w-lg pt-4"><h3 className="font-bold text-gray-900 border-b pb-2 mb-4">Portal Settings</h3><div className="space-y-3"><label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer"><span className="text-sm font-medium text-gray-700">Show Wallet Balance</span><div onClick={() => setPortalConfig(prev => ({ ...prev, show_balance: !prev.show_balance }))} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.show_balance ? 'bg-indigo-600' : 'bg-gray-300'}`}><div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.show_balance ? 'translate-x-5' : ''}`}></div></div></label><label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer"><span className="text-sm font-medium text-gray-700">Show History</span><div onClick={() => setPortalConfig(prev => ({ ...prev, show_history: !prev.show_history }))} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.show_history ? 'bg-indigo-600' : 'bg-gray-300'}`}><div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.show_history ? 'translate-x-5' : ''}`}></div></div></label></div></div><button onClick={handleUpdateProfile} className="bg-indigo-600 text-white px-6 py-3 rounded font-bold hover:bg-indigo-700 w-full md:w-auto shadow-sm">Save All Changes</button></div>
                                 )}
                             </div>
                         </div>
                     )}
                 </div>
             )}
+            {/* Catch/Manual Modal ... (keeping original structure) */}
             {isCatchModalOpen && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"><div className="bg-white rounded-lg shadow-xl w-full max-w-md h-[500px] flex flex-col"><div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50"><h3 className="font-bold text-gray-800">Select Client from Leads</h3><button onClick={() => setIsCatchModalOpen(false)}><X className="h-5 w-5 text-gray-500"/></button></div><div className="p-2 border-b border-gray-100"><input className="w-full border border-gray-300 rounded-md p-2 text-sm" placeholder="Search name..." value={catchSearch} onChange={e => setCatchSearch(e.target.value)} autoFocus /></div><div className="flex-1 overflow-y-auto">
-                    {leads.filter(l => l.full_name.toLowerCase().includes(catchSearch.toLowerCase())).map(lead => (<div key={lead.id} onClick={() => handleCatchFish(lead.id)} className="p-3 border-b border-gray-100 hover:bg-indigo-50 cursor-pointer flex justify-between items-center"><div><p className="font-bold text-gray-900">{lead.full_name}</p><p className="text-xs text-gray-500">{lead.primary_phone}</p></div><Plus className="h-4 w-4 text-indigo-600"/></div>))}
-                </div></div></div>
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"><div className="bg-white rounded-lg shadow-xl w-full max-w-md h-[500px] flex flex-col"><div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50"><h3 className="font-bold text-gray-800">Select Client from Leads</h3><button onClick={() => setIsCatchModalOpen(false)}><X className="h-5 w-5 text-gray-500"/></button></div><div className="p-2 border-b border-gray-100"><input className="w-full border border-gray-300 rounded-md p-2 text-sm" placeholder="Search name..." value={catchSearch} onChange={e => setCatchSearch(e.target.value)} autoFocus /></div><div className="flex-1 overflow-y-auto">{leads.filter(l => l.full_name.toLowerCase().includes(catchSearch.toLowerCase())).map(lead => (<div key={lead.id} onClick={() => handleCatchFish(lead.id)} className="p-3 border-b border-gray-100 hover:bg-indigo-50 cursor-pointer flex justify-between items-center"><div><p className="font-bold text-gray-900">{lead.full_name}</p><p className="text-xs text-gray-500">{lead.primary_phone}</p></div><Plus className="h-4 w-4 text-indigo-600"/></div>))}</div></div></div>
             )}
             {isManualAddOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"><div className="bg-white rounded-lg shadow-xl w-full max-w-sm p-6"><h3 className="font-bold text-lg mb-4">Add Manual Client</h3><div className="space-y-3"><input className="w-full border border-gray-300 rounded p-2" placeholder="Client Name" value={manualName} onChange={e => setManualName(e.target.value)} /><input className="w-full border border-gray-300 rounded p-2" placeholder="Phone Number" value={manualPhone} onChange={e => setManualPhone(e.target.value)} /><button onClick={handleManualAdd} className="w-full bg-indigo-600 text-white font-bold py-2 rounded hover:bg-indigo-700">Create Client</button><button onClick={() => setIsManualAddOpen(false)} className="w-full border border-gray-300 text-gray-700 font-bold py-2 rounded hover:bg-gray-50">Cancel</button></div></div></div>
@@ -810,16 +663,11 @@ const BigFishPage: React.FC = () => {
             {isShareModalOpen && selectedFish && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"><div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6"><h3 className="font-bold text-lg mb-4 text-center">Share Portal Access</h3><div className="bg-gray-100 p-3 rounded-lg border border-gray-200 mb-4 break-all text-sm font-mono text-center">{window.location.origin}/#/portal/{selectedFish.id}</div><div className="flex gap-2"><button onClick={() => { navigator.clipboard.writeText(`${window.location.origin}/#/portal/${selectedFish.id}`); setIsShareModalOpen(false); alert("Link Copied!"); }} className="flex-1 bg-indigo-600 text-white font-bold py-2 rounded hover:bg-indigo-700 flex items-center justify-center"><Copy className="h-4 w-4 mr-2"/> Copy Link</button><button onClick={() => setIsShareModalOpen(false)} className="flex-1 border border-gray-300 font-bold py-2 rounded hover:bg-gray-50">Close</button></div></div></div>
             )}
-            {isEditTxModalOpen && editingTx && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"><div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6"><h3 className="font-bold text-lg mb-4">Edit Transaction</h3><div className="space-y-3"><input type="date" className="w-full border border-gray-300 rounded p-2" value={editTxDate} onChange={e => setEditTxDate(e.target.value)} /><input type="number" className="w-full border border-gray-300 rounded p-2" value={editTxAmount} onChange={e => setEditTxAmount(parseFloat(e.target.value))} /><input type="text" className="w-full border border-gray-300 rounded p-2" value={editTxDesc} onChange={e => setEditTxDesc(e.target.value)} /><div className="flex gap-2 pt-2"><button onClick={handleUpdateTransaction} className="flex-1 bg-indigo-600 text-white font-bold py-2 rounded hover:bg-indigo-700">Update</button><button onClick={() => setIsEditTxModalOpen(false)} className="flex-1 border border-gray-300 text-gray-700 font-bold py-2 rounded hover:bg-gray-50">Cancel</button></div></div></div></div>
-            )}
             {previewImage && (
                 <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black bg-opacity-90 p-4 backdrop-blur-sm" onClick={() => setPreviewImage(null)}>
                     <div className="relative max-w-3xl w-full max-h-[90vh] flex flex-col items-center">
-                        <img src={previewImage} alt="Payment Screenshot" className="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl border-2 border-white" />
-                        <button onClick={() => setPreviewImage(null)} className="mt-4 bg-white text-gray-900 px-6 py-2 rounded-full font-bold shadow-lg hover:bg-gray-200 transition-colors">
-                            Close Preview
-                        </button>
+                        <img src={previewImage} alt="Screenshot" className="max-w-full max-h-[80vh] object-contain rounded-lg border-2 border-white shadow-2xl" />
+                        <button onClick={() => setPreviewImage(null)} className="mt-4 bg-white text-gray-900 px-6 py-2 rounded-full font-bold shadow-lg">Close Preview</button>
                     </div>
                 </div>
             )}
