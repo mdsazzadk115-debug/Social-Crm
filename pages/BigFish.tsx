@@ -76,7 +76,8 @@ const BigFishPage: React.FC = () => {
             allow_topup_request: true,
             show_message_report: true,
             show_sales_report: true,
-            show_profit_loss_report: false
+            show_profit_loss_report: false,
+            show_payment_methods: true
         }
     });
 
@@ -148,7 +149,6 @@ const BigFishPage: React.FC = () => {
         setTimeout(loadData, 300); 
     };
 
-    // --- REFINED CAMPAIGN ENTRY LOGIC ---
     const handleCampaignEntry = async () => {
         if (!selectedFish || campSpend <= 0) return alert("Client Bill amount is required ($)");
         if (!campStartDateInput) return alert("Date is required");
@@ -156,10 +156,10 @@ const BigFishPage: React.FC = () => {
         const record: Partial<CampaignRecord> = {
             start_date: campStartDateInput,
             end_date: campEndDateInput || campStartDateInput,
-            amount_spent: campSpend, // এই অ্যামাউন্টটিই ক্লায়েন্টের ব্যালেন্স থেকে মাইনাস হবে
-            real_amount_spent: campRealSpend || campSpend, // এজেন্সির আসল খরচ (প্রফিট হিসাবের জন্য)
-            buying_rate: campBuyingRate, // এজেন্সির ডলার কেনার রেট (৳১৩০)
-            client_rate: campClientRate, // ক্লায়েন্টকে চার্জ করা রেট (৳১৪৫)
+            amount_spent: campSpend,
+            real_amount_spent: campRealSpend || campSpend,
+            buying_rate: campBuyingRate,
+            client_rate: campClientRate,
             impressions: campImpr,
             reach: campReach,
             clicks: campClicks,
@@ -174,7 +174,6 @@ const BigFishPage: React.FC = () => {
             await mockService.updateTargets(selectedFish.id, selectedFish.target_sales, newSales);
         }
 
-        // মক সার্ভিসে পাঠানোর পর মক সার্ভিস অটোমেটিক AD_SPEND ট্রানজ্যাকশন তৈরি করবে campSpend দিয়ে।
         const updatedFish = await mockService.addCampaignRecord(selectedFish.id, record as any);
         
         setCampSpend(0); setCampRealSpend(0); setCampImpr(0); setCampReach(0); setCampClicks(0); setCampResults(0);
@@ -306,7 +305,7 @@ const BigFishPage: React.FC = () => {
             const cRate = rec.client_rate || 145;
             const chargedBDT = clientChargedUSD * cRate;
             const costBDT = realCostUSD * bRate;
-            return acc + (chargedBDT - costBDT); // Agency Profit in BDT
+            return acc + (chargedBDT - costBDT);
         }, 0);
     };
 
@@ -316,6 +315,20 @@ const BigFishPage: React.FC = () => {
 
     // Live Agency Profit Calculation for the form
     const liveAgencyProfitBDT = (campSpend * campClientRate) - (campRealSpend * campBuyingRate);
+
+    // Toggle Helper for Portal Config
+    const toggleConfig = (field: keyof PortalConfig | keyof NonNullable<PortalConfig['feature_flags']>) => {
+        setPortalConfig(prev => {
+            const newConfig = { ...prev };
+            if (field === 'show_balance' || field === 'show_history' || field === 'is_suspended') {
+                newConfig[field] = !newConfig[field];
+            } else if (newConfig.feature_flags) {
+                // @ts-ignore
+                newConfig.feature_flags[field] = !newConfig.feature_flags[field];
+            }
+            return newConfig;
+        });
+    };
 
     return (
         <div className="space-y-6">
@@ -646,14 +659,81 @@ const BigFishPage: React.FC = () => {
                                     <div className="max-w-md space-y-4"><div><label className="block text-sm font-medium text-gray-700 mb-1">Target Sales</label><input type="number" className="w-full border border-gray-300 rounded p-2" value={newTarget} onChange={e => setNewTarget(parseInt(e.target.value))} /></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Current Sales</label><input type="number" className="w-full border border-gray-300 rounded p-2" value={newCurrent} onChange={e => setNewCurrent(parseInt(e.target.value))} /></div><button onClick={handleUpdateTargets} className="bg-indigo-600 text-white px-4 py-2 rounded font-bold hover:bg-indigo-700">Update Targets</button></div>
                                 )}
                                 {activeTab === 'profile' && (
-                                    <div className="space-y-8"><div className="max-w-lg space-y-4"><h3 className="font-bold text-gray-900 border-b pb-2">Client Profile</h3><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Phone</label><input className="w-full border border-gray-300 rounded p-2" value={profilePhone} onChange={e => setProfilePhone(e.target.value)} /></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Website URL</label><input className="w-full border border-gray-300 rounded p-2" value={profileWeb} onChange={e => setProfileWeb(e.target.value)} /></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Facebook Page</label><input className="w-full border border-gray-300 rounded p-2" value={profileFb} onChange={e => setProfileFb(e.target.value)} /></div><div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Admin Notes</label><textarea className="w-full border border-gray-300 rounded p-2 h-24" value={profileNotes} onChange={e => setProfileNotes(e.target.value)} /></div></div><div className="max-w-lg pt-4"><h3 className="font-bold text-gray-900 border-b pb-2 mb-4">Portal Settings</h3><div className="space-y-3"><label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer"><span className="text-sm font-medium text-gray-700">Show Wallet Balance</span><div onClick={() => setPortalConfig(prev => ({ ...prev, show_balance: !prev.show_balance }))} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.show_balance ? 'bg-indigo-600' : 'bg-gray-300'}`}><div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.show_balance ? 'translate-x-5' : ''}`}></div></div></label><label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer"><span className="text-sm font-medium text-gray-700">Show History</span><div onClick={() => setPortalConfig(prev => ({ ...prev, show_history: !prev.show_history }))} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.show_history ? 'bg-indigo-600' : 'bg-gray-300'}`}><div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.show_history ? 'translate-x-5' : ''}`}></div></div></label></div></div><button onClick={handleUpdateProfile} className="bg-indigo-600 text-white px-6 py-3 rounded font-bold hover:bg-indigo-700 w-full md:w-auto shadow-sm">Save All Changes</button></div>
+                                    <div className="space-y-8">
+                                        <div className="max-w-lg space-y-4">
+                                            <h3 className="font-bold text-gray-900 border-b pb-2">Client Profile</h3>
+                                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Phone</label><input className="w-full border border-gray-300 rounded p-2" value={profilePhone} onChange={e => setProfilePhone(e.target.value)} /></div>
+                                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Website URL</label><input className="w-full border border-gray-300 rounded p-2" value={profileWeb} onChange={e => setProfileWeb(e.target.value)} /></div>
+                                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Facebook Page</label><input className="w-full border border-gray-300 rounded p-2" value={profileFb} onChange={e => setProfileFb(e.target.value)} /></div>
+                                            <div><label className="block text-xs font-bold text-gray-500 uppercase mb-1">Admin Notes</label><textarea className="w-full border border-gray-300 rounded p-2 h-24" value={profileNotes} onChange={e => setProfileNotes(e.target.value)} /></div>
+                                        </div>
+                                        
+                                        <div className="max-w-lg pt-4">
+                                            <h3 className="font-bold text-gray-900 border-b pb-2 mb-4">Portal Visibility Settings</h3>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer border border-transparent hover:border-indigo-200">
+                                                    <span className="text-xs font-bold text-gray-700">Wallet Balance</span>
+                                                    <div onClick={() => toggleConfig('show_balance')} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.show_balance ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                                                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.show_balance ? 'translate-x-5' : ''}`}></div>
+                                                    </div>
+                                                </label>
+                                                <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer border border-transparent hover:border-indigo-200">
+                                                    <span className="text-xs font-bold text-gray-700">History Ledger</span>
+                                                    <div onClick={() => toggleConfig('show_history')} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.show_history ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                                                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.show_history ? 'translate-x-5' : ''}`}></div>
+                                                    </div>
+                                                </label>
+                                                <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer border border-transparent hover:border-indigo-200">
+                                                    <span className="text-xs font-bold text-gray-700">Message Report</span>
+                                                    <div onClick={() => toggleConfig('show_message_report')} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.feature_flags?.show_message_report ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                                                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.feature_flags?.show_message_report ? 'translate-x-5' : ''}`}></div>
+                                                    </div>
+                                                </label>
+                                                <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer border border-transparent hover:border-indigo-200">
+                                                    <span className="text-xs font-bold text-gray-700">Sales Report</span>
+                                                    <div onClick={() => toggleConfig('show_sales_report')} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.feature_flags?.show_sales_report ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                                                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.feature_flags?.show_sales_report ? 'translate-x-5' : ''}`}></div>
+                                                    </div>
+                                                </label>
+                                                <label className="flex items-center justify-between p-3 bg-purple-50 rounded-lg cursor-pointer border border-purple-100 hover:border-purple-300">
+                                                    <span className="text-xs font-black text-purple-700">Profit/Loss Report</span>
+                                                    <div onClick={() => toggleConfig('show_profit_loss_report')} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.feature_flags?.show_profit_loss_report ? 'bg-purple-600' : 'bg-gray-300'}`}>
+                                                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.feature_flags?.show_profit_loss_report ? 'translate-x-5' : ''}`}></div>
+                                                    </div>
+                                                </label>
+                                                <label className="flex items-center justify-between p-3 bg-indigo-50 rounded-lg cursor-pointer border border-indigo-100 hover:border-indigo-300">
+                                                    <span className="text-xs font-black text-indigo-700">Payment Methods</span>
+                                                    <div onClick={() => toggleConfig('show_payment_methods')} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.feature_flags?.show_payment_methods ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                                                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.feature_flags?.show_payment_methods ? 'translate-x-5' : ''}`}></div>
+                                                    </div>
+                                                </label>
+                                                <label className="flex items-center justify-between p-3 bg-gray-50 rounded-lg cursor-pointer border border-transparent hover:border-indigo-200">
+                                                    <span className="text-xs font-bold text-gray-700">Allow Top-up</span>
+                                                    <div onClick={() => toggleConfig('allow_topup_request')} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.feature_flags?.allow_topup_request ? 'bg-indigo-600' : 'bg-gray-300'}`}>
+                                                        <div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.feature_flags?.allow_topup_request ? 'translate-x-5' : ''}`}></div>
+                                                    </div>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div className="max-w-lg pt-4">
+                                            <label className="flex items-center justify-between p-3 bg-red-50 rounded-lg cursor-pointer border border-red-100">
+                                                <span className="text-sm font-black text-red-700 uppercase">Suspended (Block Access)</span>
+                                                <div onClick={() => toggleConfig('is_suspended')} className={`w-10 h-5 flex items-center rounded-full p-1 duration-300 ${portalConfig.is_suspended ? 'bg-red-600' : 'bg-gray-300'}`}>
+                                                    <div className={`bg-white w-4 h-4 rounded-full shadow-md transform duration-300 ${portalConfig.is_suspended ? 'translate-x-5' : ''}`}></div>
+                                                </div>
+                                            </label>
+                                        </div>
+
+                                        <button onClick={handleUpdateProfile} className="bg-indigo-600 text-white px-6 py-3 rounded font-bold hover:bg-indigo-700 w-full md:w-auto shadow-sm mt-6">Save All Changes</button>
+                                    </div>
                                 )}
                             </div>
                         </div>
                     )}
                 </div>
             )}
-            {/* Catch/Manual Modal ... (keeping original structure) */}
+            {/* Catch/Manual Modal ... */}
             {isCatchModalOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"><div className="bg-white rounded-lg shadow-xl w-full max-w-md h-[500px] flex flex-col"><div className="p-4 border-b border-gray-200 flex justify-between items-center bg-gray-50"><h3 className="font-bold text-gray-800">Select Client from Leads</h3><button onClick={() => setIsCatchModalOpen(false)}><X className="h-5 w-5 text-gray-500"/></button></div><div className="p-2 border-b border-gray-100"><input className="w-full border border-gray-300 rounded-md p-2 text-sm" placeholder="Search name..." value={catchSearch} onChange={e => setCatchSearch(e.target.value)} autoFocus /></div><div className="flex-1 overflow-y-auto">{leads.filter(l => l.full_name.toLowerCase().includes(catchSearch.toLowerCase())).map(lead => (<div key={lead.id} onClick={() => handleCatchFish(lead.id)} className="p-3 border-b border-gray-100 hover:bg-indigo-50 cursor-pointer flex justify-between items-center"><div><p className="font-bold text-gray-900">{lead.full_name}</p><p className="text-xs text-gray-500">{lead.primary_phone}</p></div><Plus className="h-4 w-4 text-indigo-600"/></div>))}</div></div></div>
             )}

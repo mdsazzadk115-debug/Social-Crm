@@ -186,7 +186,6 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
     
     // Filtered Transactions
     const allTransactions = client.transactions || [];
-    // Ensure sorting by date descending (Newest first)
     const sortedTransactions = [...allTransactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
     const filteredTx = sortedTransactions.filter(tx => {
@@ -208,7 +207,6 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
 
     // --- REPORT DATA FILTERING ---
     const allRecords = Array.isArray(client.campaign_records) ? client.campaign_records : [];
-    
     const filteredRecords = allRecords.filter(rec => {
         const recDate = new Date(rec.start_date);
         const s = new Date(reportStart);
@@ -219,10 +217,6 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
     const messageCampaigns = filteredRecords.filter(r => r.result_type === 'MESSAGES');
     const salesCampaigns = filteredRecords.filter(r => r.result_type === 'SALES');
 
-    // Pending Top-ups
-    const pendingTopUps = client.topup_requests?.filter(r => r.status === 'PENDING') || [];
-
-    // Download CSV
     const handleDownloadLedger = () => {
         const dataToExport = filteredTx.map(tx => ({
             Date: new Date(tx.date).toLocaleDateString(),
@@ -231,14 +225,11 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
             Amount: tx.amount,
             BalanceEffect: tx.type === 'DEPOSIT' ? '+' : '-'
         }));
-
         if (dataToExport.length === 0) return alert("No transactions to export.");
-
         const csvContent = [
             Object.keys(dataToExport[0]).join(','),
             ...dataToExport.map(row => Object.values(row).map(val => `"${val}"`).join(','))
         ].join('\n');
-
         const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
@@ -256,11 +247,12 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
     const showCalculators = showCPR || showCurrency || showROI;
     const showTopUp = client.portal_config?.feature_flags?.allow_topup_request;
 
-    // Report Visibility Flags
+    // Visibility Flags
     const flags: any = client.portal_config?.feature_flags || {};
     const showMessageReport = flags.show_message_report !== false; 
     const showSalesReport = flags.show_sales_report !== false;
     const showProfitLossReport = flags.show_profit_loss_report === true; 
+    const showPaymentMethods = flags.show_payment_methods !== false; // Default true
 
     return (
         <div className="min-h-screen bg-gray-50 text-gray-900 font-inter">
@@ -351,7 +343,7 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
                     </div>
                 </div>
 
-                {/* --- REPORT CONTROLS (GLOBAL FOR THIS SECTION) --- */}
+                {/* 2. PERFORMANCE REPORTS */}
                 {(showMessageReport || showSalesReport || showProfitLossReport) && (
                     <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-4 rounded-xl border border-gray-200 shadow-sm">
                         <div className="flex items-center gap-2 text-gray-700">
@@ -400,302 +392,59 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
                     </div>
                 )}
 
-                {/* --- SEPARATED PERFORMANCE REPORTS (Standard Style) --- */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    
-                    {/* 1. MESSAGE PERFORMANCE SECTION */}
                     {showMessageReport && (
                         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-full">
                             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
-                                <div>
-                                    <h3 className="font-bold text-gray-900 text-base flex items-center">
-                                        <MessageCircle className="mr-2 text-blue-600 h-5 w-5"/> Message Report
-                                    </h3>
-                                    <span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded mt-1 inline-block">মেসেজ রিপোর্ট</span>
-                                </div>
+                                <div><h3 className="font-bold text-gray-900 text-base flex items-center"><MessageCircle className="mr-2 text-blue-600 h-5 w-5"/> Message Report</h3><span className="text-[10px] text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded mt-1 inline-block">মেসেজ রিপোর্ট</span></div>
                                 <div className="flex bg-gray-100 p-1 rounded-lg">
-                                    <button 
-                                        onClick={() => setMsgView('TABLE')}
-                                        className={`p-1.5 rounded transition-all ${msgView === 'TABLE' ? 'bg-white shadow text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
-                                    >
-                                        <Table className="h-4 w-4"/>
-                                    </button>
-                                    <button 
-                                        onClick={() => setMsgView('GRAPH')}
-                                        className={`p-1.5 rounded transition-all ${msgView === 'GRAPH' ? 'bg-white shadow text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}
-                                    >
-                                        <BarChart2 className="h-4 w-4"/>
-                                    </button>
+                                    <button onClick={() => setMsgView('TABLE')} className={`p-1.5 rounded transition-all ${msgView === 'TABLE' ? 'bg-white shadow text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}><Table className="h-4 w-4"/></button>
+                                    <button onClick={() => setMsgView('GRAPH')} className={`p-1.5 rounded transition-all ${msgView === 'GRAPH' ? 'bg-white shadow text-blue-600' : 'text-gray-400 hover:text-gray-600'}`}><BarChart2 className="h-4 w-4"/></button>
                                 </div>
                             </div>
-                            
                             <div className="flex-1 min-h-[300px]">
-                                {messageCampaigns.length === 0 ? (
-                                    <div className="flex items-center justify-center h-full text-gray-400 text-sm p-8">No message data for selected period.</div>
-                                ) : msgView === 'TABLE' ? (
-                                    <div className="max-h-80 overflow-y-auto">
-                                        <table className="w-full text-sm text-left">
-                                            <thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase sticky top-0">
-                                                <tr>
-                                                    <th className="px-4 py-3">Date</th>
-                                                    <th className="px-4 py-3 text-right">Spend</th>
-                                                    <th className="px-4 py-3 text-center">Messages</th>
-                                                    <th className="px-4 py-3 text-right">CPR</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-100">
-                                                {messageCampaigns.map(rec => (
-                                                    <tr key={rec.id} className="hover:bg-gray-50">
-                                                        <td className="px-4 py-3 text-gray-700 font-medium">
-                                                            {new Date(rec.start_date).toLocaleDateString('en-GB', {day: '2-digit', month: 'short'})}
-                                                            {rec.start_date !== rec.end_date && ` - ${new Date(rec.end_date).toLocaleDateString('en-GB', {day: '2-digit', month: 'short'})}`}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right font-mono font-bold text-gray-800">${rec.amount_spent.toFixed(2)}</td>
-                                                        <td className="px-4 py-3 text-center">
-                                                            <span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold">{rec.results_count}</span>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right text-xs text-gray-500 font-mono">
-                                                            ${(rec.results_count > 0 ? (rec.amount_spent / rec.results_count) : 0).toFixed(2)}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                ) : (
-                                    <SimpleChart 
-                                        data={messageCampaigns} 
-                                        labelKey="start_date" 
-                                        valueKey="results_count" 
-                                        colorClass="bg-blue-500" 
-                                        valuePrefix="" 
-                                        valueSuffix=" msgs"
-                                    />
-                                )}
+                                {messageCampaigns.length === 0 ? <div className="flex items-center justify-center h-full text-gray-400 text-sm p-8">No message data.</div> : msgView === 'TABLE' ? (
+                                    <div className="max-h-80 overflow-y-auto"><table className="w-full text-sm text-left"><thead className="bg-gray-50 text-gray-500 font-bold text-xs uppercase sticky top-0"><tr><th className="px-4 py-3">Date</th><th className="px-4 py-3 text-right">Spend</th><th className="px-4 py-3 text-center">Messages</th><th className="px-4 py-3 text-right">CPR</th></tr></thead><tbody className="divide-y divide-gray-100">{messageCampaigns.map(rec => (<tr key={rec.id} className="hover:bg-gray-50"><td className="px-4 py-3 text-gray-700 font-medium">{new Date(rec.start_date).toLocaleDateString('en-GB', {day: '2-digit', month: 'short'})}</td><td className="px-4 py-3 text-right font-mono font-bold text-gray-800">${rec.amount_spent.toFixed(2)}</td><td className="px-4 py-3 text-center"><span className="bg-blue-100 text-blue-800 px-2 py-0.5 rounded text-xs font-bold">{rec.results_count}</span></td><td className="px-4 py-3 text-right text-xs text-gray-500 font-mono">${(rec.results_count > 0 ? (rec.amount_spent / rec.results_count) : 0).toFixed(2)}</td></tr>))}</tbody></table></div>
+                                ) : <SimpleChart data={messageCampaigns} labelKey="start_date" valueKey="results_count" colorClass="bg-blue-500" valuePrefix="" valueSuffix=" msgs" />}
                             </div>
                         </div>
                     )}
-
-                    {/* 2. SALES PERFORMANCE SECTION */}
                     {showSalesReport && (
                         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col h-full">
                             <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
-                                <div>
-                                    <h3 className="font-bold text-gray-900 text-base flex items-center">
-                                        <ShoppingBag className="mr-2 text-green-600 h-5 w-5"/> Sales Report
-                                    </h3>
-                                    <span className="text-[10px] text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded mt-1 inline-block">সেলস রিপোর্ট</span>
-                                </div>
+                                <div><h3 className="font-bold text-gray-900 text-base flex items-center"><ShoppingBag className="mr-2 text-green-600 h-5 w-5"/> Sales Report</h3><span className="text-[10px] text-green-600 font-bold bg-green-50 px-2 py-0.5 rounded mt-1 inline-block">সেলস রিপোর্ট</span></div>
                                 <div className="flex bg-gray-100 p-1 rounded-lg">
-                                    <button 
-                                        onClick={() => setSalesView('TABLE')}
-                                        className={`p-1.5 rounded transition-all ${salesView === 'TABLE' ? 'bg-white shadow text-green-600' : 'text-gray-400 hover:text-gray-600'}`}
-                                    >
-                                        <Table className="h-4 w-4"/>
-                                    </button>
-                                    <button 
-                                        onClick={() => setSalesView('GRAPH')}
-                                        className={`p-1.5 rounded transition-all ${salesView === 'GRAPH' ? 'bg-white shadow text-green-600' : 'text-gray-400 hover:text-gray-600'}`}
-                                    >
-                                        <BarChart2 className="h-4 w-4"/>
-                                    </button>
+                                    <button onClick={() => setSalesView('TABLE')} className={`p-1.5 rounded transition-all ${salesView === 'TABLE' ? 'bg-white shadow text-green-600' : 'text-gray-400 hover:text-gray-600'}`}><Table className="h-4 w-4"/></button>
+                                    <button onClick={() => setSalesView('GRAPH')} className={`p-1.5 rounded transition-all ${salesView === 'GRAPH' ? 'bg-white shadow text-green-600' : 'text-gray-400 hover:text-gray-600'}`}><BarChart2 className="h-4 w-4"/></button>
                                 </div>
                             </div>
-                            
                             <div className="flex-1 min-h-[300px]">
-                                {salesCampaigns.length === 0 ? (
-                                    <div className="flex items-center justify-center h-full text-gray-400 text-sm p-8">No sales data for selected period.</div>
-                                ) : salesView === 'TABLE' ? (
-                                    <div className="max-h-80 overflow-y-auto">
-                                        <table className="w-full text-sm text-left">
-                                            <thead className="bg-white text-gray-500 font-bold text-xs uppercase sticky top-0">
-                                                <tr>
-                                                    <th className="px-4 py-3">Date</th>
-                                                    <th className="px-4 py-3 text-right">Spend</th>
-                                                    <th className="px-4 py-3 text-center">Sales</th>
-                                                    <th className="px-4 py-3 text-right">CPA</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-100">
-                                                {salesCampaigns.map(rec => (
-                                                    <tr key={rec.id} className="hover:bg-gray-50">
-                                                        <td className="px-4 py-3 text-gray-700 font-medium">
-                                                            {new Date(rec.start_date).toLocaleDateString('en-GB', {day: '2-digit', month: 'short'})}
-                                                            {rec.start_date !== rec.end_date && ` - ${new Date(rec.end_date).toLocaleDateString('en-GB', {day: '2-digit', month: 'short'})}`}
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right font-mono font-bold text-gray-800">${rec.amount_spent.toFixed(2)}</td>
-                                                        <td className="px-4 py-3 text-center">
-                                                            <span className="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs font-bold">{rec.results_count}</span>
-                                                        </td>
-                                                        <td className="px-4 py-3 text-right text-xs text-gray-500 font-mono">
-                                                            ${(rec.results_count > 0 ? (rec.amount_spent / rec.results_count) : 0).toFixed(2)}
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                ) : (
-                                    <SimpleChart 
-                                        data={salesCampaigns} 
-                                        labelKey="start_date" 
-                                        valueKey="results_count" 
-                                        colorClass="bg-green-500" 
-                                        valuePrefix="" 
-                                        valueSuffix=" Sales"
-                                    />
-                                )}
+                                {salesCampaigns.length === 0 ? <div className="flex items-center justify-center h-full text-gray-400 text-sm p-8">No sales data.</div> : salesView === 'TABLE' ? (
+                                    <div className="max-h-80 overflow-y-auto"><table className="w-full text-sm text-left"><thead className="bg-white text-gray-500 font-bold text-xs uppercase sticky top-0"><tr><th className="px-4 py-3">Date</th><th className="px-4 py-3 text-right">Spend</th><th className="px-4 py-3 text-center">Sales</th><th className="px-4 py-3 text-right">CPA</th></tr></thead><tbody className="divide-y divide-gray-100">{salesCampaigns.map(rec => (<tr key={rec.id} className="hover:bg-gray-50"><td className="px-4 py-3 text-gray-700 font-medium">{new Date(rec.start_date).toLocaleDateString('en-GB', {day: '2-digit', month: 'short'})}</td><td className="px-4 py-3 text-right font-mono font-bold text-gray-800">${rec.amount_spent.toFixed(2)}</td><td className="px-4 py-3 text-center"><span className="bg-green-100 text-green-800 px-2 py-0.5 rounded text-xs font-bold">{rec.results_count}</span></td><td className="px-4 py-3 text-right text-xs text-gray-500 font-mono">${(rec.results_count > 0 ? (rec.amount_spent / rec.results_count) : 0).toFixed(2)}</td></tr>))}</tbody></table></div>
+                                ) : <SimpleChart data={salesCampaigns} labelKey="start_date" valueKey="results_count" colorClass="bg-green-500" valuePrefix="" valueSuffix=" Sales" />}
                             </div>
                         </div>
                     )}
                 </div>
 
-                {/* 3. PROFIT / LOSS LEDGER (OPTIONAL) */}
                 {showProfitLossReport && (
                     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden mt-8">
                         <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
-                            <div>
-                                <h3 className="font-bold text-gray-900 text-lg flex items-center">
-                                    <TrendingUp className="mr-2 text-purple-600 h-5 w-5"/> Profit & Loss Ledger
-                                </h3>
-                                <span className="text-[10px] text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded mt-1 inline-block">লাভ/ক্ষতি হিসাব</span>
-                            </div>
+                            <div><h3 className="font-bold text-gray-900 text-lg flex items-center"><TrendingUp className="mr-2 text-purple-600 h-5 w-5"/> Profit & Loss Ledger</h3><span className="text-[10px] text-purple-600 font-bold bg-purple-50 px-2 py-0.5 rounded mt-1 inline-block">লাভ/ক্ষতি হিসাব</span></div>
                             <div className="flex bg-gray-100 p-1 rounded-lg">
-                                <button 
-                                    onClick={() => setProfitView('TABLE')}
-                                    className={`p-1.5 rounded transition-all ${profitView === 'TABLE' ? 'bg-white shadow text-purple-600' : 'text-gray-400 hover:text-gray-600'}`}
-                                >
-                                    <Table className="h-4 w-4"/>
-                                </button>
-                                <button 
-                                    onClick={() => setProfitView('GRAPH')}
-                                    className={`p-1.5 rounded transition-all ${profitView === 'GRAPH' ? 'bg-white shadow text-purple-600' : 'text-gray-400 hover:text-gray-600'}`}
-                                >
-                                    <BarChart2 className="h-4 w-4"/>
-                                </button>
+                                <button onClick={() => setProfitView('TABLE')} className={`p-1.5 rounded transition-all ${profitView === 'TABLE' ? 'bg-white shadow text-purple-600' : 'text-gray-400 hover:text-gray-600'}`}><Table className="h-4 w-4"/></button>
+                                <button onClick={() => setProfitView('GRAPH')} className={`p-1.5 rounded transition-all ${profitView === 'GRAPH' ? 'bg-white shadow text-purple-600' : 'text-gray-400 hover:text-gray-600'}`}><BarChart2 className="h-4 w-4"/></button>
                             </div>
                         </div>
-                        
-                        {salesCampaigns.length === 0 ? (
-                            <div className="p-8 text-center text-gray-400">No data available for profit analysis in this period.</div>
-                        ) : profitView === 'TABLE' ? (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm text-left">
-                                    <thead className="bg-gray-50 text-gray-600 font-bold text-xs uppercase">
-                                        <tr>
-                                            <th className="px-6 py-3">Date</th>
-                                            <th className="px-6 py-3 text-center">Sold Qty</th>
-                                            <th className="px-6 py-3 text-right">Ad Spend</th>
-                                            <th className="px-6 py-3 text-right">Product Profit</th>
-                                            <th className="px-6 py-3 text-right">Net Profit/Loss</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                        {salesCampaigns.map(rec => {
-                                            const totalRevenue = rec.results_count * (rec.product_price || 0);
-                                            const totalCOGS = rec.results_count * (rec.product_cost || 0);
-                                            const grossProfit = totalRevenue - totalCOGS; 
-                                            const adSpendBDT = rec.amount_spent * 145; 
-                                            const realNetProfit = grossProfit - adSpendBDT;
-                                            const isProfit = realNetProfit >= 0;
-                                            return (
-                                                <tr key={rec.id} className={`hover:bg-gray-50 ${isProfit ? 'bg-green-50/10' : 'bg-red-50/10'}`}>
-                                                    <td className="px-6 py-4 font-medium text-gray-700">
-                                                        {new Date(rec.start_date).toLocaleDateString('en-GB')}
-                                                    </td>
-                                                    <td className="px-6 py-4 text-center font-bold">{rec.results_count}</td>
-                                                    <td className="px-6 py-4 text-right text-gray-600">
-                                                        ${rec.amount_spent.toFixed(2)} <span className="text-xs text-gray-400">({Math.round(adSpendBDT)}৳)</span>
-                                                    </td>
-                                                    <td className="px-6 py-4 text-right text-gray-600">
-                                                        {grossProfit.toLocaleString()}৳
-                                                    </td>
-                                                    <td className={`px-6 py-4 text-right font-bold text-lg ${isProfit ? 'text-green-600' : 'text-red-600'}`}>
-                                                        {isProfit ? '+' : ''}{realNetProfit.toLocaleString()}৳
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            </div>
-                        ) : (
-                            <div className="p-4">
-                                <SimpleChart 
-                                    data={salesCampaigns.map(r => {
-                                        const totalRevenue = r.results_count * (r.product_price || 0);
-                                        const totalCOGS = r.results_count * (r.product_cost || 0);
-                                        const adSpendBDT = r.amount_spent * 145;
-                                        const net = (totalRevenue - totalCOGS) - adSpendBDT;
-                                        return { ...r, net_profit: net };
-                                    })} 
-                                    labelKey="start_date" 
-                                    valueKey="net_profit" 
-                                    colorClass="bg-purple-500" 
-                                    valuePrefix="৳ " 
-                                    valueSuffix=""
-                                />
-                            </div>
-                        )}
-                    </div>
-                )}
-
-                {/* 4. TOOLS & CALCULATORS */}
-                {showCalculators && (
-                    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-                        <h3 className="font-bold text-gray-900 text-lg mb-6 flex items-center">
-                            <Calculator className="mr-2 text-indigo-600"/> Tools & Calculators
-                        </h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                            
-                            {/* CPR */}
-                            {showCPR && (
-                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                    <h4 className="text-sm font-bold text-indigo-600 mb-4">Cost Per Result (CPR)</h4>
-                                    <div className="space-y-3">
-                                        <input type="number" placeholder="Spend ($)" className="w-full bg-white border border-gray-300 rounded p-2 text-xs" value={cprSpend || ''} onChange={e => setCprSpend(parseFloat(e.target.value))} />
-                                        <input type="number" placeholder="Results" className="w-full bg-white border border-gray-300 rounded p-2 text-xs" value={cprResults || ''} onChange={e => setCprResults(parseFloat(e.target.value))} />
-                                        <div className="text-center font-bold text-xl text-gray-800 pt-2">
-                                            ${cprResults > 0 ? (cprSpend / cprResults).toFixed(2) : '0.00'} <span className="text-xs text-gray-500 font-normal">/ result</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Currency */}
-                            {showCurrency && (
-                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                    <h4 className="text-sm font-bold text-green-600 mb-4">USD to BDT</h4>
-                                    <div className="space-y-3">
-                                        <input type="number" placeholder="USD ($)" className="w-full bg-white border border-gray-300 rounded p-2 text-xs" value={usdAmount || ''} onChange={e => setUsdAmount(parseFloat(e.target.value))} />
-                                        <input type="number" placeholder="Rate" className="w-full bg-white border border-gray-300 rounded p-2 text-xs" value={exchangeRate} onChange={e => setExchangeRate(parseFloat(e.target.value))} />
-                                        <div className="text-center font-bold text-xl text-gray-800 pt-2">
-                                            ৳ {(usdAmount * exchangeRate).toLocaleString()}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Profit */}
-                            {showROI && (
-                                <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                                    <h4 className="text-sm font-bold text-purple-600 mb-4">Profit Calc</h4>
-                                    <div className="grid grid-cols-2 gap-2 mb-3">
-                                        <input type="number" placeholder="Buy Price" className="bg-white border border-gray-300 rounded p-1.5 text-xs" value={prodCost || ''} onChange={e => setProdCost(parseFloat(e.target.value))} />
-                                        <input type="number" placeholder="Sell Price" className="bg-white border border-gray-300 rounded p-1.5 text-xs" value={salePrice || ''} onChange={e => setSalePrice(parseFloat(e.target.value))} />
-                                        <input type="number" placeholder="Ad Cost" className="bg-white border border-gray-300 rounded p-1.5 text-xs" value={adCost || ''} onChange={e => setAdCost(parseFloat(e.target.value))} />
-                                        <input type="number" placeholder="Del. Cost" className="bg-white border border-gray-300 rounded p-1.5 text-xs" value={delCost} onChange={e => setDelCost(parseFloat(e.target.value))} />
-                                    </div>
-                                    <div className="text-center text-xs text-gray-500">
-                                        Profit: <span className="font-bold text-green-600">{(salePrice - prodCost - adCost - delCost).toFixed(0)}</span> | 
-                                        Loss (Ret): <span className="font-bold text-red-500">{(adCost + 100).toFixed(0)}</span>
-                                    </div>
-                                </div>
-                            )}
+                        <div className="p-4">
+                            {salesCampaigns.length === 0 ? <div className="p-4 text-center text-gray-400">No profit data.</div> : profitView === 'TABLE' ? (
+                                <table className="w-full text-sm text-left"><thead className="bg-gray-50 text-gray-600 font-bold text-xs uppercase"><tr><th className="px-6 py-3">Date</th><th className="px-6 py-3 text-center">Sold</th><th className="px-6 py-3 text-right">Ad Spend</th><th className="px-6 py-3 text-right">Net Profit</th></tr></thead><tbody className="divide-y divide-gray-100">{salesCampaigns.map(rec => { const net = (rec.results_count * (rec.product_price || 0) - rec.results_count * (rec.product_cost || 0)) - (rec.amount_spent * 145); return (<tr key={rec.id} className="hover:bg-gray-50"><td className="px-6 py-4">{new Date(rec.start_date).toLocaleDateString('en-GB')}</td><td className="px-6 py-4 text-center font-bold">{rec.results_count}</td><td className="px-6 py-4 text-right">${rec.amount_spent.toFixed(2)}</td><td className={`px-6 py-4 text-right font-bold ${net >= 0 ? 'text-green-600' : 'text-red-600'}`}>{net.toLocaleString()}৳</td></tr>); })}</tbody></table>
+                            ) : <SimpleChart data={salesCampaigns.map(r => ({ ...r, net: (r.results_count * (r.product_price || 0) - r.results_count * (r.product_cost || 0)) - (r.amount_spent * 145) }))} labelKey="start_date" valueKey="net" colorClass="bg-purple-500" valuePrefix="৳ " valueSuffix="" />}
                         </div>
                     </div>
                 )}
 
+                {/* 3. CALCULATORS & INFO */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                     <div className="lg:col-span-2 space-y-8">
                         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
@@ -703,293 +452,57 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
                                 <h3 className="font-bold text-gray-900 text-lg flex items-center"><CheckCircle className="mr-2 text-indigo-600"/> Project Tasks & Milestones</h3>
                             </div>
                             <div className="divide-y divide-gray-100">
-                                {client.growth_tasks?.length === 0 ? (
-                                    <div className="p-8 text-center text-gray-400">No tasks active.</div>
-                                ) : (
-                                    client.growth_tasks?.map(task => (
-                                        <div key={task.id} className="p-4 hover:bg-gray-50 transition-colors flex justify-between items-center">
-                                            <div className="flex items-center gap-3">
-                                                <div className={`h-5 w-5 rounded-full border flex items-center justify-center ${task.is_completed ? 'bg-green-500 border-green-500' : 'border-gray-300'}`}>
-                                                    {task.is_completed && <CheckCircle size={14} className="text-white"/>}
-                                                </div>
-                                                <div>
-                                                    <p className={`text-sm ${task.is_completed ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{task.title}</p>
-                                                    {task.due_date && <p className="text-xs text-gray-400">Due: {task.due_date}</p>}
-                                                </div>
-                                            </div>
-                                            {task.is_completed && <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-1 rounded">DONE</span>}
-                                        </div>
-                                    ))
-                                )}
+                                {client.growth_tasks?.length === 0 ? <div className="p-8 text-center text-gray-400">No tasks active.</div> : client.growth_tasks?.map(task => (<div key={task.id} className="p-4 flex justify-between items-center"><div className="flex items-center gap-3"><div className={`h-5 w-5 rounded-full border flex items-center justify-center ${task.is_completed ? 'bg-green-500 border-green-500' : 'border-gray-300'}`}>{task.is_completed && <CheckCircle size={14} className="text-white"/>}</div><div><p className={`text-sm ${task.is_completed ? 'text-gray-400 line-through' : 'text-gray-800'}`}>{task.title}</p></div></div>{task.is_completed && <span className="text-xs font-bold text-green-700 bg-green-100 px-2 py-1 rounded">DONE</span>}</div>))}
                             </div>
                         </div>
 
                         {client.portal_config?.show_history && (
                             <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                                <div className="p-6 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-gray-50/50">
-                                    <h3 className="font-bold text-gray-900 text-lg flex items-center"><List className="mr-2 text-indigo-600"/> Transaction History ({filteredTx.length})</h3>
-                                    <div className="flex flex-wrap gap-2 items-center">
-                                        <div className="relative">
-                                            <Calendar className="h-4 w-4 absolute left-2 top-2 text-gray-400"/>
-                                            <input 
-                                                type="date" 
-                                                className="bg-white border border-gray-300 text-gray-700 text-xs rounded pl-8 pr-2 py-1 focus:ring-indigo-500 focus:border-indigo-500"
-                                                value={startDate}
-                                                onChange={e => { setStartDate(e.target.value); setHistoryPage(1); }}
-                                            />
-                                        </div>
-                                        <span className="text-gray-400">-</span>
-                                        <div className="relative">
-                                            <Calendar className="h-4 w-4 absolute left-2 top-2 text-gray-400"/>
-                                            <input 
-                                                type="date" 
-                                                className="bg-white border border-gray-300 text-gray-700 text-xs rounded pl-8 pr-2 py-1 focus:ring-indigo-500 focus:border-indigo-500"
-                                                value={endDate}
-                                                onChange={e => { setEndDate(e.target.value); setHistoryPage(1); }}
-                                            />
-                                        </div>
-                                        <button 
-                                            onClick={handleDownloadLedger}
-                                            className="bg-white border border-gray-300 hover:bg-gray-50 text-gray-700 p-1.5 rounded" 
-                                            title="Download CSV"
-                                        >
-                                            <Download className="h-4 w-4"/>
-                                        </button>
-                                    </div>
+                                <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-gray-50/50">
+                                    <h3 className="font-bold text-gray-900 text-lg flex items-center"><List className="mr-2 text-indigo-600"/> Transaction History</h3>
+                                    <button onClick={handleDownloadLedger} className="bg-white border border-gray-300 text-gray-700 p-1.5 rounded"><Download className="h-4 w-4"/></button>
                                 </div>
-                                <div className="min-h-[200px]">
-                                    <table className="w-full text-sm text-left text-gray-600">
-                                        <thead className="text-xs text-gray-500 uppercase bg-gray-50">
-                                            <tr>
-                                                <th className="px-6 py-3">Date</th>
-                                                <th className="px-6 py-3">Description</th>
-                                                <th className="px-6 py-3 text-right">Amount</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-100">
-                                            {displayedTx.length === 0 && (
-                                                <tr><td colSpan={3} className="p-6 text-center">No transactions found in this period.</td></tr>
-                                            )}
-                                            {displayedTx.map(tx => (
-                                                <tr key={tx.id} className="hover:bg-gray-50">
-                                                    <td className="px-6 py-3">{new Date(tx.date).toLocaleDateString()}</td>
-                                                    <td className="px-6 py-3 flex items-center gap-2">
-                                                        <span className={`w-2 h-2 rounded-full ${tx.type === 'DEPOSIT' ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                                                        {tx.description}
-                                                    </td>
-                                                    <td className={`px-6 py-3 text-right font-mono ${tx.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-500'}`}>
-                                                        {tx.type === 'DEPOSIT' ? '+' : '-'}${(tx.amount || 0).toFixed(2)}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                                {filteredTx.length > 0 && (
-                                    <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-between items-center">
-                                        <button 
-                                            disabled={historyPage === 1}
-                                            onClick={() => setHistoryPage(p => p - 1)}
-                                            className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
-                                        >
-                                            <ChevronLeft className="h-4 w-4"/>
-                                        </button>
-                                        <span className="text-xs text-gray-500">Page {historyPage} of {totalHistoryPages}</span>
-                                        <button 
-                                            disabled={historyPage === totalHistoryPages}
-                                            onClick={() => setHistoryPage(p => p + 1)}
-                                            className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
-                                        >
-                                            <ChevronRight className="h-4 w-4"/>
-                                        </button>
-                                    </div>
-                                )}
+                                <table className="w-full text-sm text-left"><thead className="text-xs text-gray-500 uppercase bg-gray-50"><tr><th className="px-6 py-3">Date</th><th className="px-6 py-3">Description</th><th className="px-6 py-3 text-right">Amount</th></tr></thead><tbody className="divide-y divide-gray-100">{displayedTx.map(tx => (<tr key={tx.id} className="hover:bg-gray-50"><td className="px-6 py-3">{new Date(tx.date).toLocaleDateString()}</td><td className="px-6 py-3">{tx.description}</td><td className={`px-6 py-3 text-right font-mono ${tx.type === 'DEPOSIT' ? 'text-green-600' : 'text-red-500'}`}>{tx.type === 'DEPOSIT' ? '+' : '-'}${tx.amount.toFixed(2)}</td></tr>))}</tbody></table>
                             </div>
                         )}
                     </div>
+
                     <div className="lg:col-span-1 space-y-6">
-                         <div className="bg-indigo-50 rounded-xl border border-indigo-100 p-6 text-center">
-                            <h4 className="text-indigo-800 font-bold mb-2 flex justify-center items-center">
-                                <Users className="h-5 w-5 mr-2"/> Need Support?
-                            </h4>
-                            <p className="text-sm text-indigo-600 mb-4">Contact your account manager directly.</p>
+                        <div className="bg-indigo-50 rounded-xl border border-indigo-100 p-6 text-center">
+                            <h4 className="text-indigo-800 font-bold mb-2 flex justify-center items-center"><Users className="h-5 w-5 mr-2"/> Need Support?</h4>
                             <div className="space-y-2">
-                                {globalSettings?.portal_support_phone && (
-                                    <a href={`tel:${globalSettings.portal_support_phone}`} className="flex items-center justify-center p-2 bg-white rounded border border-indigo-100 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-indigo-600 transition-colors">
-                                        <Phone className="h-4 w-4 mr-2"/> {globalSettings.portal_support_phone}
-                                    </a>
-                                )}
-                                {globalSettings?.portal_support_url && (
-                                    <a href={globalSettings.portal_support_url} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center p-2 bg-white rounded border border-indigo-100 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-indigo-600 transition-colors">
-                                        <Globe className="h-4 w-4 mr-2"/> Visit Website
-                                    </a>
-                                )}
-                                {globalSettings?.portal_fb_group && (
-                                    <a href={globalSettings.portal_fb_group} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center p-2 bg-white rounded border border-indigo-100 text-sm font-medium text-gray-700 hover:bg-gray-50 hover:text-indigo-600 transition-colors">
-                                        <Users className="h-4 w-4 mr-2"/> Join FB Group
-                                    </a>
-                                )}
-                                {(!globalSettings?.portal_support_phone && !globalSettings?.portal_support_url && !globalSettings?.portal_fb_group) && (
-                                    <p className="text-xs text-indigo-400 italic">No contact details configured.</p>
-                                )}
-                            </div>
-                         </div>
-                        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-                            <div className="p-4 bg-gray-50/80 sticky top-0 backdrop-blur-md border-b border-gray-200 flex justify-between items-center">
-                                <h3 className="font-bold text-gray-500 text-sm uppercase tracking-wider">Daily Work Log</h3>
-                                <span className="text-xs text-gray-400">Page {logPage} of {totalLogPages || 1}</span>
-                            </div>
-                             <div className="p-4 space-y-4 min-h-[200px]">
-                                {displayedLogs.length === 0 && <p className="text-gray-400 text-sm">No logs found.</p>}
-                                {displayedLogs.map(report => (
-                                    <div key={report.id} className="relative pl-4 border-l-2 border-gray-300">
-                                        <div className="mb-1 text-xs text-indigo-600 font-bold">{new Date(report.date).toLocaleDateString()}</div>
-                                        <p className="text-sm text-gray-700">{report.task}</p>
-                                    </div>
-                                ))}
-                            </div>
-                            {allLogs.length > LOGS_PER_PAGE && (
-                                <div className="bg-gray-50 p-3 border-t border-gray-200 flex justify-between items-center">
-                                    <button 
-                                        disabled={logPage === 1}
-                                        onClick={() => setLogPage(p => p - 1)}
-                                        className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
-                                    >
-                                        <ChevronLeft className="h-4 w-4"/>
-                                    </button>
-                                    <span className="text-xs text-gray-500">{displayedLogs.length} items shown</span>
-                                    <button 
-                                        disabled={logPage === totalLogPages}
-                                        onClick={() => setLogPage(p => p + 1)}
-                                        className="p-1 rounded hover:bg-gray-200 disabled:opacity-30 disabled:cursor-not-allowed"
-                                    >
-                                        <ChevronRight className="h-4 w-4"/>
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
-                            <h3 className="font-bold text-gray-900 text-lg mb-4 flex items-center"><ShieldCheck className="mr-2 text-indigo-600"/> Make a Payment</h3>
-                            {showTopUp && (
-                                <button 
-                                    onClick={() => setIsTopUpOpen(true)}
-                                    className="w-full bg-gradient-to-r from-indigo-600 to-blue-600 text-white font-bold py-3 rounded-lg shadow-md hover:shadow-lg transition-all flex items-center justify-center mb-6"
-                                >
-                                    <UploadCloud className="h-5 w-5 mr-2" />
-                                    Submit Payment / Top-up Request
-                                </button>
-                            )}
-                            {pendingTopUps.length > 0 && (
-                                <div className="mb-6 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                                    <h4 className="text-xs font-bold text-amber-800 uppercase mb-2 flex items-center">
-                                        <Clock className="h-3 w-3 mr-1"/> Pending Requests
-                                    </h4>
-                                    <div className="space-y-2">
-                                        {pendingTopUps.map(req => (
-                                            <div key={req.id} className="text-xs text-amber-700 flex justify-between border-b border-amber-100 last:border-0 pb-1 last:pb-0">
-                                                <span>{new Date(req.created_at).toLocaleDateString()}</span>
-                                                <span className="font-bold">${req.amount}</span>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                            <div className="space-y-4">
-                                {paymentMethods.map(pm => {
-                                    if (pm.type === 'BANK') {
-                                        return (
-                                            <div key={pm.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-indigo-300 transition-colors">
-                                                <div className="flex items-center justify-between mb-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <Building className="h-5 w-5 text-indigo-600"/>
-                                                        <span className="font-bold text-gray-800">{pm.provider_name}</span>
-                                                    </div>
-                                                    <span className="text-[10px] uppercase bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">Bank Transfer</span>
-                                                </div>
-                                                <div className="space-y-2 text-sm text-gray-600">
-                                                    <div className="flex justify-between">
-                                                        <span className="text-gray-400 text-xs">Account Name</span>
-                                                        <span>{pm.account_name}</span>
-                                                    </div>
-                                                    <div className="flex justify-between items-center bg-white border border-gray-200 p-2 rounded">
-                                                        <span className="text-gray-400 text-xs">A/C Number</span>
-                                                        <div className="flex items-center">
-                                                            <span className="font-mono text-gray-800 mr-2 font-bold">{pm.account_number}</span>
-                                                            <button onClick={() => handleCopy(pm.id + '_ac', pm.account_number)} className="text-gray-400 hover:text-indigo-600">
-                                                                {copiedId === pm.id + '_ac' ? <Check size={14} className="text-green-500"/> : <Copy size={14}/>}
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex justify-between">
-                                                        <span className="text-gray-400 text-xs">Branch</span>
-                                                        <span>{pm.branch_name}</span>
-                                                    </div>
-                                                    {pm.routing_number && (
-                                                        <div className="flex justify-between items-center">
-                                                            <span className="text-gray-400 text-xs">Routing No</span>
-                                                            <div className="flex items-center gap-2">
-                                                                <span>{pm.routing_number}</span>
-                                                                <button onClick={() => handleCopy(pm.id + '_rt', pm.routing_number!)} className="text-gray-400 hover:text-indigo-600">
-                                                                    {copiedId === pm.id + '_rt' ? <Check size={14} className="text-green-500"/> : <Copy size={14}/>}
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )
-                                    } else {
-                                        return (
-                                            <div key={pm.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200 hover:border-pink-300 transition-colors">
-                                                <div className="flex items-center justify-between mb-3">
-                                                    <div className="flex items-center gap-2">
-                                                        <Smartphone className="h-5 w-5 text-pink-600"/>
-                                                        <span className="font-bold text-gray-800">{pm.provider_name}</span>
-                                                    </div>
-                                                    <span className="text-[10px] uppercase bg-pink-100 text-pink-800 px-2 py-0.5 rounded">{pm.mobile_type}</span>
-                                                </div>
-                                                <div className="bg-white border border-gray-200 p-3 rounded flex justify-between items-center">
-                                                    <div>
-                                                        <p className="text-xs text-gray-500 mb-1">{pm.instruction}</p>
-                                                        <p className="font-mono text-lg text-gray-900 font-bold">{pm.account_number}</p>
-                                                    </div>
-                                                    <button onClick={() => handleCopy(pm.id, pm.account_number)} className="p-2 hover:bg-gray-100 rounded text-gray-400 hover:text-indigo-600">
-                                                        {copiedId === pm.id ? <Check size={18} className="text-green-500"/> : <Copy size={18}/>}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )
-                                    }
-                                })}
-                                {paymentMethods.length === 0 && (
-                                    <p className="text-gray-400 text-sm text-center">No payment methods added.</p>
-                                )}
+                                {globalSettings?.portal_support_phone && <a href={`tel:${globalSettings.portal_support_phone}`} className="flex justify-center p-2 bg-white rounded border text-sm text-gray-700 hover:text-indigo-600"><Phone className="h-4 w-4 mr-2"/> Call Agent</a>}
+                                {globalSettings?.portal_fb_group && <a href={globalSettings.portal_fb_group} target="_blank" rel="noreferrer" className="flex justify-center p-2 bg-white rounded border text-sm text-gray-700 hover:text-indigo-600"><Users className="h-4 w-4 mr-2"/> FB Group</a>}
                             </div>
                         </div>
+
+                        {showPaymentMethods && (
+                            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+                                <h3 className="font-bold text-gray-900 text-lg mb-4 flex items-center"><ShieldCheck className="mr-2 text-indigo-600"/> Payment Methods</h3>
+                                {showTopUp && <button onClick={() => setIsTopUpOpen(true)} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg shadow-md hover:bg-indigo-700 transition-all flex items-center justify-center mb-6"><UploadCloud className="h-5 w-5 mr-2" /> Submit Payment Slip</button>}
+                                <div className="space-y-4">
+                                    {paymentMethods.map(pm => (
+                                        <div key={pm.id} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                            <div className="flex justify-between items-center mb-2"><span className="font-bold text-gray-800">{pm.provider_name}</span><span className="text-[10px] uppercase bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded">{pm.type}</span></div>
+                                            <div className="bg-white border border-gray-200 p-2 rounded flex justify-between items-center"><span className="font-mono text-sm font-bold">{pm.account_number}</span><button onClick={() => handleCopy(pm.id, pm.account_number)} className="text-gray-400 hover:text-indigo-600">{copiedId === pm.id ? <Check size={14} className="text-green-500"/> : <Copy size={14}/>}</button></div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
             {isTopUpOpen && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-60 backdrop-blur-sm p-4">
                     <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden animate-scale-up">
-                        <div className="bg-indigo-600 p-4 flex justify-between items-center text-white">
-                            <h3 className="font-bold text-lg flex items-center"><PlusCircle className="mr-2 h-5 w-5"/> Request Balance Add</h3>
-                            <button onClick={() => setIsTopUpOpen(false)} className="hover:bg-indigo-700 rounded p-1"><X className="h-5 w-5"/></button>
-                        </div>
+                        <div className="bg-indigo-600 p-4 flex justify-between items-center text-white"><h3 className="font-bold text-lg">Balance Top-up Request</h3><button onClick={() => setIsTopUpOpen(false)}><X className="h-5 w-5"/></button></div>
                         <div className="p-6 space-y-4">
-                            <div><label className="block text-sm font-medium text-gray-700 mb-1">Amount Sent ($)</label><input type="number" className="w-full border border-gray-300 rounded p-2.5 focus:ring-indigo-500" placeholder="e.g. 50" value={topUpAmount || ''} onChange={e => setTopUpAmount(parseFloat(e.target.value))} /></div>
-                            <div><label className="block text-sm font-medium text-gray-700 mb-1">Method Used</label><select className="w-full border border-gray-300 rounded p-2.5 focus:ring-indigo-500" value={topUpMethod} onChange={e => setTopUpMethod(e.target.value)}>
-                                <option value="">-- Select Method --</option>
-                                <optgroup label="Agency Accounts">{paymentMethods.map(pm => (<option key={pm.id} value={`${pm.provider_name} (${pm.account_number})`}>{pm.provider_name} - {pm.account_number}</option>))}</optgroup>
-                                <optgroup label="Mobile Banking"><option value="bKash">bKash</option><option value="Nagad">Nagad</option><option value="Rocket">Rocket</option><option value="Upay">Upay</option><option value="Cellfin">Cellfin</option><option value="Tap">Tap</option><option value="OK Wallet">OK Wallet</option></optgroup>
-                                <optgroup label="Banking & Others"><option value="Bank Transfer">Bank Transfer</option><option value="City Bank">City Bank</option><option value="Brac Bank">Brac Bank</option><option value="Dutch Bangla Bank">Dutch Bangla Bank</option><option value="Islami Bank">Islami Bank</option><option value="Cash">Cash / Hand Cash</option><option value="Other">Other</option></optgroup>
-                            </select></div>
-                            <div><label className="block text-sm font-medium text-gray-700 mb-1">Sender Number / Trx ID</label><input type="text" className="w-full border border-gray-300 rounded p-2.5 focus:ring-indigo-500" placeholder="Last 4 digits or Trx ID" value={topUpSender} onChange={e => setTopUpSender(e.target.value)} /></div>
-                            <div><label className="block text-sm font-medium text-gray-700 mb-1">Upload Screenshot</label><div className="border-2 border-dashed border-gray-300 rounded-lg p-6 flex flex-col items-center justify-center text-gray-500 hover:bg-gray-50 hover:border-indigo-300 transition-colors cursor-pointer" onClick={() => fileInputRef.current?.click()}>
-                                {topUpImage ? (<div className="text-center"><img src={topUpImage} alt="Preview" className="h-20 mx-auto mb-2 object-contain" /><span className="text-xs text-green-600 font-bold">Image Selected (Compressed)</span></div>) : (<><UploadCloud className="h-8 w-8 mb-2"/><span className="text-xs">Click to upload image</span></>)}
-                                <input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload} />
-                            </div></div>
-                            <button onClick={submitTopUp} disabled={isSubmittingTopUp} className="w-full bg-indigo-600 text-white font-bold py-3 rounded-lg hover:bg-indigo-700 shadow-md transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed">{isSubmittingTopUp ? 'Sending Request...' : 'Submit Request'}</button>
+                            <div><label className="block text-sm font-medium text-gray-700">Amount Sent ($)</label><input type="number" className="w-full border rounded p-2" value={topUpAmount || ''} onChange={e => setTopUpAmount(parseFloat(e.target.value))} /></div>
+                            <div><label className="block text-sm font-medium text-gray-700">Method</label><select className="w-full border rounded p-2" value={topUpMethod} onChange={e => setTopUpMethod(e.target.value)}><option value="">-- Choose --</option>{paymentMethods.map(p => <option key={p.id} value={p.provider_name}>{p.provider_name}</option>)}</select></div>
+                            <div><label className="block text-sm font-medium text-gray-700">Sender / Trx ID</label><input type="text" className="w-full border rounded p-2" value={topUpSender} onChange={e => setTopUpSender(e.target.value)} /></div>
+                            <div className="border-2 border-dashed rounded p-4 text-center cursor-pointer" onClick={() => fileInputRef.current?.click()}>{topUpImage ? <span className="text-green-600 font-bold">Image Attached</span> : <span>Upload Screenshot</span>}<input type="file" ref={fileInputRef} className="hidden" onChange={handleImageUpload}/></div>
+                            <button onClick={submitTopUp} disabled={isSubmittingTopUp} className="w-full bg-indigo-600 text-white font-bold py-3 rounded shadow hover:bg-indigo-700 disabled:opacity-50">{isSubmittingTopUp ? 'Sending...' : 'Submit Request'}</button>
                         </div>
                     </div>
                 </div>
@@ -1003,17 +516,9 @@ const ClientPortal: React.FC = () => {
     const [client, setClient] = useState<BigFish | null>(null);
     const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
     const [loading, setLoading] = useState(true);
-    useEffect(() => {
-        if(id) {
-            Promise.all([mockService.getBigFishById(id), mockService.getPaymentMethods()]).then(([c, pm]) => {
-                setClient(c || null);
-                setPaymentMethods(pm);
-                setLoading(false);
-            });
-        }
-    }, [id]);
-    if(loading) return (<div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center text-gray-900 font-inter"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600 mb-4"></div><p className="text-gray-500 text-sm">Loading secure portal...</p></div>);
-    if(!client) return (<div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center text-gray-900 p-4 text-center"><AlertTriangle className="h-16 w-16 text-red-500 mb-4" /><h1 className="text-2xl font-bold text-gray-900 mb-2">Invalid Portal Link</h1><p className="text-gray-500">The link you followed may be incorrect, expired, or the client record was removed.</p></div>);
+    useEffect(() => { if(id) { Promise.all([mockService.getBigFishById(id), mockService.getPaymentMethods()]).then(([c, pm]) => { setClient(c || null); setPaymentMethods(pm); setLoading(false); }); } }, [id]);
+    if(loading) return <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">Loading...</div>;
+    if(!client) return <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center">Invalid Link</div>;
     return <PortalView client={client} paymentMethods={paymentMethods} />;
 };
 export default ClientPortal;

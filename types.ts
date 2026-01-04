@@ -239,8 +239,8 @@ export interface CampaignRecord {
     end_date: string;
     amount_spent: number; 
     real_amount_spent?: number; 
-    buying_rate?: number; // NEW: Rate at which agency bought dollars (e.g. 130)
-    client_rate?: number; // NEW: Rate at which agency charged client (e.g. 145)
+    buying_rate?: number; 
+    client_rate?: number; 
     impressions: number;
     reach: number;
     clicks: number;
@@ -288,6 +288,7 @@ export interface PortalConfig {
         show_message_report?: boolean;
         show_sales_report?: boolean;
         show_profit_loss_report?: boolean;
+        show_payment_methods?: boolean;
     };
     announcement_title?: string;
     announcement_message?: string;
