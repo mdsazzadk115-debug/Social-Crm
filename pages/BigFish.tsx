@@ -66,6 +66,8 @@ const BigFishPage: React.FC = () => {
     const [profileWeb, setProfileWeb] = useState('');
     const [profileFb, setProfileFb] = useState('');
     const [profileNotes, setProfileNotes] = useState('');
+    
+    // Initial Default State
     const [portalConfig, setPortalConfig] = useState<PortalConfig>({
         show_balance: true,
         show_history: true,
@@ -104,7 +106,32 @@ const BigFishPage: React.FC = () => {
             setProfileWeb(selectedFish.website_url || '');
             setProfileFb(selectedFish.facebook_page || '');
             setProfileNotes(selectedFish.notes || '');
-            if(selectedFish.portal_config) setPortalConfig(selectedFish.portal_config);
+            
+            // --- FIX: Merge with defaults to ensure feature_flags exist for old records ---
+            const defaultConfig: PortalConfig = {
+                show_balance: true,
+                show_history: true,
+                is_suspended: false,
+                feature_flags: {
+                    show_profit_analysis: true,
+                    show_cpr_metrics: true,
+                    allow_topup_request: true,
+                    show_message_report: true,
+                    show_sales_report: true,
+                    show_profit_loss_report: false,
+                    show_payment_methods: true
+                }
+            };
+            
+            const mergedConfig = {
+                ...defaultConfig,
+                ...selectedFish.portal_config,
+                feature_flags: {
+                    ...defaultConfig.feature_flags,
+                    ...(selectedFish.portal_config?.feature_flags || {})
+                }
+            };
+            setPortalConfig(mergedConfig);
         }
     }, [selectedFish]);
 
@@ -316,17 +343,23 @@ const BigFishPage: React.FC = () => {
     // Live Agency Profit Calculation for the form
     const liveAgencyProfitBDT = (campSpend * campClientRate) - (campRealSpend * campBuyingRate);
 
-    // Toggle Helper for Portal Config
-    const toggleConfig = (field: keyof PortalConfig | keyof NonNullable<PortalConfig['feature_flags']>) => {
+    // --- FIX: Robust Toggle Helper for Portal Config ---
+    const toggleConfig = (field: string) => {
         setPortalConfig(prev => {
-            const newConfig = { ...prev };
-            if (field === 'show_balance' || field === 'show_history' || field === 'is_suspended') {
-                newConfig[field] = !newConfig[field];
-            } else if (newConfig.feature_flags) {
-                // @ts-ignore
-                newConfig.feature_flags[field] = !newConfig.feature_flags[field];
+            // Top level fields
+            if (['show_balance', 'show_history', 'is_suspended'].includes(field)) {
+                return { ...prev, [field]: !prev[field as keyof PortalConfig] };
             }
-            return newConfig;
+            
+            // Feature flags - Ensure object exists and update immutably
+            return {
+                ...prev,
+                feature_flags: {
+                    ...(prev.feature_flags || {}), // ensure base exists
+                    // @ts-ignore
+                    [field]: !prev.feature_flags?.[field]
+                }
+            };
         });
     };
 
