@@ -128,14 +128,7 @@ const AgencyProfit: React.FC = () => {
                 });
             });
 
-            // Demo fill for empty visuals
-            if (Object.keys(clientMap).length === 0) {
-                const seed = (day.getDate() + day.getMonth() + 1);
-                const val = ((seed % 10) + 2) * 900;
-                dayCurrencyProfit = val * 0.4;
-                dayMarkupProfit = val * 0.6;
-                clientMap['Portfolio Stats'] = { bdt: val, usd: val / 145 };
-            }
+            // Demo fill for empty visuals removed here to prevent fake data
 
             const segments: ClientProfitSegment[] = Object.entries(clientMap).map(([name, data], idx) => ({
                 name,
@@ -233,8 +226,8 @@ const AgencyProfit: React.FC = () => {
                 <div className="bg-indigo-50 p-7 rounded-[2.5rem] border border-indigo-100 flex flex-col justify-between">
                     <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-4 block">Avg Run Rate</span>
                     <div>
-                        <h3 className="text-3xl font-black text-indigo-900 font-mono tracking-tighter">৳{Math.round(totalProfit / chartData.length).toLocaleString()}</h3>
-                        <p className="text-sm font-bold text-indigo-400 mt-1">${(totalProfit / chartData.length / exchangeRate).toFixed(1)} USD/Day</p>
+                        <h3 className="text-3xl font-black text-indigo-900 font-mono tracking-tighter">৳{Math.round(totalProfit / (chartData.length || 1)).toLocaleString()}</h3>
+                        <p className="text-sm font-bold text-indigo-400 mt-1">${(totalProfit / (chartData.length || 1) / exchangeRate).toFixed(1)} USD/Day</p>
                     </div>
                 </div>
             </div>
