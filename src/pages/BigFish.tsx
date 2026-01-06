@@ -1,9 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { mockService } from '../services/mockService';
-import { BigFish, CampaignRecord } from '../types';
+// Correcting imports to point to root directory (../../)
+import { mockService } from '../../services/mockService';
+import { BigFish, CampaignRecord } from '../../types';
 import { Search, Plus, Trash2, Calendar, DollarSign, BarChart2, Users, Target, TrendingUp, CheckCircle, X, ChevronRight, Filter } from 'lucide-react';
-import { useCurrency } from '../context/CurrencyContext';
+import { useCurrency } from '../../context/CurrencyContext';
 
 const BigFishPage: React.FC = () => {
     const { formatCurrency } = useCurrency();
@@ -259,3 +260,4 @@ const BigFishPage: React.FC = () => {
 };
 
 export default BigFishPage;
+    
