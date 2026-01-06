@@ -191,20 +191,33 @@ const BigFishPage: React.FC = () => {
             product_cost: campResultType === 'SALES' ? campProdCost : 0,
         };
 
+        // --- FIX: Calculate new sales locally to force UI update ---
+        let updatedSalesCount = selectedFish.current_sales || 0;
+
         if (campResultType === 'SALES') {
-            const newSales = (selectedFish.current_sales || 0) + campResults;
-            await mockService.updateTargets(selectedFish.id, selectedFish.target_sales, newSales);
+            updatedSalesCount = (selectedFish.current_sales || 0) + campResults;
+            // Send update to server asynchronously
+            await mockService.updateTargets(selectedFish.id, selectedFish.target_sales, updatedSalesCount);
         }
 
-        const updatedFish = await mockService.addCampaignRecord(selectedFish.id, record as any);
+        // Add record to server
+        const updatedFishFromApi = await mockService.addCampaignRecord(selectedFish.id, record as any);
         
+        // Reset Inputs
         setCampSpend(0); setCampRealSpend(0); setCampImpr(0); setCampReach(0); setCampClicks(0); setCampResults(0);
         setCampProdPrice(0); setCampProdCost(0);
         
         alert(`সাফল্যের সাথে এন্ট্রি হয়েছে! ক্লায়েন্ট ব্যালেন্স থেকে $${campSpend} কাটা হয়েছে।`);
-        if (updatedFish) {
-            setSelectedFish(updatedFish);
-            setAllFish(prev => prev.map(f => f.id === updatedFish.id ? updatedFish : f));
+
+        // --- CRITICAL FIX: Force update UI with local calculation ---
+        // Even if API returns old data due to race condition, we overwrite the sales count.
+        if (updatedFishFromApi) {
+            const finalFishState = {
+                ...updatedFishFromApi,
+                current_sales: updatedSalesCount // Enforce local calculation
+            };
+            setSelectedFish(finalFishState);
+            setAllFish(prev => prev.map(f => f.id === finalFishState.id ? finalFishState : f));
         } else {
             loadData();
         }
@@ -217,9 +230,13 @@ const BigFishPage: React.FC = () => {
             if (recordToDelete && recordToDelete.result_type === 'SALES') {
                 const newSales = Math.max(0, (selectedFish.current_sales || 0) - recordToDelete.results_count);
                 await mockService.updateTargets(selectedFish.id, selectedFish.target_sales, newSales);
+                
+                // Immediately update local state for sales count
+                setSelectedFish(prev => prev ? ({ ...prev, current_sales: newSales }) : null);
             }
             await mockService.deleteCampaignRecord(selectedFish.id, recId);
-            loadData();
+            // Delay loadData slightly to ensure DB delete propagates
+            setTimeout(loadData, 500);
         }
     };
 
@@ -271,6 +288,8 @@ const BigFishPage: React.FC = () => {
         if(!selectedFish) return;
         await mockService.updateTargets(selectedFish.id, newTarget, newCurrent);
         alert("Targets updated!");
+        // Immediate local update
+        setSelectedFish(prev => prev ? ({ ...prev, target_sales: newTarget, current_sales: newCurrent }) : null);
         loadData();
     };
 
