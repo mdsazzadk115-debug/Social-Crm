@@ -294,8 +294,8 @@ export const mockService = {
                     ...record 
                 })
             });
-            // Update balance locally for immediate feedback
-            await mockService.addTransaction(fishId, 'AD_SPEND', record.amount_spent, `Ad Campaign: ${new Date(record.start_date).toLocaleDateString()}`);
+            // FIX: Removed double deduction. Server should handle balance update from add_campaign_record.
+            // await mockService.addTransaction(fishId, 'AD_SPEND', record.amount_spent, `Ad Campaign: ${new Date(record.start_date).toLocaleDateString()}`);
             return await mockService.getBigFishById(fishId);
         } catch (e) { console.error("API Campaign Error", e); }
         return undefined;
