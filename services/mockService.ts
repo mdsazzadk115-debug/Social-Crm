@@ -313,16 +313,62 @@ export const mockService = {
 
     // --- TOP UP REQUESTS ---
     createTopUpRequest: async (req: Omit<TopUpRequest, 'id' | 'status' | 'created_at'>): Promise<void> => {
+        const newReq: TopUpRequest = {
+            id: uuid(),
+            status: 'PENDING',
+            created_at: new Date().toISOString(),
+            ...req
+        };
+
+        // Update Local Storage
+        const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
+        const updatedFish = allFish.map(f => {
+            if (f.id === req.client_id) {
+                return { 
+                    ...f, 
+                    topup_requests: [newReq, ...(f.topup_requests || [])] 
+                };
+            }
+            return f;
+        });
+        setStorage('sae_big_fish', updatedFish);
+
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'create_topup_request', id: uuid(), ...req })
+                body: JSON.stringify({ action: 'create_topup_request', id: newReq.id, ...req })
             });
         } catch (e) { console.error("TopUp Error", e); }
     },
 
     approveTopUpRequest: async (fishId: string, reqId: string): Promise<void> => {
+        // Update Local Storage
+        const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
+        const updatedFish = allFish.map(f => {
+            if (f.id === fishId && f.topup_requests) {
+                const req = f.topup_requests.find(r => r.id === reqId);
+                if (req && req.status === 'PENDING') {
+                    // Update Balance & Add Transaction locally
+                    const newTx: Transaction = {
+                        id: uuid(),
+                        date: new Date().toISOString(),
+                        type: 'DEPOSIT',
+                        amount: req.amount,
+                        description: `Top-up Approved: ${req.method_name} (${req.sender_number})`
+                    };
+                    return {
+                        ...f,
+                        balance: (f.balance || 0) + req.amount,
+                        transactions: [newTx, ...(f.transactions || [])],
+                        topup_requests: f.topup_requests.map(r => r.id === reqId ? { ...r, status: 'APPROVED' } : r)
+                    };
+                }
+            }
+            return f;
+        });
+        setStorage('sae_big_fish', updatedFish);
+
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
@@ -333,6 +379,19 @@ export const mockService = {
     },
 
     rejectTopUpRequest: async (fishId: string, reqId: string): Promise<void> => {
+        // Update Local Storage
+        const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
+        const updatedFish = allFish.map(f => {
+            if (f.id === fishId && f.topup_requests) {
+                return {
+                    ...f,
+                    topup_requests: f.topup_requests.map(r => r.id === reqId ? { ...r, status: 'REJECTED' } : r)
+                };
+            }
+            return f;
+        });
+        setStorage('sae_big_fish', updatedFish);
+
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
@@ -343,6 +402,19 @@ export const mockService = {
     },
 
     deleteTopUpRequest: async (fishId: string, reqId: string): Promise<void> => {
+        // Update Local Storage
+        const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
+        const updatedFish = allFish.map(f => {
+            if (f.id === fishId && f.topup_requests) {
+                return {
+                    ...f,
+                    topup_requests: f.topup_requests.filter(r => r.id !== reqId)
+                };
+            }
+            return f;
+        });
+        setStorage('sae_big_fish', updatedFish);
+
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',

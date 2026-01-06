@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { mockService } from '../services/mockService';
 import { BigFish, Lead, Transaction, PaymentMethod, CampaignRecord, TopUpRequest, PortalConfig } from '../types';
-import { Plus, TrendingUp, CheckCircle, Target, Copy, ArrowLeft, Wallet, Activity, Eye, List, X, Archive, RotateCcw, Trash2, Settings, Smartphone, Share2, AlertTriangle, Clock, Search, CheckSquare, Layout, Grid, Check, Send, Coins, Percent, RefreshCw, MessageCircle, ShoppingBag, DollarSign } from 'lucide-react';
+import { Plus, TrendingUp, CheckCircle, Target, Copy, ArrowLeft, Wallet, Activity, Eye, List, X, Archive, RotateCcw, Trash2, Settings, Smartphone, Share2, AlertTriangle, Clock, Search, CheckSquare, Layout, Grid, Check, Send, Coins, Percent, RefreshCw, MessageCircle, ShoppingBag, DollarSign, ArrowDownCircle, CheckSquare as CheckIcon, XCircle } from 'lucide-react';
 import { PortalView } from './ClientPortal'; 
 import { useCurrency } from '../context/CurrencyContext';
 
@@ -27,7 +27,7 @@ const BigFishPage: React.FC = () => {
     const [editTxDesc, setEditTxDesc] = useState('');
     const [editTxAmount, setEditTxAmount] = useState(0);
     const [selectedFish, setSelectedFish] = useState<BigFish | null>(null);
-    const [activeTab, setActiveTab] = useState<'overview' | 'wallet' | 'ad_entry' | 'growth' | 'targets' | 'profile' | 'crm' | 'topups' | 'camp_tools'>('overview');
+    const [activeTab, setActiveTab] = useState<'overview' | 'wallet' | 'ad_entry' | 'growth' | 'targets' | 'topup' | 'profile' | 'crm' | 'camp_tools'>('overview');
     const [amount, setAmount] = useState<number>(0);
     const [desc, setDesc] = useState('');
     const [manualName, setManualName] = useState('');
@@ -512,7 +512,7 @@ const BigFishPage: React.FC = () => {
                                     { id: 'crm', label: 'CRM & Notes', icon: List },
                                     { id: 'growth', label: 'Tasks & Growth', icon: CheckCircle },
                                     { id: 'targets', label: 'Sales Targets', icon: Target },
-                                    { id: 'topups', label: 'Top-up Requests', icon: Plus },
+                                    { id: 'topup', label: 'Top Up Requests', icon: ArrowDownCircle },
                                     { id: 'profile', label: 'Profile & Settings', icon: Settings },
                                 ].map(tab => (
                                     <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`p-4 text-sm font-medium flex items-center transition-colors whitespace-nowrap md:whitespace-normal ${activeTab === tab.id ? 'bg-indigo-50 text-indigo-600 border-b-2 md:border-b-0 md:border-l-4 border-indigo-600' : 'text-gray-600 hover:bg-gray-50'}`}>
@@ -705,6 +705,78 @@ const BigFishPage: React.FC = () => {
                                 )}
                                 {activeTab === 'targets' && (
                                     <div className="max-w-md space-y-4"><div><label className="block text-sm font-medium text-gray-700 mb-1">Target Sales</label><input type="number" className="w-full border border-gray-300 rounded p-2" value={newTarget} onChange={e => setNewTarget(parseInt(e.target.value))} /></div><div><label className="block text-sm font-medium text-gray-700 mb-1">Current Sales</label><input type="number" className="w-full border border-gray-300 rounded p-2" value={newCurrent} onChange={e => setNewCurrent(parseInt(e.target.value))} /></div><button onClick={handleUpdateTargets} className="bg-indigo-600 text-white px-4 py-2 rounded font-bold hover:bg-indigo-700">Update Targets</button></div>
+                                )}
+                                {activeTab === 'topup' && (
+                                    <div className="space-y-6">
+                                        <div className="flex justify-between items-center">
+                                            <h3 className="font-bold text-gray-900 text-lg">Top Up Requests</h3>
+                                            <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-bold">
+                                                Total: {selectedFish.topup_requests?.length || 0}
+                                            </span>
+                                        </div>
+                                        
+                                        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                                            <div className="bg-gray-50 px-6 py-3 border-b border-gray-200 flex justify-between items-center">
+                                                <h4 className="font-bold text-gray-700 text-sm uppercase flex items-center">
+                                                    <Clock className="h-4 w-4 mr-2"/> Request History
+                                                </h4>
+                                            </div>
+                                            {(!selectedFish.topup_requests || selectedFish.topup_requests.length === 0) ? (
+                                                <div className="p-8 text-center text-gray-400">No requests found.</div>
+                                            ) : (
+                                                <div className="divide-y divide-gray-100">
+                                                    {selectedFish.topup_requests.map(req => (
+                                                        <div key={req.id} className="p-4 hover:bg-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 transition-colors">
+                                                            <div className="flex items-start gap-3 flex-1">
+                                                                <div className={`p-2 rounded-lg shrink-0 ${req.status === 'PENDING' ? 'bg-yellow-100 text-yellow-600' : req.status === 'APPROVED' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'}`}>
+                                                                    {req.status === 'PENDING' ? <Clock className="h-5 w-5"/> : req.status === 'APPROVED' ? <CheckCircle className="h-5 w-5"/> : <XCircle className="h-5 w-5"/>}
+                                                                </div>
+                                                                <div>
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className="font-bold text-gray-900">{formatCurrency(req.amount)}</span>
+                                                                        <span className="text-xs text-gray-500">via {req.method_name}</span>
+                                                                    </div>
+                                                                    <p className="text-sm text-gray-600 font-mono">Sender: {req.sender_number}</p>
+                                                                    <p className="text-xs text-gray-400">{new Date(req.created_at).toLocaleString()}</p>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            <div className="flex items-center gap-3 w-full md:w-auto justify-end">
+                                                                {req.screenshot_url && (
+                                                                    <button 
+                                                                        onClick={() => setPreviewImage(req.screenshot_url || null)}
+                                                                        className="text-xs font-bold text-blue-600 hover:underline flex items-center bg-blue-50 px-2 py-1 rounded"
+                                                                    >
+                                                                        <Eye className="h-3 w-3 mr-1"/> Proof
+                                                                    </button>
+                                                                )}
+                                                                
+                                                                {req.status === 'PENDING' ? (
+                                                                    <div className="flex gap-2">
+                                                                        <button onClick={() => handleApproveTopUp(req)} className="bg-green-600 text-white px-3 py-1.5 rounded text-xs font-bold hover:bg-green-700 flex items-center shadow-sm">
+                                                                            <Check className="h-3 w-3 mr-1"/> Approve
+                                                                        </button>
+                                                                        <button onClick={() => handleRejectTopUp(req.id)} className="bg-red-50 border border-red-200 text-red-600 px-3 py-1.5 rounded text-xs font-bold hover:bg-red-100 flex items-center">
+                                                                            <X className="h-3 w-3 mr-1"/> Reject
+                                                                        </button>
+                                                                    </div>
+                                                                ) : (
+                                                                    <div className="flex items-center gap-2">
+                                                                        <span className={`text-xs font-bold px-2 py-1 rounded uppercase ${req.status === 'APPROVED' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                                            {req.status}
+                                                                        </span>
+                                                                        <button onClick={() => handleDeleteTopUp(req.id)} className="text-gray-400 hover:text-red-500 p-1">
+                                                                            <Trash2 className="h-4 w-4"/>
+                                                                        </button>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 )}
                                 {activeTab === 'profile' && (
                                     <div className="space-y-8">
