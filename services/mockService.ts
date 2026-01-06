@@ -374,7 +374,26 @@ export const mockService = {
     },
 
     updateTargets: async (fishId: string, target: number, current: number): Promise<void> => {
-        await mockService.updateBigFish(fishId, { target_sales: target, current_sales: current });
+        // Optimistically update local storage first
+        const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
+        const updated = allFish.map(f => f.id === fishId ? { ...f, target_sales: target, current_sales: current } : f);
+        setStorage('sae_big_fish', updated);
+
+        // Then send correct action to PHP API
+        try {
+            await fetch(`${API_BASE}/big_fish.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    action: 'update_targets', // Corrected action name matches PHP
+                    id: fishId, 
+                    target: target, 
+                    current: current 
+                })
+            });
+        } catch (e) { 
+            console.error("API Target Update Error", e); 
+        }
     },
 
     // --- CRM / INTERACTIONS ---
