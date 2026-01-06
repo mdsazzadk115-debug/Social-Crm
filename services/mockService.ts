@@ -902,17 +902,33 @@ export const mockService = {
     },
 
     getPaymentMethods: async (): Promise<PaymentMethod[]> => {
+        try {
+            const data = await safeFetch(`${API_BASE}/payment_methods.php`);
+            if (Array.isArray(data)) return data;
+        } catch (e) {
+            console.error("API Payment Methods Error", e);
+        }
+        // Fallback for offline dev
         return getStorage<PaymentMethod[]>('sae_payment_methods', []);
     },
 
     addPaymentMethod: async (method: Partial<PaymentMethod>): Promise<void> => {
-        const methods = await mockService.getPaymentMethods();
-        const newMethod = { ...method, id: uuid() } as PaymentMethod;
-        setStorage('sae_payment_methods', [...methods, newMethod]);
+        try {
+            await fetch(`${API_BASE}/payment_methods.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'create', id: uuid(), ...method })
+            });
+        } catch (e) { console.error("API Add Payment Error", e); }
     },
 
     deletePaymentMethod: async (id: string): Promise<void> => {
-        const methods = await mockService.getPaymentMethods();
-        setStorage('sae_payment_methods', methods.filter(m => m.id !== id));
+        try {
+            await fetch(`${API_BASE}/payment_methods.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete', id })
+            });
+        } catch (e) { console.error("API Delete Payment Error", e); }
     }
 };
