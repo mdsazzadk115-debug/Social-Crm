@@ -311,7 +311,7 @@ export const mockService = {
         } catch (e) { console.error("API Campaign Delete Error", e); }
     },
 
-    // --- TOP UP REQUESTS ---
+    // --- TOP UP REQUESTS (UPDATED FOR SAFETY) ---
     createTopUpRequest: async (req: Omit<TopUpRequest, 'id' | 'status' | 'created_at'>): Promise<void> => {
         const newReq: TopUpRequest = {
             id: uuid(),
@@ -320,26 +320,41 @@ export const mockService = {
             ...req
         };
 
-        // Update Local Storage
-        const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
-        const updatedFish = allFish.map(f => {
-            if (f.id === req.client_id) {
-                return { 
-                    ...f, 
-                    topup_requests: [newReq, ...(f.topup_requests || [])] 
-                };
-            }
-            return f;
-        });
-        setStorage('sae_big_fish', updatedFish);
-
         try {
-            await fetch(`${API_BASE}/big_fish.php`, {
+            // Attempt server save FIRST
+            const res = await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'create_topup_request', id: newReq.id, ...req })
             });
-        } catch (e) { console.error("TopUp Error", e); }
+
+            if (!res.ok) {
+                const errorText = await res.text();
+                throw new Error(`Server failed: ${errorText}`);
+            }
+
+            const responseData = await res.json();
+            if (responseData.error) {
+                throw new Error(responseData.error);
+            }
+
+            // Only if server success, update Local Storage (Optimistic Update Removed for Safety)
+            const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
+            const updatedFish = allFish.map(f => {
+                if (f.id === req.client_id) {
+                    return { 
+                        ...f, 
+                        topup_requests: [newReq, ...(f.topup_requests || [])] 
+                    };
+                }
+                return f;
+            });
+            setStorage('sae_big_fish', updatedFish);
+
+        } catch (e: any) {
+            console.error("TopUp Error", e);
+            throw e; // Rethrow to UI to show alert
+        }
     },
 
     approveTopUpRequest: async (fishId: string, reqId: string): Promise<void> => {

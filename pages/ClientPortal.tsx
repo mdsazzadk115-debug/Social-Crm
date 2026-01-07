@@ -124,22 +124,40 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
         setTimeout(() => setCopiedId(null), 2000);
     };
 
-    // --- TOP UP LOGIC ---
+    // --- TOP UP LOGIC (IMPROVED COMPRESSION) ---
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
+            // Basic size check (5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                alert("File is too large. Please upload an image smaller than 5MB.");
+                return;
+            }
+
             const reader = new FileReader();
             reader.onload = (event) => {
                 const img = new Image();
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
                     const ctx = canvas.getContext('2d');
-                    const maxWidth = 800; 
-                    const scaleSize = maxWidth / img.width;
-                    canvas.width = maxWidth;
-                    canvas.height = img.height * scaleSize;
-                    ctx?.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    const dataUrl = canvas.toDataURL('image/jpeg', 0.7); 
+                    
+                    // Stronger Compression: Max Width 600px
+                    const maxWidth = 600; 
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > maxWidth) {
+                        height = Math.round(height * (maxWidth / width));
+                        width = maxWidth;
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    
+                    ctx?.drawImage(img, 0, 0, width, height);
+                    
+                    // Reduced Quality to 0.6 (60%)
+                    const dataUrl = canvas.toDataURL('image/jpeg', 0.6); 
                     setTopUpImage(dataUrl);
                 };
                 img.src = event.target?.result as string;
@@ -152,19 +170,26 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
         if (!topUpAmount || !topUpMethod || !topUpSender || !topUpImage) {
             return alert("Please fill all fields and upload a screenshot.");
         }
+        
         setIsSubmittingTopUp(true);
-        await mockService.createTopUpRequest({
-            client_id: client.id,
-            client_name: client.name,
-            amount: topUpAmount,
-            method_name: topUpMethod,
-            sender_number: topUpSender,
-            screenshot_url: topUpImage
-        });
-        setIsSubmittingTopUp(false);
-        setIsTopUpOpen(false);
-        setTopUpAmount(0); setTopUpSender(''); setTopUpImage(null);
-        alert("Top-up request submitted! Your balance will update after admin approval.");
+        try {
+            await mockService.createTopUpRequest({
+                client_id: client.id,
+                client_name: client.name,
+                amount: topUpAmount,
+                method_name: topUpMethod,
+                sender_number: topUpSender,
+                screenshot_url: topUpImage
+            });
+            setIsTopUpOpen(false);
+            setTopUpAmount(0); setTopUpSender(''); setTopUpImage(null);
+            alert("✅ Top-up request submitted successfully! Your balance will update after admin approval.");
+        } catch (e: any) {
+            console.error(e);
+            alert("❌ Failed to submit request. Please ensure the image is not too large or check your internet connection.");
+        } finally {
+            setIsSubmittingTopUp(false);
+        }
     };
 
     if (!client) return null;
@@ -501,7 +526,7 @@ export const PortalView: React.FC<{ client: BigFish, paymentMethods: PaymentMeth
                             <div><label className="block text-sm font-medium text-gray-700">Amount Sent ($)</label><input type="number" className="w-full border rounded p-2" value={topUpAmount || ''} onChange={e => setTopUpAmount(parseFloat(e.target.value))} /></div>
                             <div><label className="block text-sm font-medium text-gray-700">Method</label><select className="w-full border rounded p-2" value={topUpMethod} onChange={e => setTopUpMethod(e.target.value)}><option value="">-- Choose --</option>{paymentMethods.map(p => <option key={p.id} value={p.provider_name}>{p.provider_name}</option>)}</select></div>
                             <div><label className="block text-sm font-medium text-gray-700">Sender / Trx ID</label><input type="text" className="w-full border rounded p-2" value={topUpSender} onChange={e => setTopUpSender(e.target.value)} /></div>
-                            <div className="border-2 border-dashed rounded p-4 text-center cursor-pointer" onClick={() => fileInputRef.current?.click()}>{topUpImage ? <span className="text-green-600 font-bold">Image Attached</span> : <span>Upload Screenshot</span>}<input type="file" ref={fileInputRef} className="hidden" onChange={handleImageUpload}/></div>
+                            <div className="border-2 border-dashed rounded p-4 text-center cursor-pointer" onClick={() => fileInputRef.current?.click()}>{topUpImage ? <span className="text-green-600 font-bold">Image Attached</span> : <span>Upload Screenshot (Max 5MB)</span>}<input type="file" ref={fileInputRef} className="hidden" accept="image/*" onChange={handleImageUpload}/></div>
                             <button onClick={submitTopUp} disabled={isSubmittingTopUp} className="w-full bg-indigo-600 text-white font-bold py-3 rounded shadow hover:bg-indigo-700 disabled:opacity-50">{isSubmittingTopUp ? 'Sending...' : 'Submit Request'}</button>
                         </div>
                     </div>
