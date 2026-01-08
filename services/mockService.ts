@@ -101,14 +101,23 @@ export const mockService = {
 
     updateLead: async (id: string, updates: Partial<Lead>): Promise<void> => {
         const leads = getStorage<Lead[]>('sae_leads', DEMO_LEADS as Lead[]);
-        const updated = leads.map(l => l.id === id ? { ...l, ...updates, last_activity_at: new Date().toISOString() } : l);
-        setStorage('sae_leads', updated);
+        
+        // FIX: Find existing lead to merge data properly
+        const existingLead = leads.find(l => l.id === id);
+        const fullUpdatedLead = existingLead 
+            ? { ...existingLead, ...updates, last_activity_at: new Date().toISOString() }
+            : { ...updates, id } as Lead;
+
+        const updatedList = leads.map(l => l.id === id ? fullUpdatedLead : l);
+        setStorage('sae_leads', updatedList);
 
         try {
+            // FIX: Send the FULL MERGED OBJECT to API, not just the updates.
+            // This prevents the PHP script from wiping out missing fields.
             await fetch(`${API_BASE}/leads.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'update', id, ...updates })
+                body: JSON.stringify({ action: 'update', id, ...fullUpdatedLead }) 
             });
         } catch (e) { console.error("API Update Error", e); }
     },
@@ -175,7 +184,6 @@ export const mockService = {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                // FIX: PHP expects 'updates' key containing the fields
                 body: JSON.stringify({ action: 'update', id, updates: updates })
             });
         } catch (e) { console.error("API Update Error", e); }
@@ -205,11 +213,29 @@ export const mockService = {
             campaign_records: [],
             growth_tasks: [],
             reports: [],
-            start_date: new Date().toISOString()
+            start_date: new Date().toISOString(),
+            portal_config: {
+                show_balance: true,
+                show_history: true,
+                is_suspended: false,
+                feature_flags: {
+                    show_profit_analysis: true,
+                    show_cpr_metrics: true,
+                    allow_topup_request: true,
+                    show_message_report: true,
+                    show_sales_report: true,
+                    show_profit_loss_report: true,
+                    show_payment_methods: true
+                }
+            }
         };
 
         await mockService.createBigFish(newFish);
-        await mockService.updateLeadStatus(leadId, LeadStatus.CLOSED_WON);
+        
+        // FIX: Ensure we update the lead with FULL data, not just status
+        const leadUpdatePayload = { ...lead, status: LeadStatus.CLOSED_WON };
+        await mockService.updateLead(leadId, leadUpdatePayload);
+        
         return newFish as BigFish;
     },
 
@@ -294,8 +320,12 @@ export const mockService = {
                     ...record 
                 })
             });
-            // FIX: Removed double deduction. Server should handle balance update from add_campaign_record.
-            // await mockService.addTransaction(fishId, 'AD_SPEND', record.amount_spent, `Ad Campaign: ${new Date(record.start_date).toLocaleDateString()}`);
+            
+            if (data && data.id) {
+                return data as BigFish;
+            }
+
+            console.warn("API did not return updated fish object, falling back to fetch.");
             return await mockService.getBigFishById(fishId);
         } catch (e) { console.error("API Campaign Error", e); }
         return undefined;
@@ -311,7 +341,7 @@ export const mockService = {
         } catch (e) { console.error("API Campaign Delete Error", e); }
     },
 
-    // --- TOP UP REQUESTS (UPDATED FOR SAFETY) ---
+    // --- TOP UP REQUESTS ---
     createTopUpRequest: async (req: Omit<TopUpRequest, 'id' | 'status' | 'created_at'>): Promise<void> => {
         const newReq: TopUpRequest = {
             id: uuid(),
@@ -321,7 +351,6 @@ export const mockService = {
         };
 
         try {
-            // Attempt server save FIRST
             const res = await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -338,7 +367,6 @@ export const mockService = {
                 throw new Error(responseData.error);
             }
 
-            // Only if server success, update Local Storage (Optimistic Update Removed for Safety)
             const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
             const updatedFish = allFish.map(f => {
                 if (f.id === req.client_id) {
@@ -353,18 +381,16 @@ export const mockService = {
 
         } catch (e: any) {
             console.error("TopUp Error", e);
-            throw e; // Rethrow to UI to show alert
+            throw e;
         }
     },
 
     approveTopUpRequest: async (fishId: string, reqId: string): Promise<void> => {
-        // Update Local Storage
         const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
         const updatedFish = allFish.map(f => {
             if (f.id === fishId && f.topup_requests) {
                 const req = f.topup_requests.find(r => r.id === reqId);
                 if (req && req.status === 'PENDING') {
-                    // Update Balance & Add Transaction locally
                     const newTx: Transaction = {
                         id: uuid(),
                         date: new Date().toISOString(),
@@ -394,7 +420,6 @@ export const mockService = {
     },
 
     rejectTopUpRequest: async (fishId: string, reqId: string): Promise<void> => {
-        // Update Local Storage
         const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
         const updatedFish = allFish.map(f => {
             if (f.id === fishId && f.topup_requests) {
@@ -417,7 +442,6 @@ export const mockService = {
     },
 
     deleteTopUpRequest: async (fishId: string, reqId: string): Promise<void> => {
-        // Update Local Storage
         const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
         const updatedFish = allFish.map(f => {
             if (f.id === fishId && f.topup_requests) {
@@ -461,18 +485,16 @@ export const mockService = {
     },
 
     updateTargets: async (fishId: string, target: number, current: number): Promise<void> => {
-        // Optimistically update local storage first
         const allFish = getStorage<BigFish[]>('sae_big_fish', DEMO_BIG_FISH);
         const updated = allFish.map(f => f.id === fishId ? { ...f, target_sales: target, current_sales: current } : f);
         setStorage('sae_big_fish', updated);
 
-        // Then send correct action to PHP API
         try {
             await fetch(`${API_BASE}/big_fish.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
-                    action: 'update_targets', // Corrected action name matches PHP
+                    action: 'update_targets',
                     id: fishId, 
                     target: target, 
                     current: current 
@@ -485,11 +507,11 @@ export const mockService = {
 
     // --- CRM / INTERACTIONS ---
     addClientInteraction: async (fishId: string, interaction: Partial<ClientInteraction>): Promise<void> => {
-        // Implementation placeholder
+        // Placeholder
     },
 
     deleteClientInteraction: async (fishId: string, interactionId: string): Promise<void> => {
-        // Implementation placeholder
+        // Placeholder
     },
 
     // --- TASKS (GENERAL) ---
@@ -812,7 +834,6 @@ export const mockService = {
 
     // --- SNIPPETS ---
     getSnippets: async (): Promise<Snippet[]> => {
-        /* FIX: Changed typo 't' to 's' in INITIAL_SNIPPETS map function */
         return getStorage<Snippet[]>('sae_snippets', INITIAL_SNIPPETS.map(s => ({ ...s, id: uuid() })));
     },
 
