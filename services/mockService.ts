@@ -114,10 +114,11 @@ export const mockService = {
         try {
             // FIX: Send the FULL MERGED OBJECT to API, not just the updates.
             // This prevents the PHP script from wiping out missing fields.
+            // Removed duplicate 'id' property here to fix TS2783
             await fetch(`${API_BASE}/leads.php`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'update', id, ...fullUpdatedLead }) 
+                body: JSON.stringify({ action: 'update', ...fullUpdatedLead }) 
             });
         } catch (e) { console.error("API Update Error", e); }
     },
