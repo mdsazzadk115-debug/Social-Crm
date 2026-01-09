@@ -1,4 +1,3 @@
-
 import { 
   BigFish, Lead, LeadStatus, CampaignRecord, Task, Customer, 
   Invoice, Snippet, Document, Interaction, MessageTemplate, 
@@ -581,22 +580,58 @@ export const mockService = {
 
     // --- TEMPLATES ---
     getTemplates: async (): Promise<MessageTemplate[]> => {
+        try {
+            const data = await safeFetch(`${API_BASE}/templates.php`);
+            if (Array.isArray(data)) return data;
+        } catch (e) {
+            console.error("API Template Fetch Error", e);
+        }
+        // Fallback or Initial Data
         return getStorage<MessageTemplate[]>('sae_templates', INITIAL_TEMPLATES.map(t => ({ ...t, id: uuid() })));
     },
 
     createTemplate: async (template: Partial<MessageTemplate>): Promise<void> => {
-        const templates = await mockService.getTemplates();
-        setStorage('sae_templates', [{ ...template, id: uuid() } as MessageTemplate, ...templates]);
+        const newTemplate = { ...template, id: uuid(), created_at: getMySQLDate() };
+        
+        // Optimistic UI Update
+        const templates = getStorage<MessageTemplate[]>('sae_templates', []);
+        setStorage('sae_templates', [newTemplate, ...templates]);
+
+        try {
+            await fetch(`${API_BASE}/templates.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'create', ...newTemplate })
+            });
+        } catch (e) { console.error("API Template Create Error", e); }
     },
 
     updateTemplate: async (id: string, updates: Partial<MessageTemplate>): Promise<void> => {
-        const templates = await mockService.getTemplates();
+        // Optimistic UI Update
+        const templates = getStorage<MessageTemplate[]>('sae_templates', []);
         setStorage('sae_templates', templates.map(t => t.id === id ? { ...t, ...updates } : t));
+
+        try {
+            await fetch(`${API_BASE}/templates.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'update', id, ...updates })
+            });
+        } catch (e) { console.error("API Template Update Error", e); }
     },
 
     deleteTemplate: async (id: string): Promise<void> => {
-        const templates = await mockService.getTemplates();
+        // Optimistic UI Update
+        const templates = getStorage<MessageTemplate[]>('sae_templates', []);
         setStorage('sae_templates', templates.filter(t => t.id !== id));
+
+        try {
+            await fetch(`${API_BASE}/templates.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete', id })
+            });
+        } catch (e) { console.error("API Template Delete Error", e); }
     },
 
     // --- AUTOMATION ---
