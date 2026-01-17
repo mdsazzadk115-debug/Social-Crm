@@ -516,31 +516,65 @@ export const mockService = {
 
     // --- TASKS (GENERAL) ---
     getTasks: async (): Promise<Task[]> => {
+        try {
+            const data = await safeFetch(`${API_BASE}/tasks.php`);
+            if (Array.isArray(data)) return data;
+        } catch (e) {
+            console.error("API Tasks Fetch Error", e);
+        }
         return getStorage<Task[]>('sae_tasks', []);
     },
 
     createTask: async (text: string, dueDate?: string, leadId?: string): Promise<void> => {
-        const tasks = await mockService.getTasks();
-        const newTask: Task = {
+        const newTask = {
             id: uuid(),
             text,
             is_completed: false,
-            created_at: new Date().toISOString(),
+            created_at: getMySQLDate(),
             due_date: dueDate,
             lead_id: leadId
         };
+
+        // Optimistic UI update
+        const tasks = getStorage<Task[]>('sae_tasks', []);
         setStorage('sae_tasks', [newTask, ...tasks]);
+
+        try {
+            await fetch(`${API_BASE}/tasks.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'create', ...newTask })
+            });
+        } catch (e) { console.error("API Task Create Error", e); }
     },
 
     toggleTask: async (id: string): Promise<void> => {
-        const tasks = await mockService.getTasks();
+        // Optimistic UI update
+        const tasks = getStorage<Task[]>('sae_tasks', []);
         const updated = tasks.map(t => t.id === id ? { ...t, is_completed: !t.is_completed } : t);
         setStorage('sae_tasks', updated);
+
+        try {
+            await fetch(`${API_BASE}/tasks.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'toggle', id })
+            });
+        } catch (e) { console.error("API Task Toggle Error", e); }
     },
 
     deleteTask: async (id: string): Promise<void> => {
-        const tasks = await mockService.getTasks();
+        // Optimistic UI update
+        const tasks = getStorage<Task[]>('sae_tasks', []);
         setStorage('sae_tasks', tasks.filter(t => t.id !== id));
+
+        try {
+            await fetch(`${API_BASE}/tasks.php`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ action: 'delete', id })
+            });
+        } catch (e) { console.error("API Task Delete Error", e); }
     },
 
     // --- CRM / INTERACTIONS ---
